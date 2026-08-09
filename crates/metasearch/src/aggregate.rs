@@ -10,8 +10,8 @@ use tracing::{debug, warn};
 use url::Url;
 
 use crate::{
-    AggregatedHit, EngineOutput, Error, MetaSearchOutput, Result, SearchEngine, SearchHit,
-    SearchQuery,
+    AggregatedHit, EngineKind, EngineOutput, Error, MetaSearchOutput, Result, SearchEngine,
+    SearchHit, SearchQuery,
     engines::{Bing, Naver, Wikipedia},
 };
 
@@ -50,12 +50,29 @@ pub struct MetaSearch {
 
 impl MetaSearch {
     pub fn new() -> Result<Self> {
-        let engines: Vec<Arc<dyn SearchEngine>> = vec![
-            Arc::new(Bing::new()?),
-            Arc::new(Naver::new()?),
-            Arc::new(Wikipedia::new()?),
-        ];
-        Ok(Self::with_engines(MetaSearchConfig::default(), engines))
+        Self::from_engine_kinds(MetaSearchConfig::default(), &EngineKind::ALL)
+    }
+
+    pub fn from_engine_kinds(config: MetaSearchConfig, kinds: &[EngineKind]) -> Result<Self> {
+        let mut enabled = Vec::new();
+        let mut engines: Vec<Arc<dyn SearchEngine>> = Vec::new();
+        for kind in kinds {
+            if enabled.contains(kind) {
+                continue;
+            }
+            enabled.push(*kind);
+            match kind {
+                EngineKind::Bing => engines.push(Arc::new(Bing::new()?)),
+                EngineKind::Naver => engines.push(Arc::new(Naver::new()?)),
+                EngineKind::Wikipedia => engines.push(Arc::new(Wikipedia::new()?)),
+            }
+        }
+        if engines.is_empty() {
+            return Err(Error::InvalidConfiguration(
+                "at least one engine must be enabled".into(),
+            ));
+        }
+        Ok(Self::with_engines(config, engines))
     }
 
     pub fn with_engines(config: MetaSearchConfig, engines: Vec<Arc<dyn SearchEngine>>) -> Self {
@@ -407,6 +424,22 @@ fn validate(query: &SearchQuery) -> Result<()> {
 mod tests {
     use super::*;
     use crate::BoxSearchFuture;
+
+    #[test]
+    fn engine_policy_is_applied_and_deduplicated() {
+        let search = MetaSearch::from_engine_kinds(
+            MetaSearchConfig::default(),
+            &[EngineKind::Wikipedia, EngineKind::Wikipedia],
+        )
+        .unwrap();
+        assert_eq!(search.engines.len(), 1);
+        assert_eq!(search.engines[0].engine.name(), "wikipedia");
+    }
+
+    #[test]
+    fn engine_policy_cannot_be_empty() {
+        assert!(MetaSearch::from_engine_kinds(MetaSearchConfig::default(), &[]).is_err());
+    }
 
     struct FakeEngine {
         name: &'static str,

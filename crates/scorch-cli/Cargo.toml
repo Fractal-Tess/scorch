@@ -14,6 +14,7 @@ path = "src/main.rs"
 [dependencies]
 anyhow.workspace = true
 clap.workspace = true
+metasearch = { path = "../metasearch" }
 reqwest.workspace = true
 rmcp.workspace = true
 scorch-api = { path = "../scorch-api" }

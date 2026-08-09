@@ -10,10 +10,11 @@ use std::{
 
 use clap::{Args, Parser, Subcommand, ValueEnum};
 use client::ApiClient;
+use metasearch::EngineKind;
 use scorch_engine::{EngineConfig, ScorchEngine};
 use scorch_types::{
     CrawlRequest, CrawlStatus, MapRequest, RenderMode, ScrapeFormat, ScrapeOptions, ScrapeRequest,
-    SearchProvider, SearchRequest,
+    SearchRequest,
 };
 use tracing::info;
 use tracing_subscriber::EnvFilter;
@@ -60,20 +61,27 @@ struct EngineArgs {
     #[arg(
         long,
         value_enum,
-        env = "SCORCH_SEARCH_PROVIDER",
-        default_value = "bing"
+        value_delimiter = ',',
+        env = "SCORCH_SEARCH_ENGINES",
+        default_value = "bing,naver,wikipedia"
     )]
-    search_provider: SearchProviderArg,
+    search_engines: Vec<SearchEngineArg>,
 }
 
 impl EngineArgs {
     fn config(&self) -> EngineConfig {
+        let mut search_engines = Vec::new();
+        for engine in self.search_engines.iter().copied().map(EngineKind::from) {
+            if !search_engines.contains(&engine) {
+                search_engines.push(engine);
+            }
+        }
         EngineConfig {
             browser_path: self.browser_path.clone(),
             max_concurrency: self.max_concurrency.max(1),
             max_response_bytes: self.max_response_bytes.max(1024),
             job_ttl: Duration::from_secs(self.job_ttl_secs.max(1)),
-            default_search_provider: self.search_provider.into(),
+            search_engines,
             ..Default::default()
         }
     }
@@ -162,22 +170,18 @@ impl ScrapeArgs {
 }
 
 #[derive(Debug, Clone, Copy, ValueEnum)]
-enum SearchProviderArg {
+enum SearchEngineArg {
     Bing,
-    Metasearch,
     Naver,
     Wikipedia,
-    Duckduckgo,
 }
 
-impl From<SearchProviderArg> for SearchProvider {
-    fn from(value: SearchProviderArg) -> Self {
+impl From<SearchEngineArg> for EngineKind {
+    fn from(value: SearchEngineArg) -> Self {
         match value {
-            SearchProviderArg::Bing => Self::Bing,
-            SearchProviderArg::Metasearch => Self::Metasearch,
-            SearchProviderArg::Naver => Self::Naver,
-            SearchProviderArg::Wikipedia => Self::Wikipedia,
-            SearchProviderArg::Duckduckgo => Self::Duckduckgo,
+            SearchEngineArg::Bing => Self::Bing,
+            SearchEngineArg::Naver => Self::Naver,
+            SearchEngineArg::Wikipedia => Self::Wikipedia,
         }
     }
 }
@@ -187,8 +191,6 @@ struct SearchArgs {
     query: String,
     #[arg(long, default_value_t = 5)]
     limit: usize,
-    #[arg(long, value_enum)]
-    provider: Option<SearchProviderArg>,
     #[arg(long)]
     scrape: bool,
     #[arg(long, default_value = "us")]
@@ -282,7 +284,6 @@ async fn run_client(api_url: &str, command: Command) -> anyhow::Result<()> {
                 .search(&SearchRequest {
                     query: args.query,
                     limit: args.limit,
-                    provider: args.provider.map(Into::into),
                     scrape_options: args.scrape.then(ScrapeOptions::default),
                     country: args.country,
                     language: args.language,

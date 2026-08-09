@@ -44,9 +44,9 @@ Each crawl has cancellation, an absolute deadline, a page/depth/concurrency ceil
 
 ## Search
 
-Search providers are isolated adapters selected by the request or the server default. Bing is the infrastructure-free default. The native `metasearch` provider concurrently queries independently implemented Bing, Naver, and Wikipedia adapters, collects additional responses for a short window after the first useful result, normalizes and deduplicates URLs, and ranks agreement with reciprocal-rank fusion. Slow engines cannot hold the full request open.
+Metasearch is the only search provider and owns routing, concurrent searching, normalization, deduplication, and reciprocal-rank reranking. Bing, Naver, and Wikipedia are internal engine adapters, not request-selectable providers. The server's `SCORCH_SEARCH_ENGINES` policy controls which adapters metasearch may use. It collects additional responses for a short window after the first useful result, so slow engines cannot hold the full request open.
 
-The metasearch runtime has per-engine concurrency limits, a bounded 60-second in-memory response cache, partial-failure behavior, and temporary circuit breakers after repeated engine failures. Exact `bing`, `naver`, `wikipedia`, and legacy `duckduckgo` providers are also selectable. Challenges, markup drift, and rate limits are failures rather than authoritative empty results. Optional result scraping uses the guarded scrape pipeline.
+The metasearch runtime has per-engine concurrency limits, a bounded 60-second in-memory response cache, partial-failure behavior, and temporary circuit breakers after repeated engine failures. Challenges, markup drift, and rate limits are failures rather than authoritative empty results. Optional result scraping uses the guarded scrape pipeline.
 
 ## MCP
 

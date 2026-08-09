@@ -44,16 +44,15 @@ The response includes requested and final URLs, engine, elapsed time, metadata, 
 {
   "query": "rust async runtime",
   "limit": 5,
-  "provider": "metasearch",
   "country": "us",
   "language": "en",
   "scrapeOptions": null
 }
 ```
 
-`provider` is optional and accepts `bing`, `metasearch`, `naver`, `wikipedia`, or `duckduckgo`. When omitted, the server uses `SCORCH_SEARCH_PROVIDER`, which defaults to `bing`. Responses report the provider and each result's contributing `sources`.
+Metasearch is the only search provider. Requests cannot select a source engine. The server independently controls the engines metasearch may route to with `SCORCH_SEARCH_ENGINES` or `--search-engines`; allowed values are `bing`, `naver`, and `wikipedia`, and all are enabled by default. Responses report `metasearch` as the provider and identify each result's contributing `sources`.
 
-The native `metasearch` provider concurrently queries Bing, Naver, and Wikipedia, deduplicates normalized URLs, and uses reciprocal-rank fusion. It returns shortly after the first useful response rather than waiting for every engine, maintains a bounded in-memory cache and failure cooldowns, and reports completed-engine failures in `warnings`. Search remains best-effort because public providers can change markup, rate-limit, or issue challenges. Limits are 1–20 and queries are capped at 512 bytes. Supplying `scrapeOptions` enriches results with bounded page documents while preserving per-result errors.
+Metasearch concurrently queries its allowed engines, deduplicates normalized URLs, and uses reciprocal-rank fusion. It returns shortly after the first useful response rather than waiting for every engine, maintains a bounded in-memory cache and failure cooldowns, and reports completed-engine failures in `warnings`. Search remains best-effort because public providers can change markup, rate-limit, or issue challenges. Limits are 1–20 and queries are capped at 512 bytes. Supplying `scrapeOptions` enriches results with bounded page documents while preserving per-result errors.
 
 ## Map
 

@@ -27,9 +27,8 @@ Each engine is implemented and tested separately before being added to the aggre
 | Bing | Yes, weight 1.0 | Parser fixture and successful live search |
 | Naver | Yes, weight 0.85 | Parser fixture and successful live search |
 | Wikipedia | Yes, weight 0.55 | JSON fixture, input validation, and successful live search |
-| DuckDuckGo | No; explicit legacy provider only | Parser fixture; currently unreachable from the development network |
 
-Other evaluated HTML endpoints returned JavaScript-only shells, consent redirects, CAPTCHA pages, temporary errors, or explicit automated-query blocks. They are not included merely to increase the engine count. Credential-backed APIs can be added later as separately configured engines.
+These are internal engines selected by server policy, not public API providers. Other evaluated HTML endpoints returned JavaScript-only shells, consent redirects, CAPTCHA pages, temporary errors, or explicit automated-query blocks. They are not included merely to increase the engine count. Credential-backed APIs can be added later as separately configured engines.
 
 On the development network, one six-request dashboard run using client concurrency six and server concurrency four completed successfully in 2.50 seconds wall time, with 1.39 seconds median latency and 2.40 requests/second. These are directional network measurements, not universal performance guarantees.
 

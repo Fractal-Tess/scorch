@@ -143,12 +143,14 @@ async fn readiness(State(state): State<AppState>) -> (StatusCode, Json<Readiness
             browser_available,
             browser_path: state.engine.config().browser_path.display().to_string(),
             max_concurrency: state.engine.config().max_concurrency,
-            default_search_provider: state
+            search_provider: "metasearch".into(),
+            search_engines: state
                 .engine
                 .config()
-                .default_search_provider
-                .as_str()
-                .into(),
+                .search_engines
+                .iter()
+                .map(|engine| engine.as_str().into())
+                .collect(),
         }),
     )
 }
@@ -335,6 +337,23 @@ mod tests {
                     .body(Body::from(
                         r#"{"url":"https://example.com","unexpected":true}"#,
                     ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn search_engine_selection_is_not_a_request_option() {
+        let engine = ScorchEngine::new(EngineConfig::default()).await.unwrap();
+        let response = router(engine)
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/v1/search")
+                    .header("content-type", "application/json")
+                    .body(Body::from(r#"{"query":"Rust","provider":"bing"}"#))
                     .unwrap(),
             )
             .await

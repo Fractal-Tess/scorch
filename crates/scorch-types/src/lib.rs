@@ -122,37 +122,12 @@ pub struct ScrapeDocument {
     pub warnings: Vec<String>,
 }
 
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "lowercase")]
-pub enum SearchProvider {
-    #[default]
-    Bing,
-    Metasearch,
-    Naver,
-    Wikipedia,
-    Duckduckgo,
-}
-
-impl SearchProvider {
-    pub fn as_str(self) -> &'static str {
-        match self {
-            Self::Bing => "bing",
-            Self::Metasearch => "metasearch",
-            Self::Naver => "naver",
-            Self::Wikipedia => "wikipedia",
-            Self::Duckduckgo => "duckduckgo",
-        }
-    }
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct SearchRequest {
     pub query: String,
     #[serde(default = "default_search_limit")]
     pub limit: usize,
-    #[serde(default)]
-    pub provider: Option<SearchProvider>,
     #[serde(default)]
     pub scrape_options: Option<ScrapeOptions>,
     #[serde(default = "default_country")]
@@ -359,5 +334,6 @@ pub struct ReadinessResponse {
     pub browser_available: bool,
     pub browser_path: String,
     pub max_concurrency: usize,
-    pub default_search_provider: String,
+    pub search_provider: String,
+    pub search_engines: Vec<String>,
 }

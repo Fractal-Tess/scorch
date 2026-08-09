@@ -41,18 +41,25 @@ pub struct ScorchEngine {
 
 impl ScorchEngine {
     pub async fn new(config: EngineConfig) -> Result<Arc<Self>> {
+        let search_engines = config
+            .search_engines
+            .iter()
+            .map(|engine| engine.as_str())
+            .collect::<Vec<_>>()
+            .join(",");
         info!(
             browser_path = %config.browser_path.display(),
             max_concurrency = config.max_concurrency,
             max_response_bytes = config.max_response_bytes,
-            default_search_provider = config.default_search_provider.as_str(),
+            search_provider = "metasearch",
+            search_engines,
             max_crawl_limit = config.max_crawl_limit,
             job_ttl_seconds = config.job_ttl.as_secs(),
             "initializing Scorch engine"
         );
         let security = SecurityPolicy;
         let fetcher = SafeFetcher::new(security.clone(), config.clone());
-        let search = search::SearchService::new(fetcher.clone(), &config)?;
+        let search = search::SearchService::new(&config)?;
         let browser = BrowserManager::new(config.clone(), security).await?;
         let jobs = Arc::new(JobStore::new(
             config.job_ttl,
@@ -189,13 +196,9 @@ impl ScorchEngine {
 
     pub async fn search(&self, request: &SearchRequest) -> Result<SearchResponse> {
         let started = Instant::now();
-        let provider = request
-            .provider
-            .unwrap_or(self.config.default_search_provider)
-            .as_str();
         info!(
             operation = "search",
-            provider,
+            provider = "metasearch",
             query_length = request.query.len(),
             limit = request.limit,
             enrich_results = request.scrape_options.is_some(),

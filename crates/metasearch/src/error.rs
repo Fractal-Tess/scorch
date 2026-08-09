@@ -1,5 +1,7 @@
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
+    #[error("invalid metasearch configuration: {0}")]
+    InvalidConfiguration(String),
     #[error("invalid search query: {0}")]
     InvalidQuery(String),
     #[error("{engine} request timed out")]

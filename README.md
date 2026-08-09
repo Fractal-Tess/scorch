@@ -32,7 +32,7 @@ Every web command calls the configured HTTP API:
 
 ```sh
 cargo run -- scrape https://example.com --format markdown,links
-cargo run -- search "rust async runtime" --provider metasearch --limit 5 --scrape
+cargo run -- search "rust async runtime" --limit 5 --scrape
 cargo run -- map https://example.com --limit 100
 cargo run -- crawl https://example.com --limit 20 --max-depth 2 --wait
 ```
@@ -45,23 +45,18 @@ Server and runtime options are available with:
 cargo run -- serve --help
 ```
 
-### Search providers
+### Metasearch engines
 
-Bing is the default and requires no supporting service. Choose a different default when starting the API:
-
-```sh
-SCORCH_SEARCH_PROVIDER=metasearch cargo run -- serve
-# equivalent: cargo run -- serve --search-provider metasearch
-```
-
-Individual CLI and API requests can override it. Available providers are `bing`, `metasearch`, `naver`, `wikipedia`, and `duckduckgo`:
+Metasearch is Scorch's only search provider. It owns engine routing, concurrent searching, result merging, and reranking. Configure the engines it is allowed to use independently when starting the API:
 
 ```sh
-cargo run -- search "Rust async runtime" --provider bing
-cargo run -- search "Rust async runtime" --provider metasearch
+SCORCH_SEARCH_ENGINES=bing,wikipedia cargo run -- serve
+# equivalent: cargo run -- serve --search-engines bing,wikipedia
 ```
 
-The native metasearch provider concurrently queries Bing, Naver, and Wikipedia, combines agreement with reciprocal-rank fusion, caches short-lived results, and stops waiting shortly after useful results arrive. It remains inside the single Scorch executable. See `docs/metasearch.md` for design details and engine verification.
+Allowed engines are `bing`, `naver`, and `wikipedia`; all three are enabled by default. Engine selection is a server policy and cannot be overridden by individual search requests.
+
+The native metasearch provider combines agreement with reciprocal-rank fusion, caches short-lived results, and stops waiting shortly after useful results arrive. It remains inside the single Scorch executable. See `docs/metasearch.md` for design details and engine verification.
 
 ### Concurrent search dashboard
 
@@ -69,7 +64,6 @@ With the API running, launch the dependency-free Python terminal dashboard:
 
 ```sh
 python3 scripts/concurrent_search_demo.py \
-  --provider metasearch \
   --requests 8 \
   --concurrency 4
 ```
