@@ -2,6 +2,7 @@ mod client;
 mod mcp;
 
 use std::{
+    env,
     net::SocketAddr,
     path::PathBuf,
     time::{Duration, Instant},
@@ -14,6 +15,7 @@ use scorch_types::{
     CrawlRequest, CrawlStatus, MapRequest, RenderMode, ScrapeFormat, ScrapeOptions, ScrapeRequest,
     SearchRequest,
 };
+use tracing::info;
 use tracing_subscriber::EnvFilter;
 use uuid::Uuid;
 
@@ -212,14 +214,29 @@ async fn main() -> anyhow::Result<()> {
 
     match cli.command {
         Command::Serve(args) => {
+            info!(
+                version = env!("CARGO_PKG_VERSION"),
+                bind = %args.bind,
+                "starting Scorch service"
+            );
             let engine = ScorchEngine::new(args.engine.config()).await?;
             scorch_api::serve(args.bind, engine, shutdown_signal()).await?;
         }
         Command::Mcp(args) => {
+            info!(
+                version = env!("CARGO_PKG_VERSION"),
+                "starting Scorch MCP server"
+            );
             let engine = ScorchEngine::new(args.config()).await?;
             mcp::run(engine).await?;
         }
-        Command::Benchmark(args) => benchmark(args).await?,
+        Command::Benchmark(args) => {
+            info!(
+                version = env!("CARGO_PKG_VERSION"),
+                "starting Scorch benchmark"
+            );
+            benchmark(args).await?
+        }
         command => run_client(&cli.api_url, command).await?,
     }
     Ok(())
@@ -341,12 +358,16 @@ async fn benchmark(args: BenchmarkArgs) -> anyhow::Result<()> {
 fn init_tracing() {
     let filter =
         EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("scorch=info"));
-    tracing_subscriber::fmt()
+    let json = env::var("SCORCH_LOG_FORMAT").is_ok_and(|value| value.eq_ignore_ascii_case("json"));
+    let subscriber = tracing_subscriber::fmt()
         .with_env_filter(filter)
         .with_target(false)
-        .with_writer(std::io::stderr)
-        .compact()
-        .init();
+        .with_writer(std::io::stderr);
+    if json {
+        subscriber.json().flatten_event(true).init();
+    } else {
+        subscriber.compact().init();
+    }
 }
 
 async fn shutdown_signal() {
@@ -365,4 +386,5 @@ async fn shutdown_signal() {
     #[cfg(not(unix))]
     let terminate = std::future::pending::<()>();
     tokio::select! { () = ctrl_c => {}, () = terminate => {} }
+    info!("shutdown signal received");
 }

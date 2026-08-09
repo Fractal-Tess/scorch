@@ -13,6 +13,19 @@ cargo run -- serve
 
 The API listens on `127.0.0.1:3000` by default. Authentication is intentionally not built into this local-first release; do not expose it to an untrusted network without an authenticated TLS gateway.
 
+## Logging
+
+Scorch writes structured operational logs to stderr. The default compact output records startup and shutdown, request IDs, methods, response statuses and latency, engine selection, operation outcomes, browser lifecycle, and crawl lifecycle. Request bodies, search text, and URL query strings are not logged at info level.
+
+Use `RUST_LOG` for filtering and `SCORCH_LOG_FORMAT=json` for newline-delimited JSON:
+
+```sh
+RUST_LOG=scorch=debug cargo run -- serve
+SCORCH_LOG_FORMAT=json RUST_LOG=scorch=info cargo run -- serve
+```
+
+CLI and MCP JSON protocol output remains isolated on stdout.
+
 ## CLI
 
 Every web command calls the configured HTTP API:
@@ -90,6 +103,20 @@ The tools are `scorch_search`, `scorch_scrape`, `scorch_map`, `scorch_crawl_star
 Chromium traffic is forced through an embedded validating HTTP/CONNECT proxy. Direct fetches and browser connections reject local, private, link-local, reserved, and unsafe targets, repin DNS addresses, and revalidate redirects. Response sizes, redirects, browser pages, crawl depth, crawl count, retained bytes, request bodies, and job lifetimes are bounded.
 
 The browser choice and measured tradeoffs are documented in `docs/browser-evaluation.md`.
+
+## Build profiles
+
+The production profile uses thin LTO, one code-generation unit, symbol stripping, and overflow checks while retaining unwind behavior for panic isolation:
+
+```sh
+cargo build --release
+```
+
+For production-equivalent profiling with debug symbols:
+
+```sh
+cargo build --profile release-debug
+```
 
 ## Checks
 

@@ -3,6 +3,7 @@ use std::{net::SocketAddr, sync::Arc, time::Duration};
 use anyhow::Context;
 use axum::{
     Json, Router,
+    body::Body,
     extract::{DefaultBodyLimit, Path, Query, State, rejection::JsonRejection},
     http::{HeaderName, StatusCode},
     response::{IntoResponse, Response},
@@ -17,11 +18,12 @@ use serde::Serialize;
 use tokio::net::TcpListener;
 use tower_http::{
     catch_panic::CatchPanicLayer,
+    classify::ServerErrorsFailureClass,
     request_id::{MakeRequestUuid, PropagateRequestIdLayer, SetRequestIdLayer},
     timeout::TimeoutLayer,
     trace::TraceLayer,
 };
-use tracing::info;
+use tracing::{info, warn};
 use uuid::Uuid;
 
 const REQUEST_ID_HEADER: HeaderName = HeaderName::from_static("x-request-id");
@@ -44,11 +46,51 @@ pub fn router(engine: Arc<ScorchEngine>) -> Router {
         .with_state(AppState { engine })
         .layer(DefaultBodyLimit::max(256 * 1024))
         .layer(PropagateRequestIdLayer::new(REQUEST_ID_HEADER.clone()))
+        .layer(
+            TraceLayer::new_for_http()
+                .make_span_with(|request: &axum::http::Request<Body>| {
+                    let request_id = request
+                        .headers()
+                        .get(&REQUEST_ID_HEADER)
+                        .and_then(|value| value.to_str().ok())
+                        .unwrap_or("-");
+                    tracing::info_span!(
+                        "http_request",
+                        request_id,
+                        method = %request.method(),
+                        path = request.uri().path()
+                    )
+                })
+                .on_request(
+                    |_request: &axum::http::Request<Body>, span: &tracing::Span| {
+                        info!(parent: span, "request started");
+                    },
+                )
+                .on_response(
+                    |response: &Response, latency: Duration, span: &tracing::Span| {
+                        info!(
+                            parent: span,
+                            status = %response.status(),
+                            latency_ms = latency.as_millis() as u64,
+                            "request completed"
+                        );
+                    },
+                )
+                .on_failure(
+                    |failure: ServerErrorsFailureClass, latency: Duration, span: &tracing::Span| {
+                        warn!(
+                            parent: span,
+                            %failure,
+                            latency_ms = latency.as_millis() as u64,
+                            "request failed"
+                        );
+                    },
+                ),
+        )
         .layer(SetRequestIdLayer::new(
             REQUEST_ID_HEADER.clone(),
             MakeRequestUuid,
         ))
-        .layer(TraceLayer::new_for_http())
         .layer(TimeoutLayer::with_status_code(
             StatusCode::REQUEST_TIMEOUT,
             Duration::from_secs(130),
@@ -68,7 +110,9 @@ pub async fn serve(
     axum::serve(listener, router(engine))
         .with_graceful_shutdown(shutdown)
         .await
-        .context("API server failed")
+        .context("API server failed")?;
+    info!("Scorch API stopped");
+    Ok(())
 }
 
 #[derive(Serialize)]
@@ -235,6 +279,25 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn request_ids_are_propagated() {
+        let engine = ScorchEngine::new(EngineConfig::default()).await.unwrap();
+        let response = router(engine)
+            .oneshot(
+                Request::builder()
+                    .uri("/healthz")
+                    .header(&REQUEST_ID_HEADER, "known-request-id")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            response.headers().get(&REQUEST_ID_HEADER).unwrap(),
+            "known-request-id"
+        );
     }
 
     #[tokio::test]

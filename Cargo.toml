@@ -44,3 +44,14 @@ tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter", "json"] }
 url = { version = "2.5.8", features = ["serde"] }
 uuid = { version = "1.24.0", features = ["serde", "v7"] }
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = "symbols"
+overflow-checks = true
+
+[profile.release-debug]
+inherits = "release"
+debug = 1
+strip = "none"

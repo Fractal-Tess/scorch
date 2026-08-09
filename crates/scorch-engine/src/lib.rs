@@ -20,6 +20,7 @@ use scorch_types::{
     ScrapeDocument, ScrapeEngine, ScrapeFormat, ScrapeRequest, SearchRequest, SearchResponse,
 };
 use scraper::{Html, Selector};
+use tracing::{debug, info, warn};
 
 pub use config::EngineConfig;
 pub use error::{EngineError, Result};
@@ -39,6 +40,14 @@ pub struct ScorchEngine {
 
 impl ScorchEngine {
     pub async fn new(config: EngineConfig) -> Result<Arc<Self>> {
+        info!(
+            browser_path = %config.browser_path.display(),
+            max_concurrency = config.max_concurrency,
+            max_response_bytes = config.max_response_bytes,
+            max_crawl_limit = config.max_crawl_limit,
+            job_ttl_seconds = config.job_ttl.as_secs(),
+            "initializing Scorch engine"
+        );
         let security = SecurityPolicy;
         let fetcher = SafeFetcher::new(security.clone(), config.clone());
         let browser = BrowserManager::new(config.clone(), security).await?;
@@ -70,8 +79,45 @@ impl ScorchEngine {
     }
 
     pub async fn scrape(&self, request: &ScrapeRequest) -> Result<ScrapeDocument> {
-        validate_scrape_request(request)?;
         let started = Instant::now();
+        let origin = log_origin(&request.url);
+        info!(
+            operation = "scrape",
+            %origin,
+            render = ?request.options.render,
+            format_count = request.options.formats.len(),
+            "scrape started"
+        );
+        let result = self.scrape_inner(request, started).await;
+        match &result {
+            Ok(document) => info!(
+                operation = "scrape",
+                %origin,
+                engine = ?document.engine,
+                status_code = document.metadata.status_code,
+                elapsed_ms = started.elapsed().as_millis() as u64,
+                "scrape completed"
+            ),
+            Err(error) => {
+                warn!(
+                    operation = "scrape",
+                    %origin,
+                    error_code = error.code(),
+                    elapsed_ms = started.elapsed().as_millis() as u64,
+                    "scrape failed"
+                );
+                debug!(operation = "scrape", %origin, %error, "scrape failure details");
+            }
+        }
+        result
+    }
+
+    async fn scrape_inner(
+        &self,
+        request: &ScrapeRequest,
+        started: Instant,
+    ) -> Result<ScrapeDocument> {
+        validate_scrape_request(request)?;
         let timeout = Duration::from_millis(request.options.timeout_ms.min(120_000));
         let wants_screenshot = request.options.formats.contains(&ScrapeFormat::Screenshot);
 
@@ -138,6 +184,37 @@ impl ScorchEngine {
     }
 
     pub async fn search(&self, request: &SearchRequest) -> Result<SearchResponse> {
+        let started = Instant::now();
+        info!(
+            operation = "search",
+            query_length = request.query.len(),
+            limit = request.limit,
+            enrich_results = request.scrape_options.is_some(),
+            "search started"
+        );
+        let result = self.search_inner(request).await;
+        match &result {
+            Ok(response) => info!(
+                operation = "search",
+                provider = %response.provider,
+                result_count = response.results.len(),
+                elapsed_ms = started.elapsed().as_millis() as u64,
+                "search completed"
+            ),
+            Err(error) => {
+                warn!(
+                    operation = "search",
+                    error_code = error.code(),
+                    elapsed_ms = started.elapsed().as_millis() as u64,
+                    "search failed"
+                );
+                debug!(operation = "search", %error, "search failure details");
+            }
+        }
+        result
+    }
+
+    async fn search_inner(&self, request: &SearchRequest) -> Result<SearchResponse> {
         let mut response = search::search(&self.fetcher, request).await?;
         let Some(options) = request.scrape_options.clone() else {
             return Ok(response);
@@ -181,7 +258,37 @@ impl ScorchEngine {
     }
 
     pub async fn map(&self, request: &MapRequest) -> Result<MapResponse> {
-        map::map(&self.fetcher, request).await
+        let started = Instant::now();
+        let origin = log_origin(&request.url);
+        info!(
+            operation = "map",
+            %origin,
+            limit = request.limit,
+            include_subdomains = request.include_subdomains,
+            "map started"
+        );
+        let result = map::map(&self.fetcher, request).await;
+        match &result {
+            Ok(response) => info!(
+                operation = "map",
+                %origin,
+                link_count = response.links.len(),
+                source_count = response.sources.len(),
+                elapsed_ms = started.elapsed().as_millis() as u64,
+                "map completed"
+            ),
+            Err(error) => {
+                warn!(
+                    operation = "map",
+                    %origin,
+                    error_code = error.code(),
+                    elapsed_ms = started.elapsed().as_millis() as u64,
+                    "map failed"
+                );
+                debug!(operation = "map", %origin, %error, "map failure details");
+            }
+        }
+        result
     }
 
     pub fn start_crawl(self: &Arc<Self>, request: CrawlRequest) -> Result<CrawlJob> {
@@ -221,6 +328,16 @@ impl ScorchEngine {
     pub fn delete_crawl(&self, id: uuid::Uuid) -> bool {
         self.jobs.cancel_and_delete(id)
     }
+}
+
+pub(crate) fn log_origin(input: &str) -> String {
+    let Ok(url) = url::Url::parse(input) else {
+        return "<invalid-url>".into();
+    };
+    if !matches!(url.scheme(), "http" | "https") || url.host_str().is_none() {
+        return "<invalid-url>".into();
+    }
+    url.origin().ascii_serialization()
 }
 
 fn validate_scrape_request(request: &ScrapeRequest) -> Result<()> {
@@ -291,5 +408,24 @@ fn ensure_supported_content(response: &FetchResponse) -> Result<()> {
         Ok(())
     } else {
         Err(EngineError::UnsupportedContent(content_type))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::log_origin;
+
+    #[test]
+    fn log_origin_removes_sensitive_url_components() {
+        assert_eq!(
+            log_origin("https://user:secret@example.com:8443/private/token?api_key=secret#value"),
+            "https://example.com:8443"
+        );
+        assert_eq!(
+            log_origin("https://[2001:db8::1]/path"),
+            "https://[2001:db8::1]"
+        );
+        assert_eq!(log_origin("not a URL"), "<invalid-url>");
+        assert_eq!(log_origin("file:///tmp/secret"), "<invalid-url>");
     }
 }

@@ -12,12 +12,14 @@ use scorch_types::{
 };
 use tokio::sync::Semaphore;
 use tokio_util::sync::CancellationToken;
+use tracing::{info, warn};
 use url::Url;
 use uuid::Uuid;
 
 use crate::{
     ScorchEngine,
     error::{EngineError, Result},
+    log_origin,
     map::path_allowed,
 };
 
@@ -107,6 +109,15 @@ impl JobStore {
                 retained_bytes: 0,
             },
         );
+        info!(
+            operation = "crawl",
+            crawl_id = %id,
+            origin = %log_origin(&request.url),
+            limit = request.limit,
+            max_depth = request.max_depth,
+            concurrency = request.concurrency,
+            "crawl queued"
+        );
         let store = Arc::clone(self);
         tokio::spawn(async move {
             store.run(engine, id, request, cancel).await;
@@ -125,6 +136,7 @@ impl JobStore {
     pub fn cancel_and_delete(&self, id: Uuid) -> bool {
         self.jobs.remove(&id).is_some_and(|(_, entry)| {
             entry.cancel.cancel();
+            info!(operation = "crawl", crawl_id = %id, "crawl cancelled and removed");
             true
         })
     }
@@ -142,10 +154,12 @@ impl JobStore {
         };
         if cancel.is_cancelled() {
             self.mutate(id, |job| job.status = CrawlStatus::Cancelled);
+            info!(operation = "crawl", crawl_id = %id, "crawl cancelled before start");
             return;
         }
         self.mutate(id, |job| job.status = CrawlStatus::Running);
         let started = std::time::Instant::now();
+        info!(operation = "crawl", crawl_id = %id, "crawl started");
         let Ok(root) = Url::parse(&request.url) else {
             self.fail(id, &request.url, "invalid crawl URL");
             return;
@@ -176,6 +190,12 @@ impl JobStore {
             }
             if cancel.is_cancelled() {
                 self.mutate(id, |job| job.status = CrawlStatus::Cancelled);
+                info!(
+                    operation = "crawl",
+                    crawl_id = %id,
+                    elapsed_ms = started.elapsed().as_millis() as u64,
+                    "crawl cancelled"
+                );
                 return;
             }
             let remaining = request.limit.saturating_sub(self.completed(id));
@@ -260,6 +280,18 @@ impl JobStore {
                 CrawlStatus::Completed
             };
         });
+        if let Some(entry) = self.jobs.get(&id) {
+            info!(
+                operation = "crawl",
+                crawl_id = %id,
+                status = ?entry.job.status,
+                completed = entry.job.completed,
+                error_count = entry.job.errors.len(),
+                retained_bytes = entry.retained_bytes,
+                elapsed_ms = started.elapsed().as_millis() as u64,
+                "crawl finished"
+            );
+        }
     }
 
     fn completed(&self, id: Uuid) -> usize {
@@ -288,6 +320,13 @@ impl JobStore {
     }
 
     fn fail(&self, id: Uuid, url: &str, message: &str) {
+        warn!(
+            operation = "crawl",
+            crawl_id = %id,
+            origin = %log_origin(url),
+            reason = message,
+            "crawl failed"
+        );
         self.mutate(id, |job| {
             job.status = CrawlStatus::Failed;
             job.errors.push(CrawlError {

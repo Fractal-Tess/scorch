@@ -12,7 +12,7 @@ use tokio::{
     task::JoinHandle,
     time::{sleep, timeout},
 };
-use tracing::{error, warn};
+use tracing::{error, info, warn};
 
 use crate::{
     config::EngineConfig,
@@ -133,6 +133,7 @@ impl BrowserManager {
             .as_ref()
             .is_some_and(|runtime| runtime.handler.is_finished())
         {
+            warn!("recycling stopped Chromium runtime");
             runtime.take();
         }
         if runtime.is_none() {
@@ -160,6 +161,11 @@ impl BrowserManager {
             .map_err(|error| {
                 EngineError::Browser(format!("failed to create browser profile: {error}"))
             })?;
+        info!(
+            browser_path = %browser_path.display(),
+            proxy = %self.proxy.url(),
+            "launching Chromium"
+        );
         let config = BrowserConfig::builder()
             .chrome_executable(browser_path)
             .user_data_dir(profile.path())
@@ -197,7 +203,9 @@ impl BrowserManager {
                     break;
                 }
             }
+            warn!("Chromium event stream ended");
         });
+        info!("Chromium is ready");
         Ok(BrowserRuntime {
             browser,
             handler,
