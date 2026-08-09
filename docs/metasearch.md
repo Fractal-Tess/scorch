@@ -1,6 +1,6 @@
 # Native metasearch
 
-Scorch's `metasearch` crate is an original MIT-licensed implementation. It keeps multi-engine search inside the Scorch executable and does not require a Python service, Redis, or another deployment.
+Scorch's `metasearch` crate is an original MIT-licensed implementation. It keeps multi-engine search inside the `scorchd` service and does not require a Python service, Redis, or another deployment.
 
 ## Runtime behavior
 

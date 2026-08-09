@@ -2157,19 +2157,14 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "clap",
- "metasearch",
  "reqwest",
  "rmcp",
  "schemars",
- "scorch-api",
- "scorch-engine",
  "scorch-types",
  "serde",
  "serde_json",
  "tokio",
  "tokio-util",
- "tracing",
- "tracing-subscriber",
  "uuid",
 ]
 
@@ -2197,6 +2192,20 @@ dependencies = [
  "tracing",
  "url",
  "uuid",
+]
+
+[[package]]
+name = "scorch-server"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "metasearch",
+ "scorch-api",
+ "scorch-engine",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]

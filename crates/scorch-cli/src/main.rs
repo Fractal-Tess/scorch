@@ -1,27 +1,18 @@
 mod client;
 mod mcp;
 
-use std::{
-    env,
-    net::SocketAddr,
-    path::PathBuf,
-    time::{Duration, Instant},
-};
+use std::time::{Duration, Instant};
 
 use clap::{Args, Parser, Subcommand, ValueEnum};
 use client::ApiClient;
-use metasearch::EngineKind;
-use scorch_engine::{EngineConfig, ScorchEngine};
 use scorch_types::{
     CrawlRequest, CrawlStatus, MapRequest, RenderMode, ScrapeFormat, ScrapeOptions, ScrapeRequest,
     SearchRequest,
 };
-use tracing::info;
-use tracing_subscriber::EnvFilter;
 use uuid::Uuid;
 
 #[derive(Parser)]
-#[command(version, about = "Self-contained web search, scraping, and crawling")]
+#[command(version, about = "Command-line client for the Scorch HTTP API")]
 struct Cli {
     #[arg(
         long,
@@ -37,62 +28,14 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
-    Serve(ServeArgs),
     Scrape(ScrapeArgs),
     Search(SearchArgs),
     Map(MapArgs),
     Crawl(CrawlArgs),
     CrawlStatus(CrawlStatusArgs),
     CrawlCancel { id: Uuid },
-    Mcp(EngineArgs),
+    Mcp,
     Benchmark(BenchmarkArgs),
-}
-
-#[derive(Args, Clone)]
-struct EngineArgs {
-    #[arg(long, env = "SCORCH_BROWSER_PATH", default_value = "chromium")]
-    browser_path: PathBuf,
-    #[arg(long, env = "SCORCH_MAX_CONCURRENCY", default_value_t = 4)]
-    max_concurrency: usize,
-    #[arg(long, env = "SCORCH_MAX_RESPONSE_BYTES", default_value_t = 5 * 1024 * 1024)]
-    max_response_bytes: usize,
-    #[arg(long, env = "SCORCH_JOB_TTL_SECS", default_value_t = 900)]
-    job_ttl_secs: u64,
-    #[arg(
-        long,
-        value_enum,
-        value_delimiter = ',',
-        env = "SCORCH_SEARCH_ENGINES",
-        default_value = "bing,naver,wikipedia"
-    )]
-    search_engines: Vec<SearchEngineArg>,
-}
-
-impl EngineArgs {
-    fn config(&self) -> EngineConfig {
-        let mut search_engines = Vec::new();
-        for engine in self.search_engines.iter().copied().map(EngineKind::from) {
-            if !search_engines.contains(&engine) {
-                search_engines.push(engine);
-            }
-        }
-        EngineConfig {
-            browser_path: self.browser_path.clone(),
-            max_concurrency: self.max_concurrency.max(1),
-            max_response_bytes: self.max_response_bytes.max(1024),
-            job_ttl: Duration::from_secs(self.job_ttl_secs.max(1)),
-            search_engines,
-            ..Default::default()
-        }
-    }
-}
-
-#[derive(Args)]
-struct ServeArgs {
-    #[arg(long, env = "SCORCH_BIND", default_value = "127.0.0.1:3000")]
-    bind: SocketAddr,
-    #[command(flatten)]
-    engine: EngineArgs,
 }
 
 #[derive(Debug, Clone, Copy, ValueEnum)]
@@ -169,23 +112,6 @@ impl ScrapeArgs {
     }
 }
 
-#[derive(Debug, Clone, Copy, ValueEnum)]
-enum SearchEngineArg {
-    Bing,
-    Naver,
-    Wikipedia,
-}
-
-impl From<SearchEngineArg> for EngineKind {
-    fn from(value: SearchEngineArg) -> Self {
-        match value {
-            SearchEngineArg::Bing => Self::Bing,
-            SearchEngineArg::Naver => Self::Naver,
-            SearchEngineArg::Wikipedia => Self::Wikipedia,
-        }
-    }
-}
-
 #[derive(Args)]
 struct SearchArgs {
     query: String,
@@ -236,47 +162,21 @@ struct BenchmarkArgs {
     urls: Vec<String>,
     #[arg(long, default_value_t = 3)]
     runs: usize,
-    #[command(flatten)]
-    engine: EngineArgs,
 }
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    init_tracing();
     let cli = Cli::parse();
-
+    let client = ApiClient::new(&cli.api_url)?;
     match cli.command {
-        Command::Serve(args) => {
-            info!(
-                version = env!("CARGO_PKG_VERSION"),
-                bind = %args.bind,
-                "starting Scorch service"
-            );
-            let engine = ScorchEngine::new(args.engine.config()).await?;
-            scorch_api::serve(args.bind, engine, shutdown_signal()).await?;
-        }
-        Command::Mcp(args) => {
-            info!(
-                version = env!("CARGO_PKG_VERSION"),
-                "starting Scorch MCP server"
-            );
-            let engine = ScorchEngine::new(args.config()).await?;
-            mcp::run(engine).await?;
-        }
-        Command::Benchmark(args) => {
-            info!(
-                version = env!("CARGO_PKG_VERSION"),
-                "starting Scorch benchmark"
-            );
-            benchmark(args).await?
-        }
-        command => run_client(&cli.api_url, command).await?,
+        Command::Mcp => mcp::run(client).await?,
+        Command::Benchmark(args) => benchmark(&client, args).await?,
+        command => run_client(&client, command).await?,
     }
     Ok(())
 }
 
-async fn run_client(api_url: &str, command: Command) -> anyhow::Result<()> {
-    let client = ApiClient::new(api_url)?;
+async fn run_client(client: &ApiClient, command: Command) -> anyhow::Result<()> {
     let value = match command {
         Command::Scrape(args) => serde_json::to_value(client.scrape(&args.request()).await?)?,
         Command::Search(args) => serde_json::to_value(
@@ -334,17 +234,16 @@ async fn run_client(api_url: &str, command: Command) -> anyhow::Result<()> {
                 .await?,
         )?,
         Command::CrawlCancel { id } => serde_json::to_value(client.cancel_crawl(id).await?)?,
-        Command::Serve(_) | Command::Mcp(_) | Command::Benchmark(_) => unreachable!(),
+        Command::Mcp | Command::Benchmark(_) => unreachable!(),
     };
     println!("{}", serde_json::to_string_pretty(&value)?);
     Ok(())
 }
 
-async fn benchmark(args: BenchmarkArgs) -> anyhow::Result<()> {
+async fn benchmark(client: &ApiClient, args: BenchmarkArgs) -> anyhow::Result<()> {
     if args.runs == 0 || args.runs > 20 {
         anyhow::bail!("runs must be between 1 and 20");
     }
-    let engine = ScorchEngine::new(args.engine.config()).await?;
     let mut reports = Vec::new();
     for url in args.urls {
         for render in [RenderMode::Never, RenderMode::Always] {
@@ -362,7 +261,7 @@ async fn benchmark(args: BenchmarkArgs) -> anyhow::Result<()> {
                     },
                 };
                 let started = Instant::now();
-                match engine.scrape(&request).await {
+                match client.scrape(&request).await {
                     Ok(document) => {
                         timings.push(started.elapsed().as_millis() as u64);
                         bytes = document.html.map_or(0, |html| html.len());
@@ -386,38 +285,4 @@ async fn benchmark(args: BenchmarkArgs) -> anyhow::Result<()> {
     }
     println!("{}", serde_json::to_string_pretty(&reports)?);
     Ok(())
-}
-
-fn init_tracing() {
-    let filter =
-        EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("scorch=info"));
-    let json = env::var("SCORCH_LOG_FORMAT").is_ok_and(|value| value.eq_ignore_ascii_case("json"));
-    let subscriber = tracing_subscriber::fmt()
-        .with_env_filter(filter)
-        .with_target(false)
-        .with_writer(std::io::stderr);
-    if json {
-        subscriber.json().flatten_event(true).init();
-    } else {
-        subscriber.compact().init();
-    }
-}
-
-async fn shutdown_signal() {
-    let ctrl_c = async {
-        tokio::signal::ctrl_c()
-            .await
-            .expect("failed to install Ctrl+C handler")
-    };
-    #[cfg(unix)]
-    let terminate = async {
-        tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
-            .expect("failed to install SIGTERM handler")
-            .recv()
-            .await;
-    };
-    #[cfg(not(unix))]
-    let terminate = std::future::pending::<()>();
-    tokio::select! { () = ctrl_c => {}, () = terminate => {} }
-    info!("shutdown signal received");
 }

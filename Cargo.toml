@@ -4,6 +4,7 @@ members = [
   "crates/scorch-api",
   "crates/scorch-cli",
   "crates/scorch-engine",
+  "crates/scorch-server",
   "crates/scorch-types",
 ]
 default-members = ["crates/scorch-cli"]

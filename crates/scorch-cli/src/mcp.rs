@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use rmcp::{
     ServerHandler, ServiceExt,
     handler::server::{
@@ -10,7 +8,6 @@ use rmcp::{
     tool, tool_handler, tool_router,
     transport::stdio,
 };
-use scorch_engine::{EngineError, ScorchEngine};
 use scorch_types::{
     CrawlCancelRequest, CrawlJobSummary, CrawlPage, CrawlRequest, CrawlStatusRequest,
     DeleteResponse, MapRequest, MapResponse, ScrapeDocument, ScrapeRequest, SearchRequest,
@@ -18,17 +15,19 @@ use scorch_types::{
 };
 use tokio_util::sync::CancellationToken;
 
+use crate::client::ApiClient;
+
 #[derive(Clone)]
 pub struct ScorchMcp {
-    engine: Arc<ScorchEngine>,
+    client: ApiClient,
     tool_router: ToolRouter<Self>,
 }
 
 #[tool_router(router = tool_router)]
 impl ScorchMcp {
-    pub fn new(engine: Arc<ScorchEngine>) -> Self {
+    pub fn new(client: ApiClient) -> Self {
         Self {
-            engine,
+            client,
             tool_router: Self::tool_router(),
         }
     }
@@ -43,10 +42,10 @@ impl ScorchMcp {
         cancellation: CancellationToken,
     ) -> Result<Json<SearchResponse>, CallToolResult> {
         let result = tokio::select! {
-            result = self.engine.search(&request) => result,
+            result = self.client.search(&request) => result,
             () = cancellation.cancelled() => return Err(tool_error("search cancelled")),
         };
-        result.map(Json).map_err(engine_error)
+        result.map(Json).map_err(client_error)
     }
 
     #[tool(
@@ -59,10 +58,10 @@ impl ScorchMcp {
         cancellation: CancellationToken,
     ) -> Result<Json<ScrapeDocument>, CallToolResult> {
         let result = tokio::select! {
-            result = self.engine.scrape(&request) => result,
+            result = self.client.scrape(&request) => result,
             () = cancellation.cancelled() => return Err(tool_error("scrape cancelled")),
         };
-        result.map(Json).map_err(engine_error)
+        result.map(Json).map_err(client_error)
     }
 
     #[tool(
@@ -75,10 +74,10 @@ impl ScorchMcp {
         cancellation: CancellationToken,
     ) -> Result<Json<MapResponse>, CallToolResult> {
         let result = tokio::select! {
-            result = self.engine.map(&request) => result,
+            result = self.client.map(&request) => result,
             () = cancellation.cancelled() => return Err(tool_error("map cancelled")),
         };
-        result.map(Json).map_err(engine_error)
+        result.map(Json).map_err(client_error)
     }
 
     #[tool(
@@ -88,11 +87,13 @@ impl ScorchMcp {
     async fn crawl_start(
         &self,
         Parameters(request): Parameters<CrawlRequest>,
+        cancellation: CancellationToken,
     ) -> Result<Json<CrawlJobSummary>, CallToolResult> {
-        self.engine
-            .start_crawl(request)
-            .map(|job| Json(CrawlJobSummary::from(&job)))
-            .map_err(engine_error)
+        let result = tokio::select! {
+            result = self.client.start_crawl(&request) => result,
+            () = cancellation.cancelled() => return Err(tool_error("crawl start cancelled")),
+        };
+        result.map(Json).map_err(client_error)
     }
 
     #[tool(
@@ -102,11 +103,13 @@ impl ScorchMcp {
     async fn crawl_status(
         &self,
         Parameters(request): Parameters<CrawlStatusRequest>,
+        cancellation: CancellationToken,
     ) -> Result<Json<CrawlPage>, CallToolResult> {
-        self.engine
-            .crawl_page(&request)
-            .map(Json)
-            .map_err(engine_error)
+        let result = tokio::select! {
+            result = self.client.crawl_status(request.id, request.cursor, request.page_size) => result,
+            () = cancellation.cancelled() => return Err(tool_error("crawl status cancelled")),
+        };
+        result.map(Json).map_err(client_error)
     }
 
     #[tool(
@@ -116,29 +119,27 @@ impl ScorchMcp {
     async fn crawl_cancel(
         &self,
         Parameters(request): Parameters<CrawlCancelRequest>,
+        cancellation: CancellationToken,
     ) -> Result<Json<DeleteResponse>, CallToolResult> {
-        let deleted = self.engine.delete_crawl(request.id);
-        if !deleted {
-            return Err(engine_error(EngineError::JobNotFound));
-        }
-        Ok(Json(DeleteResponse {
-            id: request.id,
-            deleted,
-        }))
+        let result = tokio::select! {
+            result = self.client.cancel_crawl(request.id) => result,
+            () = cancellation.cancelled() => return Err(tool_error("crawl cancellation cancelled")),
+        };
+        result.map(Json).map_err(client_error)
     }
 }
 
-#[tool_handler(router = self.tool_router, name = "scorch", instructions = "Search, scrape, map, and crawl the public web with bounded local browser execution")]
+#[tool_handler(router = self.tool_router, name = "scorch", instructions = "Use the configured Scorch HTTP API to search, scrape, map, and crawl the public web")]
 impl ServerHandler for ScorchMcp {}
 
-pub async fn run(engine: Arc<ScorchEngine>) -> anyhow::Result<()> {
-    let service = ScorchMcp::new(engine).serve(stdio()).await?;
+pub async fn run(client: ApiClient) -> anyhow::Result<()> {
+    let service = ScorchMcp::new(client).serve(stdio()).await?;
     service.waiting().await?;
     Ok(())
 }
 
-fn engine_error(error: EngineError) -> CallToolResult {
-    tool_error(format!("{}: {error}", error.code()))
+fn client_error(error: anyhow::Error) -> CallToolResult {
+    tool_error(error.to_string())
 }
 
 fn tool_error(message: impl Into<String>) -> CallToolResult {
@@ -148,12 +149,11 @@ fn tool_error(message: impl Into<String>) -> CallToolResult {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use scorch_engine::EngineConfig;
 
-    #[tokio::test]
-    async fn exposes_expected_tools() {
-        let engine = ScorchEngine::new(EngineConfig::default()).await.unwrap();
-        let server = ScorchMcp::new(engine);
+    #[test]
+    fn exposes_expected_tools() {
+        let client = ApiClient::new("http://127.0.0.1:3000").unwrap();
+        let server = ScorchMcp::new(client);
         let names: Vec<_> = server
             .tool_router
             .list_all()

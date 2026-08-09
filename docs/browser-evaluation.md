@@ -21,7 +21,7 @@ These are directional smoke measurements, not a general browser benchmark. They 
 
 The static result supports fetch-first routing. The JavaScript page demonstrates why a browser fallback remains necessary: it returned substantially more rendered HTML at additional latency.
 
-Reproduce the harness with:
+With `scorchd` running, reproduce the API-backed harness with:
 
 ```sh
 scorch benchmark https://example.com https://quotes.toscrape.com/js/ --runs 3

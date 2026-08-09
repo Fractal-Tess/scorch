@@ -1,21 +1,25 @@
 # Architecture
 
-Scorch is a five-crate Rust workspace that produces one executable.
+Scorch is a six-crate Rust workspace that produces two executables with a strict process boundary.
 
 ```text
-metasearch    <- native concurrent search engines, ranking, cache, circuit breakers
-scorch-types  <- shared request and response contracts
-      ^
-scorch-engine <- network policy, proxy, fetch, browser, extraction, search, map, jobs
-      ^
-scorch-api    <- Axum transport and HTTP error mapping
-      ^
-scorch-cli    <- `scorch` executable, HTTP client commands, server mode, MCP mode
+metasearch     <- native concurrent search engines, routing, ranking, cache, breakers
+scorch-types   <- shared HTTP request and response contracts
+       ^
+scorch-engine  <- network policy, proxy, fetch, browser, extraction, search, map, jobs
+       ^
+scorch-api     <- Axum transport and HTTP error mapping
+       ^
+scorch-server  <- `scorchd`: service configuration and lifecycle
+
+scorch-cli     <- `scorch`: lightweight HTTP client, API benchmark, API-backed MCP adapter
 ```
+
+`scorch` does not link `scorch-engine`, `scorch-api`, Chromium, or metasearch. Every operation it exposes crosses the HTTP API boundary. Only `scorchd` owns runtime and engine configuration.
 
 ## Runtime
 
-`scorch serve` owns:
+`scorchd` owns:
 
 - one Axum server;
 - one globally bounded direct-fetch runtime;
@@ -50,7 +54,7 @@ The metasearch runtime has per-engine concurrency limits, a bounded 60-second in
 
 ## MCP
 
-`scorch mcp` invokes the engine directly rather than looping through HTTP. The official Rust MCP SDK provides JSON-RPC framing, generated schemas, cancellation tokens, tool discovery, and stdio lifecycle. Protocol output is isolated on stdout; tracing is always written to stderr.
+`scorch mcp` is an HTTP-backed adapter: every MCP tool calls the configured `SCORCH_API_URL`, and cancellation drops the corresponding HTTP request future. It never constructs or invokes the engine directly. The official Rust MCP SDK provides JSON-RPC framing, generated schemas, cancellation tokens, tool discovery, and stdio lifecycle. Protocol output is isolated on stdout.
 
 ## Trust boundary
 

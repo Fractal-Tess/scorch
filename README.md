@@ -1,6 +1,6 @@
 # Scorch
 
-Scorch is a self-contained web search, scraping, mapping, and crawling service written in Rust. One `scorch` executable provides an HTTP API, an HTTP client CLI, a bounded in-memory crawl runtime, and an MCP stdio server. It uses direct HTTP for inexpensive static pages and a locally managed headless Chromium process when JavaScript rendering or screenshots are required.
+Scorch is a self-contained web search, scraping, mapping, and crawling service written in Rust. `scorchd` runs the HTTP API, browser, metasearch, and bounded in-memory crawl runtime. The separate `scorch` executable is a lightweight HTTP client for convenient API, benchmark, and MCP access. It uses direct HTTP for inexpensive static pages and a locally managed headless Chromium process when JavaScript rendering or screenshots are required.
 
 Scorch does not require a database, broker, cache server, browser service, or external worker deployment. Crawl state is intentionally ephemeral and is lost when the process restarts.
 
@@ -8,7 +8,7 @@ Scorch does not require a database, broker, cache server, browser service, or ex
 
 ```sh
 devenv shell
-cargo run -- serve
+cargo run -p scorch-server --
 ```
 
 The API listens on `127.0.0.1:3000` by default. Authentication is intentionally not built into this local-first release; do not expose it to an untrusted network without an authenticated TLS gateway.
@@ -20,8 +20,8 @@ Scorch writes structured operational logs to stderr. The default compact output 
 Use `RUST_LOG` for filtering and `SCORCH_LOG_FORMAT=json` for newline-delimited JSON:
 
 ```sh
-RUST_LOG=scorch=debug cargo run -- serve
-SCORCH_LOG_FORMAT=json RUST_LOG=scorch=info cargo run -- serve
+RUST_LOG=scorch=debug cargo run -p scorch-server --
+SCORCH_LOG_FORMAT=json RUST_LOG=scorch=info cargo run -p scorch-server --
 ```
 
 CLI and MCP JSON protocol output remains isolated on stdout.
@@ -31,18 +31,18 @@ CLI and MCP JSON protocol output remains isolated on stdout.
 Every web command calls the configured HTTP API:
 
 ```sh
-cargo run -- scrape https://example.com --format markdown,links
-cargo run -- search "rust async runtime" --limit 5 --scrape
-cargo run -- map https://example.com --limit 100
-cargo run -- crawl https://example.com --limit 20 --max-depth 2 --wait
+cargo run -p scorch-cli -- scrape https://example.com --format markdown,links
+cargo run -p scorch-cli -- search "rust async runtime" --limit 5 --scrape
+cargo run -p scorch-cli -- map https://example.com --limit 100
+cargo run -p scorch-cli -- crawl https://example.com --limit 20 --max-depth 2 --wait
 ```
 
 Set `SCORCH_API_URL` or pass `--api-url` to use another server.
 
-Server and runtime options are available with:
+`scorch` contains no engine, browser, or API-server dependencies. Server and runtime options belong exclusively to `scorchd`:
 
 ```sh
-cargo run -- serve --help
+cargo run -p scorch-server -- --help
 ```
 
 ### Metasearch engines
@@ -50,13 +50,13 @@ cargo run -- serve --help
 Metasearch is Scorch's only search provider. It owns engine routing, concurrent searching, result merging, and reranking. Configure the engines it is allowed to use independently when starting the API:
 
 ```sh
-SCORCH_SEARCH_ENGINES=bing,wikipedia cargo run -- serve
-# equivalent: cargo run -- serve --search-engines bing,wikipedia
+SCORCH_SEARCH_ENGINES=bing,wikipedia cargo run -p scorch-server --
+# installed binary: scorchd --search-engines bing,wikipedia
 ```
 
 Allowed engines are `bing`, `naver`, and `wikipedia`; all three are enabled by default. Engine selection is a server policy and cannot be overridden by individual search requests.
 
-The native metasearch provider combines agreement with reciprocal-rank fusion, caches short-lived results, and stops waiting shortly after useful results arrive. It remains inside the single Scorch executable. See `docs/metasearch.md` for design details and engine verification.
+The native metasearch provider combines agreement with reciprocal-rank fusion, caches short-lived results, and stops waiting shortly after useful results arrive. It remains inside `scorchd`. See `docs/metasearch.md` for design details and engine verification.
 
 ### Concurrent search dashboard
 
@@ -99,11 +99,13 @@ See `docs/api.md` for request contracts and limits.
 
 ## MCP
 
-Run the stdio server directly:
+Run the API-backed stdio adapter directly:
 
 ```sh
-cargo run -- mcp
+cargo run -p scorch-cli -- mcp
 ```
+
+The adapter performs no web or browser work itself; every tool call is forwarded to `SCORCH_API_URL`.
 
 A client configuration can point at a release build:
 
@@ -114,7 +116,7 @@ A client configuration can point at a release build:
       "command": "/absolute/path/to/scorch",
       "args": ["mcp"],
       "env": {
-        "SCORCH_BROWSER_PATH": "/absolute/path/to/chromium"
+        "SCORCH_API_URL": "http://127.0.0.1:3000"
       }
     }
   }
@@ -134,13 +136,14 @@ The browser choice and measured tradeoffs are documented in `docs/browser-evalua
 The production profile uses thin LTO, one code-generation unit, symbol stripping, and overflow checks while retaining unwind behavior for panic isolation:
 
 ```sh
-cargo build --release
+cargo build --release --workspace
+# target/release/scorch and target/release/scorchd
 ```
 
 For production-equivalent profiling with debug symbols:
 
 ```sh
-cargo build --profile release-debug
+cargo build --profile release-debug --workspace
 ```
 
 ## Checks

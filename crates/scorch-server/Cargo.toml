@@ -1,5 +1,5 @@
 [package]
-name = "scorch-cli"
+name = "scorch-server"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
@@ -8,18 +8,15 @@ repository.workspace = true
 rust-version.workspace = true
 
 [[bin]]
-name = "scorch"
+name = "scorchd"
 path = "src/main.rs"
 
 [dependencies]
 anyhow.workspace = true
 clap.workspace = true
-reqwest.workspace = true
-rmcp.workspace = true
-scorch-types = { path = "../scorch-types" }
-schemars.workspace = true
-serde.workspace = true
-serde_json.workspace = true
+metasearch = { path = "../metasearch" }
+scorch-api = { path = "../scorch-api" }
+scorch-engine = { path = "../scorch-engine" }
 tokio.workspace = true
-tokio-util.workspace = true
-uuid.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
