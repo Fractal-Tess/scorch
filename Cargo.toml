@@ -1,5 +1,6 @@
 [workspace]
 members = [
+  "crates/metasearch",
   "crates/scorch-api",
   "crates/scorch-cli",
   "crates/scorch-engine",

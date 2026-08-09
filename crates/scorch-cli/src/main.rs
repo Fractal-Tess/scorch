@@ -13,7 +13,7 @@ use client::ApiClient;
 use scorch_engine::{EngineConfig, ScorchEngine};
 use scorch_types::{
     CrawlRequest, CrawlStatus, MapRequest, RenderMode, ScrapeFormat, ScrapeOptions, ScrapeRequest,
-    SearchRequest,
+    SearchProvider, SearchRequest,
 };
 use tracing::info;
 use tracing_subscriber::EnvFilter;
@@ -57,6 +57,13 @@ struct EngineArgs {
     max_response_bytes: usize,
     #[arg(long, env = "SCORCH_JOB_TTL_SECS", default_value_t = 900)]
     job_ttl_secs: u64,
+    #[arg(
+        long,
+        value_enum,
+        env = "SCORCH_SEARCH_PROVIDER",
+        default_value = "bing"
+    )]
+    search_provider: SearchProviderArg,
 }
 
 impl EngineArgs {
@@ -66,6 +73,7 @@ impl EngineArgs {
             max_concurrency: self.max_concurrency.max(1),
             max_response_bytes: self.max_response_bytes.max(1024),
             job_ttl: Duration::from_secs(self.job_ttl_secs.max(1)),
+            default_search_provider: self.search_provider.into(),
             ..Default::default()
         }
     }
@@ -153,11 +161,34 @@ impl ScrapeArgs {
     }
 }
 
+#[derive(Debug, Clone, Copy, ValueEnum)]
+enum SearchProviderArg {
+    Bing,
+    Metasearch,
+    Naver,
+    Wikipedia,
+    Duckduckgo,
+}
+
+impl From<SearchProviderArg> for SearchProvider {
+    fn from(value: SearchProviderArg) -> Self {
+        match value {
+            SearchProviderArg::Bing => Self::Bing,
+            SearchProviderArg::Metasearch => Self::Metasearch,
+            SearchProviderArg::Naver => Self::Naver,
+            SearchProviderArg::Wikipedia => Self::Wikipedia,
+            SearchProviderArg::Duckduckgo => Self::Duckduckgo,
+        }
+    }
+}
+
 #[derive(Args)]
 struct SearchArgs {
     query: String,
     #[arg(long, default_value_t = 5)]
     limit: usize,
+    #[arg(long, value_enum)]
+    provider: Option<SearchProviderArg>,
     #[arg(long)]
     scrape: bool,
     #[arg(long, default_value = "us")]
@@ -251,6 +282,7 @@ async fn run_client(api_url: &str, command: Command) -> anyhow::Result<()> {
                 .search(&SearchRequest {
                     query: args.query,
                     limit: args.limit,
+                    provider: args.provider.map(Into::into),
                     scrape_options: args.scrape.then(ScrapeOptions::default),
                     country: args.country,
                     language: args.language,

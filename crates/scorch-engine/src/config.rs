@@ -1,10 +1,13 @@
 use std::{path::PathBuf, time::Duration};
 
+use scorch_types::SearchProvider;
+
 #[derive(Debug, Clone)]
 pub struct EngineConfig {
     pub browser_path: PathBuf,
     pub max_concurrency: usize,
     pub max_response_bytes: usize,
+    pub default_search_provider: SearchProvider,
     pub connect_timeout: Duration,
     pub request_timeout: Duration,
     pub job_ttl: Duration,
@@ -22,6 +25,7 @@ impl Default for EngineConfig {
             browser_path: "chromium".into(),
             max_concurrency: 4,
             max_response_bytes: 5 * 1024 * 1024,
+            default_search_provider: SearchProvider::Bing,
             connect_timeout: Duration::from_secs(10),
             request_timeout: Duration::from_secs(30),
             job_ttl: Duration::from_secs(15 * 60),

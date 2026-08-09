@@ -32,7 +32,7 @@ Every web command calls the configured HTTP API:
 
 ```sh
 cargo run -- scrape https://example.com --format markdown,links
-cargo run -- search "rust async runtime" --limit 5 --scrape
+cargo run -- search "rust async runtime" --provider metasearch --limit 5 --scrape
 cargo run -- map https://example.com --limit 100
 cargo run -- crawl https://example.com --limit 20 --max-depth 2 --wait
 ```
@@ -45,12 +45,33 @@ Server and runtime options are available with:
 cargo run -- serve --help
 ```
 
+### Search providers
+
+Bing is the default and requires no supporting service. Choose a different default when starting the API:
+
+```sh
+SCORCH_SEARCH_PROVIDER=metasearch cargo run -- serve
+# equivalent: cargo run -- serve --search-provider metasearch
+```
+
+Individual CLI and API requests can override it. Available providers are `bing`, `metasearch`, `naver`, `wikipedia`, and `duckduckgo`:
+
+```sh
+cargo run -- search "Rust async runtime" --provider bing
+cargo run -- search "Rust async runtime" --provider metasearch
+```
+
+The native metasearch provider concurrently queries Bing, Naver, and Wikipedia, combines agreement with reciprocal-rank fusion, caches short-lived results, and stops waiting shortly after useful results arrive. It remains inside the single Scorch executable. See `docs/metasearch.md` for design details and engine verification.
+
 ### Concurrent search dashboard
 
 With the API running, launch the dependency-free Python terminal dashboard:
 
 ```sh
-python3 scripts/concurrent_search_demo.py --requests 8 --concurrency 4
+python3 scripts/concurrent_search_demo.py \
+  --provider metasearch \
+  --requests 8 \
+  --concurrency 4
 ```
 
 Pass custom queries as positional arguments, add `--scrape` to enrich results, or use `--plain` for non-interactive output. Each request receives a distinct `x-request-id` that also appears in Scorch's service logs.

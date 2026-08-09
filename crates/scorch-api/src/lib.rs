@@ -143,6 +143,12 @@ async fn readiness(State(state): State<AppState>) -> (StatusCode, Json<Readiness
             browser_available,
             browser_path: state.engine.config().browser_path.display().to_string(),
             max_concurrency: state.engine.config().max_concurrency,
+            default_search_provider: state
+                .engine
+                .config()
+                .default_search_provider
+                .as_str()
+                .into(),
         }),
     )
 }

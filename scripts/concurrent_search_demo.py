@@ -74,6 +74,11 @@ def parse_args():
         help="total requests; defaults to 8 or the number of supplied queries",
     )
     parser.add_argument("--limit", type=int, default=3, help="results per search")
+    parser.add_argument(
+        "--provider",
+        choices=("bing", "metasearch", "naver", "wikipedia", "duckduckgo"),
+        help="override the API service's default search provider",
+    )
     parser.add_argument("--timeout", type=float, default=30.0)
     parser.add_argument(
         "--scrape",
@@ -112,7 +117,7 @@ def check_health(api_url, timeout):
         raise RuntimeError(f"unexpected health response: {payload}")
 
 
-def execute_search(task, endpoint, limit, scrape, timeout):
+def execute_search(task, endpoint, limit, provider, scrape, timeout):
     with task.lock:
         task.status = "running"
         task.started_at = time.monotonic()
@@ -131,6 +136,8 @@ def execute_search(task, endpoint, limit, scrape, timeout):
         "country": "us",
         "language": "en",
     }
+    if provider:
+        payload["provider"] = provider
     if scrape:
         payload["scrapeOptions"] = {}
     request = urllib.request.Request(
@@ -292,6 +299,7 @@ def main():
                 task,
                 endpoint,
                 args.limit,
+                args.provider,
                 args.scrape,
                 args.timeout,
             )

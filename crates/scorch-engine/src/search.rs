@@ -1,21 +1,115 @@
-use std::time::{Duration, Instant};
+use std::{
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
-use base64::{Engine as _, engine::general_purpose::STANDARD_NO_PAD};
-use scorch_types::{SearchRequest, SearchResponse, SearchResult};
+use metasearch::{
+    EngineOutput, MetaSearch, MetaSearchConfig, MetaSearchOutput, SearchEngine as _,
+    SearchHit as MetaSearchHit, SearchQuery,
+    engines::{Bing, Naver, Wikipedia},
+};
+use scorch_types::{SearchProvider, SearchRequest, SearchResponse, SearchResult};
 use scraper::{ElementRef, Html, Selector};
+use tokio::sync::Semaphore;
 use url::Url;
 
 use crate::{
+    config::EngineConfig,
     error::{EngineError, Result},
     fetch::SafeFetcher,
 };
 
-pub async fn search(fetcher: &SafeFetcher, request: &SearchRequest) -> Result<SearchResponse> {
-    let started = Instant::now();
-    let query = request.query.trim();
-    if query.is_empty() {
+pub struct SearchService {
+    default_provider: SearchProvider,
+    fetcher: SafeFetcher,
+    metasearch: MetaSearch,
+    bing: Arc<Bing>,
+    naver: Arc<Naver>,
+    wikipedia: Arc<Wikipedia>,
+    limit: Arc<Semaphore>,
+}
+
+impl SearchService {
+    pub fn new(fetcher: SafeFetcher, config: &EngineConfig) -> Result<Self> {
+        let bing = Arc::new(Bing::new().map_err(search_error)?);
+        let naver = Arc::new(Naver::new().map_err(search_error)?);
+        let wikipedia = Arc::new(Wikipedia::new().map_err(search_error)?);
+        let engines: Vec<Arc<dyn metasearch::SearchEngine>> =
+            vec![bing.clone(), naver.clone(), wikipedia.clone()];
+        let metasearch = MetaSearch::with_engines(
+            MetaSearchConfig {
+                per_engine_concurrency: config.max_concurrency,
+                ..Default::default()
+            },
+            engines,
+        );
+        Ok(Self {
+            default_provider: config.default_search_provider,
+            fetcher,
+            metasearch,
+            bing,
+            naver,
+            wikipedia,
+            limit: Arc::new(Semaphore::new(config.max_concurrency.max(1))),
+        })
+    }
+
+    pub async fn search(&self, request: &SearchRequest) -> Result<SearchResponse> {
+        validate(request)?;
+        let _permit = self
+            .limit
+            .acquire()
+            .await
+            .map_err(|_| EngineError::Capacity("search runtime is shutting down".into()))?;
+        let provider = request.provider.unwrap_or(self.default_provider);
+        let query = SearchQuery {
+            query: request.query.trim().into(),
+            limit: request.limit,
+            country: request.country.clone(),
+            language: request.language.clone(),
+        };
+        match provider {
+            SearchProvider::Metasearch => self
+                .metasearch
+                .search(&query)
+                .await
+                .map(|output| from_metasearch(request, output))
+                .map_err(search_error),
+            SearchProvider::Bing => self
+                .bing
+                .search(&query)
+                .await
+                .and_then(require_hits)
+                .map(|output| from_engine(request, output))
+                .map_err(search_error),
+            SearchProvider::Naver => self
+                .naver
+                .search(&query)
+                .await
+                .and_then(require_hits)
+                .map(|output| from_engine(request, output))
+                .map_err(search_error),
+            SearchProvider::Wikipedia => self
+                .wikipedia
+                .search(&query)
+                .await
+                .and_then(require_hits)
+                .map(|output| from_engine(request, output))
+                .map_err(search_error),
+            SearchProvider::Duckduckgo => duckduckgo(&self.fetcher, request).await,
+        }
+    }
+}
+
+fn validate(request: &SearchRequest) -> Result<()> {
+    if request.query.trim().is_empty() {
         return Err(EngineError::InvalidRequest(
             "search query cannot be empty".into(),
+        ));
+    }
+    if request.query.len() > 512 {
+        return Err(EngineError::InvalidRequest(
+            "search query cannot exceed 512 bytes".into(),
         ));
     }
     if !(1..=20).contains(&request.limit) {
@@ -23,71 +117,78 @@ pub async fn search(fetcher: &SafeFetcher, request: &SearchRequest) -> Result<Se
             "search limit must be between 1 and 20".into(),
         ));
     }
-
-    let mut provider_errors = Vec::new();
-    for provider in [Provider::DuckDuckGo, Provider::Bing] {
-        match provider.search(fetcher, request).await {
-            Ok(mut results) if !results.is_empty() => {
-                results.truncate(request.limit);
-                return Ok(SearchResponse {
-                    query: query.to_owned(),
-                    provider: provider.name().into(),
-                    results,
-                    elapsed_ms: started.elapsed().as_millis() as u64,
-                });
-            }
-            Ok(_) => provider_errors.push(format!("{} returned no results", provider.name())),
-            Err(error) => provider_errors.push(format!("{}: {error}", provider.name())),
-        }
-    }
-
-    Err(EngineError::Search(provider_errors.join("; ")))
+    Ok(())
 }
 
-#[derive(Clone, Copy)]
-enum Provider {
-    DuckDuckGo,
-    Bing,
+fn require_hits(output: EngineOutput) -> metasearch::Result<EngineOutput> {
+    if output.hits.is_empty() {
+        return Err(metasearch::Error::AllEnginesFailed(format!(
+            "{} returned no results",
+            output.engine
+        )));
+    }
+    Ok(output)
 }
 
-impl Provider {
-    fn name(self) -> &'static str {
-        match self {
-            Self::DuckDuckGo => "duckduckgo",
-            Self::Bing => "bing",
-        }
-    }
-
-    async fn search(
-        self,
-        fetcher: &SafeFetcher,
-        request: &SearchRequest,
-    ) -> Result<Vec<SearchResult>> {
-        let url = match self {
-            Self::DuckDuckGo => duckduckgo_url(request),
-            Self::Bing => bing_url(request),
-        };
-        let user_agent = match self {
-            Self::DuckDuckGo => {
-                "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-            }
-            Self::Bing => "Mozilla/5.0",
-        };
-        let response = fetcher
-            .get_with_user_agent(url.as_str(), Duration::from_secs(15), user_agent)
-            .await?;
-        if !response.status.is_success() {
-            return Err(EngineError::Search(format!("HTTP {}", response.status)));
-        }
-        let html = String::from_utf8_lossy(&response.body);
-        Ok(match self {
-            Self::DuckDuckGo => parse_duckduckgo(&html),
-            Self::Bing => parse_bing(&html),
-        })
+fn from_engine(request: &SearchRequest, output: EngineOutput) -> SearchResponse {
+    SearchResponse {
+        query: request.query.trim().into(),
+        provider: output.engine.into(),
+        results: output
+            .hits
+            .into_iter()
+            .enumerate()
+            .map(|(index, hit)| result(index, hit, vec![output.engine.into()]))
+            .collect(),
+        elapsed_ms: output.elapsed.as_millis() as u64,
+        warnings: Vec::new(),
     }
 }
 
-fn duckduckgo_url(request: &SearchRequest) -> Url {
+fn from_metasearch(request: &SearchRequest, output: MetaSearchOutput) -> SearchResponse {
+    let warnings = output.engine_failures;
+    SearchResponse {
+        query: request.query.trim().into(),
+        provider: "metasearch".into(),
+        results: output
+            .hits
+            .into_iter()
+            .enumerate()
+            .map(|(index, hit)| {
+                result(
+                    index,
+                    MetaSearchHit {
+                        title: hit.title,
+                        url: hit.url,
+                        snippet: hit.snippet,
+                    },
+                    hit.sources,
+                )
+            })
+            .collect(),
+        elapsed_ms: output.elapsed.as_millis() as u64,
+        warnings,
+    }
+}
+
+fn result(index: usize, hit: MetaSearchHit, sources: Vec<String>) -> SearchResult {
+    SearchResult {
+        position: index + 1,
+        title: hit.title,
+        url: hit.url,
+        description: hit.snippet,
+        sources,
+        document: None,
+        error: None,
+    }
+}
+
+fn search_error(error: metasearch::Error) -> EngineError {
+    EngineError::Search(error.to_string())
+}
+
+async fn duckduckgo(fetcher: &SafeFetcher, request: &SearchRequest) -> Result<SearchResponse> {
+    let started = Instant::now();
     let mut url = Url::parse("https://html.duckduckgo.com/html/").expect("constant URL is valid");
     url.query_pairs_mut()
         .append_pair("q", request.query.trim())
@@ -100,18 +201,39 @@ fn duckduckgo_url(request: &SearchRequest) -> Url {
             ),
         )
         .append_pair("kp", "1");
-    url
+    let response = fetcher
+        .get_with_user_agent(
+            url.as_str(),
+            Duration::from_secs(15),
+            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120 Safari/537.36",
+        )
+        .await?;
+    if !response.status.is_success() {
+        return Err(EngineError::Search(format!(
+            "duckduckgo returned HTTP {}",
+            response.status
+        )));
+    }
+    let html = String::from_utf8_lossy(&response.body);
+    let mut hits = parse_duckduckgo(&html);
+    hits.truncate(request.limit);
+    if hits.is_empty() {
+        return Err(EngineError::Search("duckduckgo returned no results".into()));
+    }
+    Ok(SearchResponse {
+        query: request.query.trim().into(),
+        provider: "duckduckgo".into(),
+        results: hits
+            .into_iter()
+            .enumerate()
+            .map(|(index, hit)| result(index, hit, vec!["duckduckgo".into()]))
+            .collect(),
+        elapsed_ms: started.elapsed().as_millis() as u64,
+        warnings: Vec::new(),
+    })
 }
 
-fn bing_url(request: &SearchRequest) -> Url {
-    let mut url = Url::parse("https://www.bing.com/search").expect("constant URL is valid");
-    url.query_pairs_mut()
-        .append_pair("q", request.query.trim())
-        .append_pair("count", &request.limit.to_string());
-    url
-}
-
-fn parse_duckduckgo(html: &str) -> Vec<SearchResult> {
+fn parse_duckduckgo(html: &str) -> Vec<MetaSearchHit> {
     let document = Html::parse_document(html);
     if Selector::parse(".anomaly-modal__modal")
         .ok()
@@ -122,67 +244,33 @@ fn parse_duckduckgo(html: &str) -> Vec<SearchResult> {
     let result_selector = Selector::parse(".result.web-result").expect("valid selector");
     let link_selector = Selector::parse(".result__a").expect("valid selector");
     let snippet_selector = Selector::parse(".result__snippet").expect("valid selector");
-
     document
         .select(&result_selector)
-        .filter_map(|block| {
-            build_result(
-                &block,
-                &link_selector,
-                &snippet_selector,
-                clean_duckduckgo_url,
-            )
-        })
-        .enumerate()
-        .map(numbered)
+        .filter_map(|block| build_duckduckgo_hit(&block, &link_selector, &snippet_selector))
         .collect()
 }
 
-fn parse_bing(html: &str) -> Vec<SearchResult> {
-    let document = Html::parse_document(html);
-    let result_selector = Selector::parse("li.b_algo").expect("valid selector");
-    let link_selector = Selector::parse("h2 a").expect("valid selector");
-    let snippet_selector = Selector::parse(".b_caption p").expect("valid selector");
-
-    document
-        .select(&result_selector)
-        .filter_map(|block| build_result(&block, &link_selector, &snippet_selector, clean_bing_url))
-        .enumerate()
-        .map(numbered)
-        .collect()
-}
-
-fn build_result(
+fn build_duckduckgo_hit(
     block: &ElementRef<'_>,
     link_selector: &Selector,
     snippet_selector: &Selector,
-    clean_url: impl Fn(&str) -> Option<String>,
-) -> Option<(String, String, Option<String>)> {
+) -> Option<MetaSearchHit> {
     let link = block.select(link_selector).next()?;
-    let url = clean_url(link.value().attr("href")?)?;
+    let url = clean_duckduckgo_url(link.value().attr("href")?)?;
     let title = normalize_space(&link.text().collect::<Vec<_>>().join(" "));
     if title.is_empty() {
         return None;
     }
-    let description = block
+    let snippet = block
         .select(snippet_selector)
         .next()
         .map(|node| normalize_space(&node.text().collect::<Vec<_>>().join(" ")))
         .filter(|value| !value.is_empty());
-    Some((title, url, description))
-}
-
-fn numbered(
-    (index, (title, url, description)): (usize, (String, String, Option<String>)),
-) -> SearchResult {
-    SearchResult {
-        position: index + 1,
+    Some(MetaSearchHit {
         title,
         url,
-        description,
-        document: None,
-        error: None,
-    }
+        snippet,
+    })
 }
 
 fn clean_duckduckgo_url(raw: &str) -> Option<String> {
@@ -194,30 +282,12 @@ fn clean_duckduckgo_url(raw: &str) -> Option<String> {
         .find(|(key, _)| key == "uddg")
         .map(|(_, value)| value.into_owned())
         .unwrap_or_else(|| parsed.to_string());
-    public_url(&candidate)
-}
-
-fn clean_bing_url(raw: &str) -> Option<String> {
-    let parsed = Url::parse(raw).ok()?;
-    if parsed
-        .host_str()
-        .is_some_and(|host| host.ends_with("bing.com"))
-        && let Some(encoded) = parsed
-            .query_pairs()
-            .find(|(key, _)| key == "u")
-            .map(|(_, value)| value.into_owned())
-            .and_then(|value| value.strip_prefix("a1").map(ToOwned::to_owned))
-        && let Ok(decoded) = STANDARD_NO_PAD.decode(encoded)
-        && let Ok(decoded) = String::from_utf8(decoded)
-    {
-        return public_url(&decoded);
+    let mut url = Url::parse(&candidate).ok()?;
+    if !matches!(url.scheme(), "http" | "https") {
+        return None;
     }
-    public_url(raw)
-}
-
-fn public_url(value: &str) -> Option<String> {
-    let url = Url::parse(value).ok()?;
-    matches!(url.scheme(), "http" | "https").then(|| url.to_string())
+    url.set_fragment(None);
+    Some(url.to_string())
 }
 
 fn normalize_space(value: &str) -> String {
@@ -232,14 +302,6 @@ mod tests {
     fn parses_duckduckgo_result() {
         let html = r#"<div class="result web-result"><a class="result__a" href="//duckduckgo.com/l/?uddg=https%3A%2F%2Fexample.com%2F">Example</a><a class="result__snippet">A result</a></div>"#;
         let results = parse_duckduckgo(html);
-        assert_eq!(results.len(), 1);
-        assert_eq!(results[0].url, "https://example.com/");
-    }
-
-    #[test]
-    fn parses_bing_redirect() {
-        let html = r#"<li class="b_algo"><h2><a href="https://www.bing.com/ck/a?u=a1aHR0cHM6Ly9leGFtcGxlLmNvbS8">Example</a></h2><div class="b_caption"><p>A result</p></div></li>"#;
-        let results = parse_bing(html);
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].url, "https://example.com/");
     }

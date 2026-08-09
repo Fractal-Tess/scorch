@@ -1,8 +1,9 @@
 # Architecture
 
-Scorch is a four-crate Rust workspace that produces one executable.
+Scorch is a five-crate Rust workspace that produces one executable.
 
 ```text
+metasearch    <- native concurrent search engines, ranking, cache, circuit breakers
 scorch-types  <- shared request and response contracts
       ^
 scorch-engine <- network policy, proxy, fetch, browser, extraction, search, map, jobs
@@ -43,7 +44,9 @@ Each crawl has cancellation, an absolute deadline, a page/depth/concurrency ceil
 
 ## Search
 
-Search providers are isolated adapters. The default waterfall currently parses public DuckDuckGo HTML and then Bing HTML. Challenges, markup drift, and rate limits are treated as provider failure rather than empty authoritative results. Optional result scraping uses the same guarded scrape pipeline.
+Search providers are isolated adapters selected by the request or the server default. Bing is the infrastructure-free default. The native `metasearch` provider concurrently queries independently implemented Bing, Naver, and Wikipedia adapters, collects additional responses for a short window after the first useful result, normalizes and deduplicates URLs, and ranks agreement with reciprocal-rank fusion. Slow engines cannot hold the full request open.
+
+The metasearch runtime has per-engine concurrency limits, a bounded 60-second in-memory response cache, partial-failure behavior, and temporary circuit breakers after repeated engine failures. Exact `bing`, `naver`, `wikipedia`, and legacy `duckduckgo` providers are also selectable. Challenges, markup drift, and rate limits are failures rather than authoritative empty results. Optional result scraping uses the guarded scrape pipeline.
 
 ## MCP
 

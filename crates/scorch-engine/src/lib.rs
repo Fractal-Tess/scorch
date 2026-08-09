@@ -34,6 +34,7 @@ use crate::{browser::BrowserManager, fetch::SafeFetcher};
 pub struct ScorchEngine {
     config: EngineConfig,
     fetcher: SafeFetcher,
+    search: search::SearchService,
     browser: BrowserManager,
     jobs: Arc<JobStore>,
 }
@@ -44,12 +45,14 @@ impl ScorchEngine {
             browser_path = %config.browser_path.display(),
             max_concurrency = config.max_concurrency,
             max_response_bytes = config.max_response_bytes,
+            default_search_provider = config.default_search_provider.as_str(),
             max_crawl_limit = config.max_crawl_limit,
             job_ttl_seconds = config.job_ttl.as_secs(),
             "initializing Scorch engine"
         );
         let security = SecurityPolicy;
         let fetcher = SafeFetcher::new(security.clone(), config.clone());
+        let search = search::SearchService::new(fetcher.clone(), &config)?;
         let browser = BrowserManager::new(config.clone(), security).await?;
         let jobs = Arc::new(JobStore::new(
             config.job_ttl,
@@ -61,6 +64,7 @@ impl ScorchEngine {
         Ok(Arc::new(Self {
             config,
             fetcher,
+            search,
             browser,
             jobs,
         }))
@@ -185,8 +189,13 @@ impl ScorchEngine {
 
     pub async fn search(&self, request: &SearchRequest) -> Result<SearchResponse> {
         let started = Instant::now();
+        let provider = request
+            .provider
+            .unwrap_or(self.config.default_search_provider)
+            .as_str();
         info!(
             operation = "search",
+            provider,
             query_length = request.query.len(),
             limit = request.limit,
             enrich_results = request.scrape_options.is_some(),
@@ -215,7 +224,7 @@ impl ScorchEngine {
     }
 
     async fn search_inner(&self, request: &SearchRequest) -> Result<SearchResponse> {
-        let mut response = search::search(&self.fetcher, request).await?;
+        let mut response = self.search.search(request).await?;
         let Some(options) = request.scrape_options.clone() else {
             return Ok(response);
         };

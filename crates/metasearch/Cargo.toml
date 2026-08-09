@@ -1,5 +1,5 @@
 [package]
-name = "scorch-engine"
+name = "metasearch"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
@@ -9,22 +9,12 @@ rust-version.workspace = true
 
 [dependencies]
 base64.workspace = true
-chromiumoxide.workspace = true
-dashmap.workspace = true
-dom_smoothie.workspace = true
 futures-util.workspace = true
-html2md.workspace = true
-metasearch = { path = "../metasearch" }
-quick-xml.workspace = true
 reqwest.workspace = true
-robotstxt.workspace = true
-scorch-types = { path = "../scorch-types" }
 scraper.workspace = true
 serde.workspace = true
+serde_json.workspace = true
 thiserror.workspace = true
-tempfile.workspace = true
 tokio.workspace = true
-tokio-util.workspace = true
 tracing.workspace = true
 url.workspace = true
-uuid.workspace = true
