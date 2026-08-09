@@ -27,10 +27,10 @@
   };
 
   scripts = {
-    check.exec = "cargo check --all-targets";
+    check.exec = "cargo check --workspace --all-targets";
     fmt.exec = "cargo fmt --all";
-    lint.exec = "cargo clippy --all-targets --all-features -- -D warnings";
-    test.exec = "cargo test --all-targets";
+    lint.exec = "cargo clippy --workspace --all-targets --all-features -- -D warnings";
+    test.exec = "cargo test --workspace --all-targets";
   };
 
   enterShell = ''

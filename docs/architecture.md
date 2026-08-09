@@ -1,43 +1,54 @@
-# Architecture proposal
+# Architecture
 
-## Goals
+Scorch is a four-crate Rust workspace that produces one executable.
 
-- One Rust server executable that owns browser lifecycle and worker tasks.
-- No database, message broker, cache server, or separate browser service.
-- Bounded CPU, memory, browser pages, crawl depth, response size, and request time.
-- Fetch static pages directly; render with Chromium only when JavaScript or actions require it.
-- Reject private, loopback, link-local, and otherwise unsafe network targets, including redirects and browser subrequests.
-- Return partial crawl results when individual pages fail.
+```text
+scorch-types  <- shared request and response contracts
+      ^
+scorch-engine <- network policy, proxy, fetch, browser, extraction, search, map, jobs
+      ^
+scorch-api    <- Axum transport and HTTP error mapping
+      ^
+scorch-cli    <- `scorch` executable, HTTP client commands, server mode, MCP mode
+```
 
-## Proposed modules
+## Runtime
 
-- `api`: HTTP routes, validation, response envelopes, and error mapping.
-- `fetch`: guarded HTTP client and redirect policy.
-- `browser`: one managed Chromium process with isolated contexts and a page semaphore.
-- `extract`: HTML cleanup, metadata, links, images, text, and Markdown conversion.
-- `search`: provider adapters, beginning with search-page parsing and optional result scraping.
-- `crawl`: sitemap-first discovery plus bounded same-origin breadth-first traversal.
-- `jobs`: in-memory async job registry, cancellation tokens, expiry, and bounded result retention.
-- `security`: URL normalization, DNS/IP checks, request interception, and size/time limits.
+`scorch serve` owns:
 
-## Proposed first API
+- one Axum server;
+- one globally bounded direct-fetch runtime;
+- one lazy Chromium process and bounded page semaphore;
+- one embedded HTTP/CONNECT safety proxy;
+- up to four active crawl tasks;
+- an in-memory crawl registry with TTL and retained-byte limits.
 
-| Method | Path | Purpose |
-| --- | --- | --- |
-| `GET` | `/healthz` | Process liveness. |
-| `GET` | `/readyz` | Browser and worker readiness. |
-| `POST` | `/v1/search` | Search the web; optionally scrape each result. |
-| `POST` | `/v1/scrape` | Fetch or render one URL and return requested formats. |
-| `POST` | `/v1/map` | Discover normalized same-site URLs without scraping every page. |
-| `POST` | `/v1/crawls` | Start a bounded in-memory crawl job. |
-| `GET` | `/v1/crawls/{id}` | Read crawl status and available results. |
-| `DELETE` | `/v1/crawls/{id}` | Cancel and remove a crawl job. |
+There is no durable state. Restarting the process removes every crawl job.
 
-## Later, if needed
+## Scrape pipeline
 
-- Batch scrape jobs using the same in-memory job runtime.
-- Short-lived browser interaction sessions.
-- Screenshots and PDF extraction.
-- Authentication and per-key rate limits for untrusted deployments.
+1. Parse and validate strict request options.
+2. Validate URL, DNS answers, port, and redirect policy.
+3. Fetch with manual redirects and DNS-pinned sockets.
+4. Select fetch output or Chromium based on requested capabilities and content heuristics.
+5. Route browser traffic through the embedded validating proxy.
+6. Extract readable content, metadata, links, text, and Markdown.
+7. Return only requested large formats.
 
-Structured AI extraction and autonomous research are intentionally outside the initial core because they require a model provider and weaken the no-external-services guarantee.
+## Discovery and crawl
+
+Mapping is sitemap-first, with bounded nested sitemap traversal and root-link fallback. Crawling seeds from mapping, follows same-origin links breadth-first, applies path filters and robots policy, and runs bounded batches. Page failures are retained beside partial successes.
+
+Each crawl has cancellation, an absolute deadline, a page/depth/concurrency ceiling, a retained-byte ceiling, and an expiry. Status responses are paginated to avoid repeatedly serializing all documents.
+
+## Search
+
+Search providers are isolated adapters. The default waterfall currently parses public DuckDuckGo HTML and then Bing HTML. Challenges, markup drift, and rate limits are treated as provider failure rather than empty authoritative results. Optional result scraping uses the same guarded scrape pipeline.
+
+## MCP
+
+`scorch mcp` invokes the engine directly rather than looping through HTTP. The official Rust MCP SDK provides JSON-RPC framing, generated schemas, cancellation tokens, tool discovery, and stdio lifecycle. Protocol output is isolated on stdout; tracing is always written to stderr.
+
+## Trust boundary
+
+Fetched pages, search results, browser output, sitemaps, and robots files are untrusted data. They never control process configuration or command execution. Direct and browser network paths share one URL/address policy. The browser cannot connect directly: QUIC and non-proxied WebRTC are disabled and Chromium receives an explicit proxy with loopback bypass removed.
