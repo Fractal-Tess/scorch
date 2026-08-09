@@ -102,4 +102,4 @@ test
 
 ## License
 
-Licensed under either Apache-2.0 or MIT, at your option.
+Licensed under the MIT License. Copyright © 2026 Fractal-Tess.
