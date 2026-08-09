@@ -117,8 +117,16 @@ def execute_search(task, endpoint, limit, scrape, timeout):
         task.status = "running"
         task.started_at = time.monotonic()
 
+    query = task.query.strip()
+    if not query:
+        with task.lock:
+            task.error = "client refused to send an empty query"
+            task.status = "error"
+            task.finished_at = time.monotonic()
+        return
+
     payload = {
-        "query": task.query,
+        "query": query,
         "limit": limit,
         "country": "us",
         "language": "en",
@@ -247,8 +255,15 @@ def print_summary(snapshots, wall_time, peak_active, colors):
 
 def main():
     args = parse_args()
-    queries = args.queries or DEFAULT_QUERIES
-    request_count = args.requests or (len(args.queries) if args.queries else 8)
+    supplied_queries = [query.strip() for query in args.queries if query.strip()]
+    ignored_queries = len(args.queries) - len(supplied_queries)
+    if ignored_queries:
+        print(
+            f"Ignoring {ignored_queries} empty query argument(s).",
+            file=sys.stderr,
+        )
+    queries = supplied_queries or DEFAULT_QUERIES
+    request_count = args.requests or (len(supplied_queries) if supplied_queries else 8)
     tasks = [
         SearchTask(
             index=index,
