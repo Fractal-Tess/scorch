@@ -45,6 +45,16 @@ Server and runtime options are available with:
 cargo run -- serve --help
 ```
 
+### Concurrent search dashboard
+
+With the API running, launch the dependency-free Python terminal dashboard:
+
+```sh
+python3 scripts/concurrent_search_demo.py --requests 8 --concurrency 4
+```
+
+Pass custom queries as positional arguments, add `--scrape` to enrich results, or use `--plain` for non-interactive output. Each request receives a distinct `x-request-id` that also appears in Scorch's service logs.
+
 ## HTTP API
 
 ```sh
