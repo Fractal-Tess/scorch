@@ -1,6 +1,6 @@
 use std::{path::PathBuf, time::Duration};
 
-use metasearch::EngineKind;
+use metasearch::{EngineCredentials, EngineKind};
 
 #[derive(Debug, Clone)]
 pub struct EngineConfig {
@@ -8,6 +8,7 @@ pub struct EngineConfig {
     pub max_concurrency: usize,
     pub max_response_bytes: usize,
     pub search_engines: Vec<EngineKind>,
+    pub search_engine_credentials: EngineCredentials,
     pub connect_timeout: Duration,
     pub request_timeout: Duration,
     pub job_ttl: Duration,
@@ -26,6 +27,7 @@ impl Default for EngineConfig {
             max_concurrency: 4,
             max_response_bytes: 5 * 1024 * 1024,
             search_engines: EngineKind::ALL.to_vec(),
+            search_engine_credentials: EngineCredentials::default(),
             connect_timeout: Duration::from_secs(10),
             request_timeout: Duration::from_secs(30),
             job_ttl: Duration::from_secs(15 * 60),

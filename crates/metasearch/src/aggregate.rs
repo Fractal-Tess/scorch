@@ -10,9 +10,9 @@ use tracing::{debug, warn};
 use url::Url;
 
 use crate::{
-    AggregatedHit, EngineKind, EngineOutput, Error, MetaSearchOutput, Result, SearchEngine,
-    SearchHit, SearchQuery,
-    engines::{Bing, Naver, Wikipedia},
+    AggregatedHit, EngineCredentials, EngineKind, EngineOutput, Error, MetaSearchOutput, Result,
+    SearchEngine, SearchHit, SearchQuery,
+    engines::{Bing, Brave, DuckDuckGo, Google, Naver, Wikipedia},
 };
 
 const RRF_K: f64 = 60.0;
@@ -54,6 +54,14 @@ impl MetaSearch {
     }
 
     pub fn from_engine_kinds(config: MetaSearchConfig, kinds: &[EngineKind]) -> Result<Self> {
+        Self::from_engine_kinds_with_credentials(config, kinds, &EngineCredentials::default())
+    }
+
+    pub fn from_engine_kinds_with_credentials(
+        config: MetaSearchConfig,
+        kinds: &[EngineKind],
+        credentials: &EngineCredentials,
+    ) -> Result<Self> {
         let mut enabled = Vec::new();
         let mut engines: Vec<Arc<dyn SearchEngine>> = Vec::new();
         for kind in kinds {
@@ -63,6 +71,18 @@ impl MetaSearch {
             enabled.push(*kind);
             match kind {
                 EngineKind::Bing => engines.push(Arc::new(Bing::new()?)),
+                EngineKind::Brave => engines.push(Arc::new(Brave::new(required_credential(
+                    &credentials.brave_api_key,
+                    "Brave API key",
+                )?)?)),
+                EngineKind::DuckDuckGo => engines.push(Arc::new(DuckDuckGo::new()?)),
+                EngineKind::Google => engines.push(Arc::new(Google::new(
+                    required_credential(&credentials.google_api_key, "Google API key")?,
+                    required_credential(
+                        &credentials.google_search_engine_id,
+                        "Google Programmable Search Engine ID",
+                    )?,
+                )?)),
                 EngineKind::Naver => engines.push(Arc::new(Naver::new()?)),
                 EngineKind::Wikipedia => engines.push(Arc::new(Wikipedia::new()?)),
             }
@@ -407,6 +427,14 @@ fn normalized_url(raw: &str) -> Option<String> {
     Some(url.to_string())
 }
 
+fn required_credential(value: &Option<String>, name: &str) -> Result<String> {
+    value
+        .as_ref()
+        .filter(|value| !value.trim().is_empty())
+        .cloned()
+        .ok_or_else(|| Error::InvalidConfiguration(format!("{name} is required")))
+}
+
 fn validate(query: &SearchQuery) -> Result<()> {
     if query.query.trim().is_empty() {
         return Err(Error::InvalidQuery("query cannot be empty".into()));
@@ -439,6 +467,35 @@ mod tests {
     #[test]
     fn engine_policy_cannot_be_empty() {
         assert!(MetaSearch::from_engine_kinds(MetaSearchConfig::default(), &[]).is_err());
+    }
+
+    #[test]
+    fn credentialed_engines_require_configuration() {
+        assert!(
+            MetaSearch::from_engine_kinds(MetaSearchConfig::default(), &[EngineKind::Brave])
+                .is_err()
+        );
+        let credentials = EngineCredentials {
+            brave_api_key: Some("brave-key".into()),
+            google_api_key: Some("google-key".into()),
+            google_search_engine_id: Some("search-engine-id".into()),
+        };
+        let debug = format!("{credentials:?}");
+        assert!(!debug.contains("brave-key"));
+        assert!(!debug.contains("google-key"));
+        assert!(!debug.contains("search-engine-id"));
+        let search = MetaSearch::from_engine_kinds_with_credentials(
+            MetaSearchConfig::default(),
+            &[EngineKind::Brave, EngineKind::Google],
+            &credentials,
+        )
+        .unwrap();
+        let names = search
+            .engines
+            .iter()
+            .map(|engine| engine.engine.name())
+            .collect::<Vec<_>>();
+        assert_eq!(names, ["brave", "google"]);
     }
 
     struct FakeEngine {

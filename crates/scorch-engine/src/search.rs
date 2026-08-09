@@ -16,12 +16,13 @@ pub struct SearchService {
 
 impl SearchService {
     pub fn new(config: &EngineConfig) -> Result<Self> {
-        let metasearch = MetaSearch::from_engine_kinds(
+        let metasearch = MetaSearch::from_engine_kinds_with_credentials(
             MetaSearchConfig {
                 per_engine_concurrency: config.max_concurrency,
                 ..Default::default()
             },
             &config.search_engines,
+            &config.search_engine_credentials,
         )
         .map_err(search_error)?;
         Ok(Self {

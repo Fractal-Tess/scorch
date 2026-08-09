@@ -1,7 +1,7 @@
 use std::{env, net::SocketAddr, path::PathBuf, time::Duration};
 
 use clap::{Parser, ValueEnum};
-use metasearch::EngineKind;
+use metasearch::{EngineCredentials, EngineKind};
 use scorch_engine::{EngineConfig, ScorchEngine};
 use tracing::info;
 use tracing_subscriber::EnvFilter;
@@ -24,9 +24,15 @@ struct ServerArgs {
         value_enum,
         value_delimiter = ',',
         env = "SCORCH_SEARCH_ENGINES",
-        default_value = "bing,naver,wikipedia"
+        default_value = "bing,duckduckgo,naver,wikipedia"
     )]
     search_engines: Vec<SearchEngineArg>,
+    #[arg(long, env = "SCORCH_BRAVE_SEARCH_API_KEY", hide_env_values = true)]
+    brave_search_api_key: Option<String>,
+    #[arg(long, env = "SCORCH_GOOGLE_SEARCH_API_KEY", hide_env_values = true)]
+    google_search_api_key: Option<String>,
+    #[arg(long, env = "SCORCH_GOOGLE_SEARCH_ENGINE_ID", hide_env_values = true)]
+    google_search_engine_id: Option<String>,
 }
 
 impl ServerArgs {
@@ -43,6 +49,11 @@ impl ServerArgs {
             max_response_bytes: self.max_response_bytes.max(1024),
             job_ttl: Duration::from_secs(self.job_ttl_secs.max(1)),
             search_engines,
+            search_engine_credentials: EngineCredentials {
+                brave_api_key: self.brave_search_api_key.clone(),
+                google_api_key: self.google_search_api_key.clone(),
+                google_search_engine_id: self.google_search_engine_id.clone(),
+            },
             ..Default::default()
         }
     }
@@ -51,6 +62,9 @@ impl ServerArgs {
 #[derive(Debug, Clone, Copy, ValueEnum)]
 enum SearchEngineArg {
     Bing,
+    Brave,
+    Duckduckgo,
+    Google,
     Naver,
     Wikipedia,
 }
@@ -59,6 +73,9 @@ impl From<SearchEngineArg> for EngineKind {
     fn from(value: SearchEngineArg) -> Self {
         match value {
             SearchEngineArg::Bing => Self::Bing,
+            SearchEngineArg::Brave => Self::Brave,
+            SearchEngineArg::Duckduckgo => Self::DuckDuckGo,
+            SearchEngineArg::Google => Self::Google,
             SearchEngineArg::Naver => Self::Naver,
             SearchEngineArg::Wikipedia => Self::Wikipedia,
         }
