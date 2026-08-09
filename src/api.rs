@@ -1,4 +1,4 @@
-use std::{sync::Arc, time::Duration};
+use std::{env, path::Path, sync::Arc, time::Duration};
 
 use axum::{
     Json, Router,
@@ -67,11 +67,35 @@ struct ReadinessResponse {
     max_concurrency: usize,
 }
 
-async fn readiness(State(state): State<AppState>) -> Json<ReadinessResponse> {
-    Json(ReadinessResponse {
-        status: "ready",
-        browser_path: state.config.browser_path.display().to_string(),
-        max_concurrency: state.config.max_concurrency,
+async fn readiness(State(state): State<AppState>) -> (StatusCode, Json<ReadinessResponse>) {
+    let browser_available = executable_exists(&state.config.browser_path);
+    let status = if browser_available {
+        StatusCode::OK
+    } else {
+        StatusCode::SERVICE_UNAVAILABLE
+    };
+
+    (
+        status,
+        Json(ReadinessResponse {
+            status: if browser_available {
+                "ready"
+            } else {
+                "browser unavailable"
+            },
+            browser_path: state.config.browser_path.display().to_string(),
+            max_concurrency: state.config.max_concurrency,
+        }),
+    )
+}
+
+fn executable_exists(path: &Path) -> bool {
+    if path.components().count() > 1 {
+        return path.is_file();
+    }
+
+    env::var_os("PATH").is_some_and(|paths| {
+        env::split_paths(&paths).any(|directory| directory.join(path).is_file())
     })
 }
 
