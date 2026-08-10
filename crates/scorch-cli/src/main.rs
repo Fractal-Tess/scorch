@@ -22,7 +22,7 @@ struct Cli {
         long,
         global = true,
         env = "SCORCH_API_URL",
-        default_value = "http://127.0.0.1:3000"
+        default_value = "http://127.0.0.1:33000"
     )]
     api_url: String,
 

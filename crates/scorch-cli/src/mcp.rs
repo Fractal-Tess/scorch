@@ -152,7 +152,7 @@ mod tests {
 
     #[test]
     fn exposes_expected_tools() {
-        let client = ApiClient::new("http://127.0.0.1:3000").unwrap();
+        let client = ApiClient::new("http://127.0.0.1:33000").unwrap();
         let server = ScorchMcp::new(client);
         let names: Vec<_> = server
             .tool_router

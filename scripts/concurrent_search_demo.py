@@ -65,7 +65,7 @@ def parse_args():
     parser.add_argument("queries", nargs="*", help="queries to cycle through")
     parser.add_argument(
         "--api-url",
-        default=os.environ.get("SCORCH_API_URL", "http://127.0.0.1:3000"),
+        default=os.environ.get("SCORCH_API_URL", "http://127.0.0.1:33000"),
     )
     parser.add_argument("--concurrency", type=int, default=4)
     parser.add_argument(

@@ -14,8 +14,8 @@ Use the environment-managed client and service. Do not install or update Scorch 
 ```bash
 command -v scorch
 scorch --version
-printf '%s\n' "${SCORCH_API_URL:-http://127.0.0.1:3000}"
-curl -fsS "${SCORCH_API_URL:-http://127.0.0.1:3000}/readyz"
+printf '%s\n' "${SCORCH_API_URL:-http://127.0.0.1:33000}"
+curl -fsS "${SCORCH_API_URL:-http://127.0.0.1:33000}/readyz"
 ```
 
 Pass `--api-url <URL>` before the subcommand when the configured endpoint differs. Quote URLs containing `?` or `&`. CLI command results are pretty-printed JSON on stdout; diagnostics remain on stderr.

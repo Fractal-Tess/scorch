@@ -71,7 +71,7 @@ in
       apiUrl = mkOption {
         type = types.nullOr types.str;
         default = null;
-        example = "http://127.0.0.1:3000";
+        example = "http://127.0.0.1:33000";
         description = "Optional SCORCH_API_URL exported to login sessions.";
       };
     };
@@ -91,7 +91,7 @@ in
       };
       port = mkOption {
         type = types.port;
-        default = 3000;
+        default = 33000;
         description = "TCP port on which scorchd listens.";
       };
       openFirewall = mkOption {

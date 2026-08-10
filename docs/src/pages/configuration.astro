@@ -47,7 +47,7 @@ const headings = [
         ></thead
       ><tbody>
         <tr
-          ><td><code>SCORCH_BIND</code></td><td><code>127.0.0.1:3000</code></td
+          ><td><code>SCORCH_BIND</code></td><td><code>127.0.0.1:33000</code></td
           ><td>Socket address for the HTTP API.</td><td><code>--bind</code></td
           ></tr
         >
@@ -142,7 +142,7 @@ const headings = [
       ><tbody>
         <tr
           ><td><code>SCORCH_API_URL</code></td><td
-            ><code>http://127.0.0.1:3000</code></td
+            ><code>http://127.0.0.1:33000</code></td
           ><td
             >Every <code>scorch</code> web command, benchmark, and the MCP adapter.</td
           ></tr
@@ -241,7 +241,7 @@ SCORCH_LOG_FORMAT=json RUST_LOG=scorch=info scorchd</code></pre>
   <h3>Local development</h3>
   <pre><code>RUST_LOG=scorch=debug scorchd</code></pre>
   <h3>Private service behind a gateway</h3>
-  <pre><code>SCORCH_BIND=127.0.0.1:3000 \
+  <pre><code>SCORCH_BIND=127.0.0.1:33000 \
 SCORCH_MAX_CONCURRENCY=8 \
 SCORCH_LOG_FORMAT=json \
 RUST_LOG=scorch=info \
@@ -258,7 +258,7 @@ SCORCH_MAX_CONCURRENCY=8 \
 scorchd</code></pre>
   <div class="callout warning">
     <strong>Do not bind publicly without a gateway.</strong>
-    <code>SCORCH_BIND=0.0.0.0:3000</code> exposes an unauthenticated web-fetching
+    <code>SCORCH_BIND=0.0.0.0:33000</code> exposes an unauthenticated web-fetching
     API. Scorch's SSRF policy does not replace caller authentication.
   </div>
 </DocLayout>

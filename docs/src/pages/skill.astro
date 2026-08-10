@@ -55,7 +55,7 @@ const headings = [
     load the checked-in skill automatically after the repository is trusted.
   </p>
   <h3>Install with Nix</h3>
-  <pre><code>nix build github:Fractal-Tess/scorch/v0.1.1#skill
+  <pre><code>nix build github:Fractal-Tess/scorch/v0.1.2#skill
 mkdir -p ~/.agents/skills
 rm -rf ~/.agents/skills/scorch
 cp -R result/share/agent-skills/scorch ~/.agents/skills/scorch</code></pre>
@@ -80,7 +80,7 @@ cp -R .agents/skills/scorch ~/.agents/skills/scorch</code></pre>
     task that matches its description. Configure the client endpoint before
     starting the agent when the service is not local.
   </p>
-  <pre><code>export SCORCH_API_URL=http://127.0.0.1:3000
+  <pre><code>export SCORCH_API_URL=http://127.0.0.1:33000
 scorchd
 
 # In a Pi session:
@@ -88,7 +88,7 @@ scorchd
   <p>The skill first verifies the local tools and API:</p>
   <pre><code>command -v scorch
 scorch --version
-curl -fsS "&#36;&#123;SCORCH_API_URL:-http://127.0.0.1:3000&#125;/readyz"</code></pre>
+curl -fsS "&#36;&#123;SCORCH_API_URL:-http://127.0.0.1:33000&#125;/readyz"</code></pre>
   <p>
     The agent should use the environment-managed binary rather than installing
     or upgrading Scorch during an unrelated task.

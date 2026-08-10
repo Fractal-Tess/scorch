@@ -10,7 +10,7 @@ use tracing_subscriber::EnvFilter;
 #[derive(Parser)]
 #[command(name = "scorchd", version, about = "Scorch HTTP API service")]
 struct ServerArgs {
-    #[arg(long, env = "SCORCH_BIND", default_value = "127.0.0.1:3000")]
+    #[arg(long, env = "SCORCH_BIND", default_value = "127.0.0.1:33000")]
     bind: SocketAddr,
     #[arg(long, value_enum, env = "SCORCH_BROWSER", default_value = "obscura")]
     browser: BrowserArg,

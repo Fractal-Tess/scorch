@@ -4,6 +4,12 @@ All notable changes to Scorch are documented in this file. The project follows [
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-08-10
+
+### Changed
+
+- Moved the default Scorch API listener and client endpoint from port 3000 to port 33000 to avoid common development-server conflicts.
+
 ## [0.1.1] - 2026-08-10
 
 ### Changed
@@ -34,6 +40,7 @@ All notable changes to Scorch are documented in this file. The project follows [
 - Embedded Obscura requests use fresh context, page, cookie, cache, and JavaScript state to prevent caller data leakage.
 - Render requests enforce one caller-visible deadline across validation, queueing, navigation, execution, serialization, and screenshots.
 
-[Unreleased]: https://github.com/Fractal-Tess/scorch/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/Fractal-Tess/scorch/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/Fractal-Tess/scorch/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/Fractal-Tess/scorch/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/Fractal-Tess/scorch/releases/tag/v0.1.0

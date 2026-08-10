@@ -52,7 +52,7 @@ const headings = [
   <h2 id="start-the-service">Start the service</h2>
   <pre><code>scorchd</code></pre>
   <p>Confirm that the API is ready before starting an MCP host:</p>
-  <pre><code>curl -fsS http://127.0.0.1:3000/readyz | jq</code></pre>
+  <pre><code>curl -fsS http://127.0.0.1:33000/readyz | jq</code></pre>
   <p>
     The MCP adapter is not a service supervisor. Your process manager, shell, or
     container runtime should keep <code>scorchd</code> running separately.
@@ -71,7 +71,7 @@ const headings = [
       "command": "/absolute/path/to/scorch",
       "args": ["mcp"],
       "env": &#123;
-        "SCORCH_API_URL": "http://127.0.0.1:3000"
+        "SCORCH_API_URL": "http://127.0.0.1:33000"
       &#125;
     &#125;
   &#125;
@@ -195,10 +195,10 @@ const headings = [
   <ol>
     <li><code>--api-url</code> passed before <code>mcp</code></li><li>
       <code>SCORCH_API_URL</code> in the MCP server environment
-    </li><li><code>http://127.0.0.1:3000</code></li>
+    </li><li><code>http://127.0.0.1:33000</code></li>
   </ol>
   <pre><code>/absolute/path/to/scorch \
-  --api-url http://127.0.0.1:3000 \
+  --api-url http://127.0.0.1:33000 \
   mcp</code></pre>
 
   <h2 id="troubleshooting">Troubleshooting</h2>
@@ -210,8 +210,8 @@ const headings = [
   </p>
   <h3>Tools fail with connection errors</h3>
   <p>Check the API separately:</p>
-  <pre><code>SCORCH_API_URL=http://127.0.0.1:3000 scorch search "health check"
-curl -v http://127.0.0.1:3000/readyz</code></pre>
+  <pre><code>SCORCH_API_URL=http://127.0.0.1:33000 scorch search "health check"
+curl -v http://127.0.0.1:33000/readyz</code></pre>
   <p>
     If the MCP host is sandboxed or containerized, <code>127.0.0.1</code> refers to
     that sandbox or container, not necessarily the machine running <code

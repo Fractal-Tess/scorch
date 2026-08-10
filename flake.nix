@@ -149,7 +149,7 @@
           module =
             assert nixpkgs.lib.hasInfix "--browser obscura"
               moduleSystem.config.systemd.services.scorchd.serviceConfig.ExecStart;
-            assert nixpkgs.lib.hasInfix "--bind 127.0.0.1:3000"
+            assert nixpkgs.lib.hasInfix "--bind 127.0.0.1:33000"
               moduleSystem.config.systemd.services.scorchd.serviceConfig.ExecStart;
             pkgs.runCommand "scorch-module-check" { } ''
               touch "$out"

@@ -9,8 +9,8 @@ Scorch does not require a database, broker, cache server, browser service, or ex
 Run either executable directly from the flake. Versioned Linux binaries are built by GitHub Actions and fetched by Nix, so installation does not compile the Rust workspace locally:
 
 ```sh
-nix run github:Fractal-Tess/scorch/v0.1.1#scorch -- --help
-nix run github:Fractal-Tess/scorch/v0.1.1#scorchd -- --help
+nix run github:Fractal-Tess/scorch/v0.1.2#scorch -- --help
+nix run github:Fractal-Tess/scorch/v0.1.2#scorchd -- --help
 ```
 
 Or enable the client and service declaratively on NixOS:
@@ -18,7 +18,7 @@ Or enable the client and service declaratively on NixOS:
 ```nix
 {
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-  inputs.scorch.url = "github:Fractal-Tess/scorch/v0.1.1";
+  inputs.scorch.url = "github:Fractal-Tess/scorch/v0.1.2";
 
   outputs = { nixpkgs, scorch, ... }: {
     nixosConfigurations.host = nixpkgs.lib.nixosSystem {
@@ -28,7 +28,7 @@ Or enable the client and service declaratively on NixOS:
         {
           programs.scorch = {
             enable = true;
-            apiUrl = "http://127.0.0.1:3000";
+            apiUrl = "http://127.0.0.1:33000";
           };
           services.scorchd.enable = true;
         }
@@ -45,7 +45,7 @@ The flake also exports an optional `scorchd-with-chromium` package, an overlay, 
 The repository includes a standard Agent Skill at `.agents/skills/scorch/SKILL.md`. It is discovered automatically while working in this repository. The flake packages it for installation into another agent environment:
 
 ```sh
-nix build github:Fractal-Tess/scorch/v0.1.1#skill
+nix build github:Fractal-Tess/scorch/v0.1.2#skill
 mkdir -p ~/.agents/skills
 rm -rf ~/.agents/skills/scorch
 cp -R result/share/agent-skills/scorch ~/.agents/skills/scorch
@@ -60,7 +60,7 @@ devenv shell
 cargo run -p scorch-server --
 ```
 
-The API listens on `127.0.0.1:3000` by default. Authentication is intentionally not built into this local-first release; do not expose it to an untrusted network without an authenticated TLS gateway.
+The API listens on `127.0.0.1:33000` by default. Authentication is intentionally not built into this local-first release; do not expose it to an untrusted network without an authenticated TLS gateway.
 
 ## Logging
 
@@ -133,7 +133,7 @@ Pass custom queries as positional arguments, add `--scrape` to enrich results, o
 ## HTTP API
 
 ```sh
-curl -sS http://127.0.0.1:3000/v1/scrape \
+curl -sS http://127.0.0.1:33000/v1/scrape \
   -H 'content-type: application/json' \
   -d '{
     "url": "https://example.com",
@@ -177,7 +177,7 @@ A client configuration can point at a release build:
       "command": "/absolute/path/to/scorch",
       "args": ["mcp"],
       "env": {
-        "SCORCH_API_URL": "http://127.0.0.1:3000"
+        "SCORCH_API_URL": "http://127.0.0.1:33000"
       }
     }
   }

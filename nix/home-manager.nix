@@ -21,7 +21,7 @@ in
     apiUrl = lib.mkOption {
       type = lib.types.nullOr lib.types.str;
       default = null;
-      example = "http://127.0.0.1:3000";
+      example = "http://127.0.0.1:33000";
       description = "Optional SCORCH_API_URL exported to the user environment.";
     };
   };

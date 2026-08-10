@@ -17,7 +17,7 @@ const headings = [
   next={{ label: "How Scorch works", href: "/architecture/" }}
 >
   <div class="callout">
-    <strong>Local-first:</strong> Scorch listens on <code>127.0.0.1:3000</code> by
+    <strong>Local-first:</strong> Scorch listens on <code>127.0.0.1:33000</code> by
     default and has no built-in authentication. Keep it on loopback while following
     this guide.
   </div>
@@ -51,8 +51,8 @@ const headings = [
   <h2 id="install">Install</h2>
   <h3 id="nix-flake">Option A: Nix flake</h3>
   <p>Run either released executable without cloning the repository:</p>
-  <pre><code>nix run github:Fractal-Tess/scorch/v0.1.1#scorch -- --help
-nix run github:Fractal-Tess/scorch/v0.1.1#scorchd -- --help</code></pre>
+  <pre><code>nix run github:Fractal-Tess/scorch/v0.1.2#scorch -- --help
+nix run github:Fractal-Tess/scorch/v0.1.2#scorchd -- --help</code></pre>
   <p>
     For a declarative NixOS service and client installation, continue to the <a
       href="/nix/">Nix installation guide</a
@@ -102,8 +102,8 @@ install -Dm755 target/release/scorch ~/.local/bin/scorch</code></pre>
     At startup the service prints operational logs to stderr. Verify liveness
     and readiness from another terminal:
   </p>
-  <pre><code>curl -sS http://127.0.0.1:3000/healthz
-curl -sS http://127.0.0.1:3000/readyz | jq</code></pre>
+  <pre><code>curl -sS http://127.0.0.1:33000/healthz
+curl -sS http://127.0.0.1:33000/readyz | jq</code></pre>
   <p>
     <code>/readyz</code> reports the default and allowed browser backends, Obscura
     stealth setting, global concurrency, search provider, and enabled search engines.
@@ -116,13 +116,14 @@ curl -sS http://127.0.0.1:3000/readyz | jq</code></pre>
 
   <h2 id="connect-a-client">Connect a client</h2>
   <p>
-    The <code>scorch</code> client defaults to <code>http://127.0.0.1:3000</code
+    The <code>scorch</code> client defaults to <code
+      >http://127.0.0.1:33000</code
     >. Set one environment variable to use a different service:
   </p>
   <pre><code>export SCORCH_API_URL=https://scorch.internal.example
 scorch search "rust async runtime" --limit 5</code></pre>
   <p>Every command also accepts <code>--api-url</code>:</p>
-  <pre><code>scorch --api-url http://127.0.0.1:3000 search "web extraction"</code></pre>
+  <pre><code>scorch --api-url http://127.0.0.1:33000 search "web extraction"</code></pre>
   <p>
     <code>SCORCH_API_URL</code> configures only the client and MCP adapter. <code
       >SCORCH_BIND</code
@@ -136,7 +137,7 @@ scorch search "rust async runtime" --limit 5
 scorch map https://example.com --limit 100
 scorch crawl https://example.com --limit 20 --max-depth 2 --wait</code></pre>
   <h3>With HTTP</h3>
-  <pre><code>curl -sS http://127.0.0.1:3000/v1/scrape \
+  <pre><code>curl -sS http://127.0.0.1:33000/v1/scrape \
   -H 'content-type: application/json' \
   -d '&#123;
     "url": "https://example.com",
@@ -176,6 +177,6 @@ scorch crawl https://example.com --limit 20 --max-depth 2 --wait</code></pre>
   </ul>
   <pre><code>SCORCH_LOG_FORMAT=json \
 RUST_LOG=scorch=info \
-SCORCH_BIND=127.0.0.1:3000 \
+SCORCH_BIND=127.0.0.1:33000 \
 scorchd</code></pre>
 </DocLayout>

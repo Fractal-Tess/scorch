@@ -197,6 +197,6 @@ mod tests {
         assert!(is_restricted_port(6379));
         assert!(!is_restricted_port(80));
         assert!(!is_restricted_port(443));
-        assert!(!is_restricted_port(3000));
+        assert!(!is_restricted_port(33000));
     }
 }
