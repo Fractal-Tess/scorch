@@ -15,15 +15,15 @@
         pkgs:
         let
           lib = pkgs.lib;
-          version = "0.1.2";
+          version = "0.1.3";
           releaseArtifacts = {
             x86_64-linux = {
               target = "x86_64-unknown-linux-gnu";
-              hash = "sha256-6yvzngn/VSnfM21ZXhr6N57oRd/ey8+Pm3DPtaZ5Kd4=";
+              hash = "sha256-u9sKkqGUEHjOcXnRck2krBgJFHuz1XqM7XesvO0yPqs=";
             };
             aarch64-linux = {
               target = "aarch64-unknown-linux-gnu";
-              hash = "sha256-9R8PiKcRkiBgFTF27vsXvlBytzR0xQlQJW98XSzwcsQ=";
+              hash = "sha256-WFC4qqHkES5OSpj4t+7wJsjqrrbXu9bcnsj9dHSWEqo=";
             };
           };
           artifact = releaseArtifacts.${pkgs.stdenv.hostPlatform.system};
@@ -155,8 +155,8 @@
               touch "$out"
             '';
           version = pkgs.runCommand "scorch-version-check" { } ''
-            test "$(${packages.scorch}/bin/scorch --version)" = 'scorch 0.1.2'
-            test "$(${packages.scorchd}/bin/scorchd --version)" = 'scorchd 0.1.2'
+            test "$(${packages.scorch}/bin/scorch --version)" = 'scorch 0.1.3'
+            test "$(${packages.scorchd}/bin/scorchd --version)" = 'scorchd 0.1.3'
             touch "$out"
           '';
         }
