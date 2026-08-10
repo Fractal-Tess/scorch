@@ -1,0 +1,260 @@
+---
+import DocLayout from "../layouts/DocLayout.astro";
+const headings = [
+  { label: "Run from the flake", href: "#run" },
+  { label: "NixOS module", href: "#nixos" },
+  { label: "Service policy", href: "#service-policy" },
+  { label: "Secrets", href: "#secrets" },
+  { label: "Home Manager", href: "#home-manager" },
+  { label: "Flake outputs", href: "#outputs" },
+];
+---
+
+<DocLayout
+  title="Nix installation"
+  description="Run Scorch directly from its flake or enable the client and service declaratively with the exported NixOS and Home Manager modules."
+  eyebrow="Deployment"
+  headings={headings}
+  previous={{ label: "Agent Skill", href: "/skill/" }}
+>
+  <h2 id="run">Run from the flake</h2>
+  <p>
+    The release flake exposes separate packages and apps for the HTTP-only
+    client and the runtime-owning service. Pin a release tag for reproducible
+    deployments.
+  </p>
+  <pre><code>nix run github:Fractal-Tess/scorch/v0.1.0#scorch -- --help
+nix run github:Fractal-Tess/scorch/v0.1.0#scorchd -- --help</code></pre>
+  <p>Install either package into a profile:</p>
+  <pre><code>nix profile install github:Fractal-Tess/scorch/v0.1.0#scorch
+nix profile install github:Fractal-Tess/scorch/v0.1.0#scorchd</code></pre>
+  <p>For a standalone daemon with Chromium already in its closure:</p>
+  <pre><code>nix run github:Fractal-Tess/scorch/v0.1.0#scorchd-with-chromium</code></pre>
+  <div class="callout">
+    <strong>Linux support.</strong> The embedded V8 renderer is packaged for
+    <code>x86_64-linux</code> and <code>aarch64-linux</code>. Use the optional
+    <code>scorchd-with-chromium</code> package or configure an explicit browser path
+    when Chromium compatibility is required.
+  </div>
+
+  <h2 id="nixos">Enable both on NixOS</h2>
+  <p>
+    Add Scorch as an input, import its module, install <code>scorch</code>, and
+    start
+    <code>scorchd</code>. The default service binds only to loopback.
+  </p>
+  <pre><code>&#123;
+  inputs = &#123;
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    scorch.url = "github:Fractal-Tess/scorch/v0.1.0";
+  &#125;;
+
+  outputs = &#123; nixpkgs, scorch, ... &#125;: &#123;
+    nixosConfigurations.host = nixpkgs.lib.nixosSystem &#123;
+      system = "x86_64-linux";
+      modules = [
+        scorch.nixosModules.default
+        (&#123; ... &#125;: &#123;
+          programs.scorch = &#123;
+            enable = true;
+            apiUrl = "http://127.0.0.1:3000";
+          &#125;;
+
+          services.scorchd = &#123;
+            enable = true;
+            address = "127.0.0.1";
+            port = 3000;
+          &#125;;
+        &#125;)
+      ];
+    &#125;;
+  &#125;;
+&#125;</code></pre>
+  <p>Apply the host configuration and inspect the service:</p>
+  <pre><code>sudo nixos-rebuild switch --flake .#host
+systemctl status scorchd
+curl -fsS http://127.0.0.1:3000/readyz | jq
+scorch search "rust web extraction" --limit 3</code></pre>
+
+  <h2 id="service-policy">Configure service policy</h2>
+  <pre><code>services.scorchd = &#123;
+  enable = true;
+  browser = "obscura";
+  allowedBrowsers = [ "obscura" "chromium" ];
+  browserPath = pkgs.chromium + "/bin/chromium";
+  obscuraStealth = true;
+  maxConcurrency = 4;
+  maxResponseBytes = 5 * 1024 * 1024;
+  jobTtlSeconds = 900;
+  searchEngines = [
+    "bing"
+    "duckduckgo"
+    "naver"
+    "wikipedia"
+  ];
+  logLevel = "scorch=info";
+  logFormat = "json";
+&#125;;</code></pre>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Option</th><th>Default</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr
+          ><td><code>programs.scorch.enable</code></td><td
+            ><code>false</code></td
+          ><td>Install the HTTP client and MCP adapter.</td></tr
+        >
+        <tr
+          ><td><code>programs.scorch.apiUrl</code></td><td><code>null</code></td
+          ><td>Export <code>SCORCH_API_URL</code> to login sessions.</td></tr
+        >
+        <tr
+          ><td><code>services.scorchd.enable</code></td><td
+            ><code>false</code></td
+          ><td>Start the hardened systemd service.</td></tr
+        >
+        <tr
+          ><td><code>address</code> / <code>port</code></td><td
+            ><code>127.0.0.1:3000</code></td
+          ><td>Configure the API listener.</td></tr
+        >
+        <tr
+          ><td><code>openFirewall</code></td><td><code>false</code></td><td
+            >Open the configured TCP port.</td
+          ></tr
+        >
+        <tr
+          ><td><code>browser</code></td><td><code>obscura</code></td><td
+            >Select the default renderer.</td
+          ></tr
+        >
+        <tr
+          ><td><code>allowedBrowsers</code></td><td
+            ><code>[ "obscura" ]</code></td
+          ><td>Set the request-level backend allowlist.</td></tr
+        >
+        <tr
+          ><td><code>browserPath</code></td><td><code>null</code></td><td
+            >Provide an executable path when Chromium is allowed.</td
+          ></tr
+        >
+        <tr
+          ><td><code>environmentFile</code></td><td><code>null</code></td><td
+            >Load credentials without putting them in the Nix store.</td
+          ></tr
+        >
+      </tbody>
+    </table>
+  </div>
+  <p>
+    The module asserts that the default browser belongs to the allowlist and
+    that browser and search-engine lists are non-empty. When Chromium is
+    allowed, <code>browserPath</code> must be set and NixOS user namespaces must remain
+    enabled for Chromium's sandbox; do not add <code>--no-sandbox</code>.
+    Authentication and TLS remain the responsibility of an external gateway.
+  </p>
+
+  <h2 id="secrets">Load search credentials safely</h2>
+  <p>
+    Do not place API keys directly in a Nix expression: evaluated values can
+    enter the world-readable Nix store. Point the module at a runtime secret
+    managed by sops-nix, agenix, or another provisioner that can write a runtime <code
+      >KEY=value</code
+    > file.
+  </p>
+  <pre><code>services.scorchd = &#123;
+  enable = true;
+  searchEngines = [ "bing" "brave" "wikipedia" ];
+  environmentFile = "/run/secrets/scorchd.env";
+&#125;;</code></pre>
+  <pre><code># /run/secrets/scorchd.env
+SCORCH_BRAVE_SEARCH_API_KEY=replace-at-deploy-time</code></pre>
+  <p>
+    Google requires both <code>SCORCH_GOOGLE_SEARCH_API_KEY</code> and <code
+      >SCORCH_GOOGLE_SEARCH_ENGINE_ID</code
+    >. The module's general <code>environment</code> option is intended only for non-secret
+    overrides.
+  </p>
+
+  <h2 id="home-manager">Home Manager</h2>
+  <p>
+    Use the Home Manager module when only the user-level client is needed. It
+    does not manage <code>scorchd</code>; run the service through NixOS or
+    another process supervisor.
+  </p>
+  <p>Inside your flake's <code>outputs</code> function:</p>
+  <pre><code>homeConfigurations.user = home-manager.lib.homeManagerConfiguration &#123;
+  pkgs = nixpkgs.legacyPackages.x86_64-linux;
+  modules = [
+    scorch.homeManagerModules.default
+    &#123;
+      home.username = "user";
+      home.homeDirectory = "/home/user";
+      home.stateVersion = "26.05";
+      programs.scorch = &#123;
+        enable = true;
+        apiUrl = "http://127.0.0.1:3000";
+      &#125;;
+    &#125;
+  ];
+&#125;;</code></pre>
+
+  <h2 id="outputs">Flake outputs</h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Output</th><th>Contents</th></tr></thead>
+      <tbody>
+        <tr
+          ><td><code>packages.&lt;system&gt;.scorch</code></td><td
+            >HTTP-only CLI and MCP executable.</td
+          ></tr
+        >
+        <tr
+          ><td><code>packages.&lt;system&gt;.scorchd</code></td><td
+            >API service with the embedded Obscura renderer.</td
+          ></tr
+        >
+        <tr
+          ><td><code>packages.&lt;system&gt;.scorchd-with-chromium</code></td
+          ><td>API service with a Nixpkgs Chromium path configured.</td></tr
+        >
+        <tr
+          ><td><code>packages.&lt;system&gt;.skill</code></td><td
+            >Installable Scorch Agent Skill.</td
+          ></tr
+        >
+        <tr
+          ><td><code>apps.&lt;system&gt;.scorch</code></td><td
+            ><code>nix run</code> client app.</td
+          ></tr
+        >
+        <tr
+          ><td><code>apps.&lt;system&gt;.scorchd</code></td><td
+            ><code>nix run</code> service app.</td
+          ></tr
+        >
+        <tr
+          ><td><code>nixosModules.default</code></td><td
+            >NixOS client and systemd service configuration.</td
+          ></tr
+        >
+        <tr
+          ><td><code>homeManagerModules.default</code></td><td
+            >User-level client configuration.</td
+          ></tr
+        >
+        <tr
+          ><td><code>overlays.default</code></td><td
+            >All Scorch packages for direct package-set use.</td
+          ></tr
+        >
+        <tr
+          ><td><code>devShells.&lt;system&gt;.default</code></td><td
+            >Rust, Bun, Chromium, and development tools.</td
+          ></tr
+        >
+      </tbody>
+    </table>
+  </div>
+  <pre><code>nix flake show github:Fractal-Tess/scorch/v0.1.0</code></pre>
+</DocLayout>

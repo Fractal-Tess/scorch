@@ -1,0 +1,120 @@
+---
+interface Props {
+  shape: "scan" | "page" | "graph";
+}
+const { shape } = Astro.props;
+---
+
+<canvas
+  class="ascii-icon"
+  width="198"
+  height="198"
+  data-ascii-icon={shape}
+  aria-hidden="true"></canvas>
+
+<script>
+  const ICON_GLYPHS = "@#%&$08WMXKB";
+
+  function iconPoint(shape: string, x: number, y: number) {
+    const nx = (x - 0.5) * 2;
+    const ny = (y - 0.5) * 2;
+    if (shape === "scan") {
+      const eye = Math.abs(nx) + ny * ny * 0.72 < 0.88;
+      const pupil = Math.hypot(nx, ny) < 0.28;
+      const irisGap = Math.hypot(nx, ny) > 0.38;
+      return eye && (pupil || irisGap);
+    }
+    if (shape === "page") {
+      const body = nx > -0.58 && nx < 0.58 && ny > -0.75 && ny < 0.75;
+      const fold = nx > 0.18 && ny < -0.35 && nx + ny > -0.22;
+      const lines =
+        ny > -0.15 &&
+        ny < 0.48 &&
+        Math.abs((ny + 0.08) % 0.24) < 0.07 &&
+        nx < 0.3;
+      return (
+        body &&
+        (!fold || Math.abs(nx + ny + 0.22) < 0.12) &&
+        (lines || Math.abs(nx) > 0.42 || Math.abs(ny) > 0.62)
+      );
+    }
+    const barOne = nx > -0.72 && nx < -0.38 && ny > 0.12 && ny < 0.72;
+    const barTwo = nx > -0.18 && nx < 0.16 && ny > -0.18 && ny < 0.72;
+    const barThree = nx > 0.36 && nx < 0.7 && ny > -0.58 && ny < 0.72;
+    return barOne || barTwo || barThree;
+  }
+
+  function mountAsciiIcon(canvas: HTMLCanvasElement) {
+    if (canvas.dataset.mounted) return;
+    canvas.dataset.mounted = "true";
+    const context = canvas.getContext("2d");
+    if (!context) return;
+    const shape = canvas.dataset.asciiIcon ?? "scan";
+    const columns = 22;
+    const rows = 22;
+    const cell = 9;
+    const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+    let frame = 0;
+    let running = false;
+    let last = 0;
+    const started = performance.now();
+
+    const draw = (now: number) => {
+      if (!running) return;
+      frame = requestAnimationFrame(draw);
+      if (now - last < 48 && !reduceMotion) return;
+      last = now;
+      context.clearRect(0, 0, canvas.width, canvas.height);
+      context.font = `700 ${cell}px ui-monospace, SFMono-Regular, monospace`;
+      context.textAlign = "center";
+      context.textBaseline = "middle";
+      context.fillStyle =
+        getComputedStyle(document.documentElement)
+          .getPropertyValue("--accent")
+          .trim() || "#2f80ff";
+      const reveal = reduceMotion
+        ? rows
+        : Math.min(rows, ((now - started) / 620) * rows);
+      for (let row = 0; row < rows; row += 1) {
+        if (row > reveal) continue;
+        for (let column = 0; column < columns; column += 1) {
+          const x = (column + 0.5) / columns;
+          const y = (row + 0.5) / rows;
+          if (!iconPoint(shape, x, y)) continue;
+          const seed =
+            Math.sin(
+              column * 12.9898 + row * 78.233 + Math.floor(now / 160) * 4.123,
+            ) * 43758.5453;
+          const index =
+            Math.abs(
+              Math.floor((seed - Math.floor(seed)) * ICON_GLYPHS.length),
+            ) % ICON_GLYPHS.length;
+          context.globalAlpha = 0.75 + (index / ICON_GLYPHS.length) * 0.25;
+          context.fillText(
+            ICON_GLYPHS[index] ?? "#",
+            column * cell + cell / 2,
+            row * cell + cell / 2,
+          );
+        }
+      }
+      context.globalAlpha = 1;
+      if (reduceMotion) stop();
+    };
+    const start = () => {
+      if (running) return;
+      running = true;
+      frame = requestAnimationFrame(draw);
+    };
+    const stop = () => {
+      running = false;
+      cancelAnimationFrame(frame);
+    };
+    new IntersectionObserver(([entry]) =>
+      entry?.isIntersecting ? start() : stop(),
+    ).observe(canvas);
+  }
+
+  document
+    .querySelectorAll<HTMLCanvasElement>("[data-ascii-icon]")
+    .forEach(mountAsciiIcon);
+</script>

@@ -1,0 +1,181 @@
+---
+import DocLayout from "../layouts/DocLayout.astro";
+const headings = [
+  { label: "What you will run", href: "#what-you-will-run" },
+  { label: "Install", href: "#install" },
+  { label: "Start the API", href: "#start-the-api" },
+  { label: "Connect a client", href: "#connect-a-client" },
+  { label: "Make a request", href: "#make-a-request" },
+  { label: "Production notes", href: "#production-notes" },
+];
+---
+
+<DocLayout
+  title="Getting started"
+  description="Install Scorch with Nix or build it from source, start the local API, and connect the CLI or any HTTP client."
+  headings={headings}
+  next={{ label: "How Scorch works", href: "/architecture/" }}
+>
+  <div class="callout">
+    <strong>Local-first:</strong> Scorch listens on <code>127.0.0.1:3000</code> by
+    default and has no built-in authentication. Keep it on loopback while following
+    this guide.
+  </div>
+
+  <h2 id="what-you-will-run">What you will run</h2>
+  <p>A release build creates two executables with a strict process boundary:</p>
+  <div class="grid gap-3 sm:grid-cols-2">
+    <div class="cut-corners border-border bg-surface border p-5">
+      <strong class="text-accent font-mono">scorchd</strong><p
+        class="mt-2 text-sm"
+      >
+        The long-running HTTP service. It owns metasearch, direct fetch, browser
+        rendering, extraction, mapping, and crawl jobs.
+      </p>
+    </div>
+    <div class="cut-corners border-border bg-surface border p-5">
+      <strong class="text-accent font-mono">scorch</strong><p
+        class="mt-2 text-sm"
+      >
+        The lightweight HTTP client. It exposes CLI commands, API benchmarking,
+        and an MCP stdio adapter.
+      </p>
+    </div>
+  </div>
+  <p>
+    You do not need PostgreSQL, Redis, a message broker, a separate browser
+    service, or worker processes. Crawl state is held in bounded memory and
+    disappears when <code>scorchd</code> restarts.
+  </p>
+
+  <h2 id="install">Install</h2>
+  <h3 id="nix-flake">Option A: Nix flake</h3>
+  <p>Run either released executable without cloning the repository:</p>
+  <pre><code>nix run github:Fractal-Tess/scorch/v0.1.0#scorch -- --help
+nix run github:Fractal-Tess/scorch/v0.1.0#scorchd -- --help</code></pre>
+  <p>
+    For a declarative NixOS service and client installation, continue to the <a
+      href="/nix/">Nix installation guide</a
+    >.
+  </p>
+
+  <h3 id="reproducible-environment">
+    Option B: reproducible development environment
+  </h3>
+  <p>
+    The repository includes <code>devenv.nix</code> with Rust, CMake, Clang, libclang,
+    pkg-config, Chromium, Git, and Jujutsu. Install <a
+      href="https://devenv.sh/getting-started/">devenv</a
+    >, then run:
+  </p>
+  <pre><code>git clone https://github.com/Fractal-Tess/scorch.git
+cd scorch
+devenv shell
+cargo build --release --workspace</code></pre>
+
+  <h3 id="native-toolchain">Option C: native toolchain</h3>
+  <p>Install stable Rust plus the native tools needed by embedded Obscura:</p>
+  <ul>
+    <li>Rust stable with Cargo, Clippy, and rustfmt</li>
+    <li>CMake, Clang, libclang, and pkg-config</li>
+    <li>Git</li>
+    <li>
+      Chromium only if you intend to enable the optional compatibility backend
+    </li>
+  </ul>
+  <p>
+    If libclang is not discovered automatically, point <code>LIBCLANG_PATH</code
+    > at the directory containing the shared library before building.
+  </p>
+  <pre><code>export LIBCLANG_PATH=/path/to/libclang/lib
+cargo build --release --workspace</code></pre>
+  <p>The optimized binaries are written to:</p>
+  <pre><code>target/release/scorchd
+target/release/scorch</code></pre>
+  <p>Install them somewhere on your <code>PATH</code> if desired:</p>
+  <pre><code>install -Dm755 target/release/scorchd ~/.local/bin/scorchd
+install -Dm755 target/release/scorch ~/.local/bin/scorch</code></pre>
+
+  <h2 id="start-the-api">Start the API</h2>
+  <pre><code>scorchd</code></pre>
+  <p>
+    At startup the service prints operational logs to stderr. Verify liveness
+    and readiness from another terminal:
+  </p>
+  <pre><code>curl -sS http://127.0.0.1:3000/healthz
+curl -sS http://127.0.0.1:3000/readyz | jq</code></pre>
+  <p>
+    <code>/readyz</code> reports the default and allowed browser backends, Obscura
+    stealth setting, global concurrency, search provider, and enabled search engines.
+  </p>
+  <div class="callout">
+    <strong>Browser startup:</strong> Obscura is embedded and requires no executable
+    or sidecar. Chromium starts lazily only when it is compiled, allowed, selected,
+    and needed.
+  </div>
+
+  <h2 id="connect-a-client">Connect a client</h2>
+  <p>
+    The <code>scorch</code> client defaults to <code>http://127.0.0.1:3000</code
+    >. Set one environment variable to use a different service:
+  </p>
+  <pre><code>export SCORCH_API_URL=https://scorch.internal.example
+scorch search "rust async runtime" --limit 5</code></pre>
+  <p>Every command also accepts <code>--api-url</code>:</p>
+  <pre><code>scorch --api-url http://127.0.0.1:3000 search "web extraction"</code></pre>
+  <p>
+    <code>SCORCH_API_URL</code> configures only the client and MCP adapter. <code
+      >SCORCH_BIND</code
+    > controls where the service listens. They are intentionally separate settings.
+  </p>
+
+  <h2 id="make-a-request">Make a request</h2>
+  <h3>With the CLI</h3>
+  <pre><code>scorch scrape https://example.com --format markdown,links
+scorch search "rust async runtime" --limit 5
+scorch map https://example.com --limit 100
+scorch crawl https://example.com --limit 20 --max-depth 2 --wait</code></pre>
+  <h3>With HTTP</h3>
+  <pre><code>curl -sS http://127.0.0.1:3000/v1/scrape \
+  -H 'content-type: application/json' \
+  -d '&#123;
+    "url": "https://example.com",
+    "options": &#123;
+      "formats": ["markdown", "links"],
+      "render": "auto"
+    &#125;
+  &#125;' | jq</code></pre>
+  <p>
+    With <code>render: "auto"</code>, Scorch starts with a guarded direct fetch
+    and escalates to a browser only when the content appears
+    JavaScript-dependent or a screenshot requires rendering.
+  </p>
+
+  <h2 id="production-notes">Production notes</h2>
+  <ul>
+    <li>
+      <strong>Put authentication and TLS at the edge.</strong> Scorch does not provide
+      either itself.
+    </li>
+    <li>
+      <strong>Do not treat crawl jobs as durable data.</strong> Poll and export results
+      before their TTL or a service restart.
+    </li>
+    <li>
+      <strong>Keep the browser allowlist narrow.</strong> Requests cannot select a
+      backend outside <code>SCORCH_ALLOWED_BROWSERS</code>.
+    </li>
+    <li>
+      <strong>Watch stderr.</strong> Protocol and result output stays on stdout; structured
+      operational logs stay on stderr.
+    </li>
+    <li>
+      <strong>Build with release mode.</strong> Production profiles use thin LTO,
+      one codegen unit, stripped symbols, and overflow checks.
+    </li>
+  </ul>
+  <pre><code>SCORCH_LOG_FORMAT=json \
+RUST_LOG=scorch=info \
+SCORCH_BIND=127.0.0.1:3000 \
+scorchd</code></pre>
+</DocLayout>

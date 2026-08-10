@@ -1,0 +1,25 @@
+---
+interface Props {
+  compact?: boolean;
+}
+const { compact = false } = Astro.props;
+---
+
+<a
+  href="/"
+  class="group inline-flex items-center gap-2.5"
+  aria-label="Scorch home"
+>
+  <img
+    src="/brand/scorch-mark.png"
+    width="32"
+    height="32"
+    alt=""
+    class="h-8 w-8 shrink-0 object-contain transition-transform duration-300 group-hover:scale-105 group-hover:rotate-3"
+  />
+  {
+    !compact && (
+      <span class="text-[17px] font-semibold tracking-tight">Scorch</span>
+    )
+  }
+</a>

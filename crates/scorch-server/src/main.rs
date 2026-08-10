@@ -8,7 +8,7 @@ use tracing::info;
 use tracing_subscriber::EnvFilter;
 
 #[derive(Parser)]
-#[command(version, about = "Scorch HTTP API service")]
+#[command(name = "scorchd", version, about = "Scorch HTTP API service")]
 struct ServerArgs {
     #[arg(long, env = "SCORCH_BIND", default_value = "127.0.0.1:3000")]
     bind: SocketAddr,

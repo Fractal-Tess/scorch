@@ -1,0 +1,304 @@
+---
+import DocLayout from "../layouts/DocLayout.astro";
+const headings = [
+  { label: "Connection", href: "#connection" },
+  { label: "Health and readiness", href: "#health" },
+  { label: "Scrape", href: "#scrape" },
+  { label: "Search", href: "#search" },
+  { label: "Map", href: "#map" },
+  { label: "Crawl", href: "#crawl" },
+  { label: "Errors", href: "#errors" },
+  { label: "Security behavior", href: "#security-behavior" },
+];
+---
+
+<DocLayout
+  title="HTTP API"
+  description="A small JSON API for liveness, readiness, scraping, metasearch, URL discovery, and bounded crawl jobs."
+  headings={headings}
+  previous={{ label: "CLI reference", href: "/cli/" }}
+  next={{ label: "MCP server", href: "/mcp/" }}
+>
+  <h2 id="connection">Connection</h2>
+  <p>
+    The default base URL is <code>http://127.0.0.1:3000</code>. All request
+    bodies use JSON with camel-case property names and <code
+      >content-type: application/json</code
+    >.
+  </p>
+  <pre><code>curl -sS http://127.0.0.1:3000/healthz</code></pre>
+  <p>
+    Request objects reject unknown fields. Every response includes an <code
+      >x-request-id</code
+    > header suitable for correlation with service logs.
+  </p>
+  <div class="callout warning">
+    <strong>No built-in authentication:</strong> use the default loopback address,
+    or put an authenticated TLS gateway in front before making the API reachable from
+    an untrusted network.
+  </div>
+
+  <h2 id="health">Health and readiness</h2>
+  <h3><span class="text-accent font-mono">GET</span> /healthz</h3>
+  <p>Process liveness. A healthy process returns HTTP 200:</p>
+  <pre><code>&#123; "status": "ok" &#125;</code></pre>
+  <h3><span class="text-accent font-mono">GET</span> /readyz</h3>
+  <p>
+    Reports runtime policy and browser availability. It returns HTTP 200 when
+    the configured browser is available, or 503 when unavailable.
+  </p>
+  <pre><code>&#123;
+  "status": "ready",
+  "browserAvailable": true,
+  "browser": "obscura",
+  "allowedBrowsers": ["obscura"],
+  "obscuraStealth": true,
+  "maxConcurrency": 4,
+  "searchProvider": "metasearch",
+  "searchEngines": ["bing", "duckduckgo", "naver", "wikipedia"]
+&#125;</code></pre>
+
+  <h2 id="scrape">Scrape</h2>
+  <h3><span class="text-accent font-mono">POST</span> /v1/scrape</h3>
+  <pre><code>&#123;
+  "url": "https://example.com",
+  "options": &#123;
+    "formats": ["markdown", "html", "text", "links", "metadata"],
+    "render": "auto",
+    "browser": "obscura",
+    "timeoutMs": 30000,
+    "waitForMs": 0,
+    "onlyMainContent": true,
+    "blockMedia": true,
+    "fullPageScreenshot": false
+  &#125;
+&#125;</code></pre>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Field</th><th>Default</th><th>Notes</th></tr></thead><tbody
+      >
+        <tr
+          ><td><code>url</code></td><td>required</td><td
+            >Public HTTP or HTTPS URL without embedded credentials.</td
+          ></tr
+        >
+        <tr
+          ><td><code>formats</code></td><td><code>["markdown"]</code></td><td
+            ><code>markdown</code>, <code>html</code>, <code>text</code>, <code
+              >links</code
+            >, <code>metadata</code>, <code>screenshot</code>.</td
+          ></tr
+        >
+        <tr
+          ><td><code>render</code></td><td><code>auto</code></td><td
+            ><code>auto</code>, <code>always</code>, or <code>never</code>.</td
+          ></tr
+        >
+        <tr
+          ><td><code>browser</code></td><td>service default</td><td
+            >Optional <code>obscura</code> or <code>chromium</code>; must be
+            server-allowed.</td
+          ></tr
+        >
+        <tr
+          ><td><code>timeoutMs</code></td><td><code>30000</code></td><td
+            >Absolute scrape budget; 100–120,000 ms.</td
+          ></tr
+        >
+        <tr
+          ><td><code>waitForMs</code></td><td><code>0</code></td><td
+            >Explicit post-load wait; capped at 60,000 ms.</td
+          ></tr
+        >
+        <tr
+          ><td><code>onlyMainContent</code></td><td><code>true</code></td><td
+            >Focus readable extraction on the main page content.</td
+          ></tr
+        >
+        <tr
+          ><td><code>blockMedia</code></td><td><code>true</code></td><td
+            >Suppress browser media requests where supported.</td
+          ></tr
+        >
+        <tr
+          ><td><code>fullPageScreenshot</code></td><td><code>false</code></td
+          ><td>Capture full document height when screenshot is requested.</td
+          ></tr
+        >
+      </tbody>
+    </table>
+  </div>
+  <p>
+    Screenshot output is a PNG data URI. The response <code>engine</code> is <code
+      >fetch</code
+    >, <code>obscura</code>, or <code>chromium</code>.
+  </p>
+  <pre><code>&#123;
+  "url": "https://example.com",
+  "finalUrl": "https://example.com/",
+  "engine": "fetch",
+  "elapsedMs": 143,
+  "metadata": &#123;
+    "title": "Example Domain",
+    "statusCode": 200,
+    "contentType": "text/html"
+  &#125;,
+  "markdown": "# Example Domain\n\n...",
+  "links": [],
+  "warnings": []
+&#125;</code></pre>
+
+  <h2 id="search">Search</h2>
+  <h3><span class="text-accent font-mono">POST</span> /v1/search</h3>
+  <pre><code>&#123;
+  "query": "rust async runtime",
+  "limit": 5,
+  "country": "us",
+  "language": "en",
+  "scrapeOptions": null
+&#125;</code></pre>
+  <p>
+    Limits range from 1 to 20 and queries are capped at 512 bytes. Metasearch is
+    the only public provider; requests cannot name source engines. Results
+    identify their contributing <code>sources</code>.
+  </p>
+  <pre><code>&#123;
+  "query": "rust async runtime",
+  "provider": "metasearch",
+  "results": [
+    &#123;
+      "position": 1,
+      "title": "Result title",
+      "url": "https://example.com/result",
+      "description": "Result description",
+      "sources": ["bing", "duckduckgo"]
+    &#125;
+  ],
+  "elapsedMs": 911,
+  "warnings": []
+&#125;</code></pre>
+  <p>
+    Set <code>scrapeOptions</code> to a normal scrape-options object to enrich each
+    result. Per-result enrichment errors are retained in that result's <code
+      >error</code
+    > field without discarding successful results.
+  </p>
+
+  <h2 id="map">Map</h2>
+  <h3><span class="text-accent font-mono">POST</span> /v1/map</h3>
+  <pre><code>&#123;
+  "url": "https://example.com",
+  "limit": 100,
+  "includeSubdomains": false,
+  "includePaths": [],
+  "excludePaths": []
+&#125;</code></pre>
+  <p>
+    Limits range from 1 to 1,000. Scorch checks robots-declared and conventional
+    sitemaps, bounded nested sitemap indexes, and root-page links. A successful
+    map may contain no links.
+  </p>
+  <pre><code>&#123;
+  "url": "https://example.com",
+  "links": ["https://example.com/", "https://example.com/docs"],
+  "elapsedMs": 287,
+  "sources": ["sitemap"]
+&#125;</code></pre>
+
+  <h2 id="crawl">Crawl</h2>
+  <h3><span class="text-accent font-mono">POST</span> /v1/crawls</h3>
+  <p>Starts an in-memory crawl and returns HTTP 202 with a job summary.</p>
+  <pre><code>&#123;
+  "url": "https://example.com",
+  "limit": 20,
+  "maxDepth": 2,
+  "concurrency": 4,
+  "includePaths": [],
+  "excludePaths": [],
+  "scrapeOptions": &#123;
+    "formats": ["markdown"],
+    "render": "auto"
+  &#125;
+&#125;</code></pre>
+  <p>Configured defaults and ceilings:</p>
+  <ul>
+    <li>Page limit 20 by default, maximum 100.</li><li>
+      Depth 2 by default, maximum 5.
+    </li><li>
+      Concurrency 4 by default and no higher than global concurrency.
+    </li><li>
+      Five-minute absolute job deadline and 32 MiB retained data per job.
+    </li><li>
+      128 retained jobs, four active crawls, and 15-minute completed-job TTL by
+      default.
+    </li>
+  </ul>
+  <h3>
+    <span class="text-accent font-mono">GET</span> /v1/crawls/&#123;id&#125;
+  </h3>
+  <pre><code>GET /v1/crawls/550e8400-e29b-41d4-a716-446655440000?cursor=0&amp;pageSize=10</code></pre>
+  <p>
+    Page sizes range from 1 to 50. Status values are <code>queued</code>, <code
+      >running</code
+    >, <code>completed</code>, <code>cancelled</code>, and <code>failed</code>.
+    Follow <code>nextCursor</code> until it is absent.
+  </p>
+  <h3>
+    <span class="text-accent font-mono">DELETE</span> /v1/crawls/&#123;id&#125;
+  </h3>
+  <p>Cancels active work and removes the job. Success returns:</p>
+  <pre><code>&#123; "id": "550e8400-e29b-41d4-a716-446655440000", "deleted": true &#125;</code></pre>
+
+  <h2 id="errors">Errors</h2>
+  <pre><code>&#123;
+  "code": "invalid_request",
+  "message": "invalid request: ..."
+&#125;</code></pre>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Status</th><th>Category</th></tr></thead><tbody>
+        <tr
+          ><td><code>400</code></td><td
+            >Invalid request or unsafe target URL.</td
+          ></tr
+        >
+        <tr><td><code>404</code></td><td>Unknown route or crawl job.</td></tr>
+        <tr><td><code>408</code></td><td>Outer HTTP request timeout.</td></tr>
+        <tr
+          ><td><code>413</code></td><td
+            >Remote response exceeded the configured byte limit.</td
+          ></tr
+        >
+        <tr><td><code>415</code></td><td>Unsupported remote content.</td></tr>
+        <tr
+          ><td><code>429</code></td><td>Runtime or job capacity exhausted.</td
+          ></tr
+        >
+        <tr
+          ><td><code>502</code></td><td
+            >DNS, fetch, extraction, or search upstream failure.</td
+          ></tr
+        >
+        <tr
+          ><td><code>503</code></td><td
+            >Browser unavailable or browser operation failed.</td
+          ></tr
+        >
+        <tr><td><code>504</code></td><td>Engine deadline exceeded.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2 id="security-behavior">Security behavior</h2>
+  <p>
+    All target-bearing endpoints accept only HTTP and HTTPS URLs without
+    embedded credentials. Scorch rejects unsafe ports and hostnames that resolve
+    to local, private, link-local, reserved, or other special-purpose addresses.
+  </p>
+  <p>
+    Direct redirects are manual, limited to five, and independently revalidated.
+    Browser connections route through an embedded validating HTTP/CONNECT proxy.
+    Response bytes, request bodies, queueing, rendering, crawl growth, retained
+    job data, and job lifetimes are bounded.
+  </p>
+</DocLayout>

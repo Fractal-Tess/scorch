@@ -4,6 +4,55 @@ Scorch is a self-contained web search, scraping, mapping, and crawling service w
 
 Scorch does not require a database, broker, cache server, browser service, or external worker deployment. Crawl state is intentionally ephemeral and is lost when the process restarts.
 
+## Install with Nix
+
+Run either executable directly from the flake:
+
+```sh
+nix run github:Fractal-Tess/scorch/v0.1.0#scorch -- --help
+nix run github:Fractal-Tess/scorch/v0.1.0#scorchd -- --help
+```
+
+Or enable the client and service declaratively on NixOS:
+
+```nix
+{
+  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+  inputs.scorch.url = "github:Fractal-Tess/scorch/v0.1.0";
+
+  outputs = { nixpkgs, scorch, ... }: {
+    nixosConfigurations.host = nixpkgs.lib.nixosSystem {
+      system = "x86_64-linux";
+      modules = [
+        scorch.nixosModules.default
+        {
+          programs.scorch = {
+            enable = true;
+            apiUrl = "http://127.0.0.1:3000";
+          };
+          services.scorchd.enable = true;
+        }
+      ];
+    };
+  };
+}
+```
+
+The flake also exports an optional `scorchd-with-chromium` package, an overlay, a Home Manager module, checks, and the Scorch Agent Skill. See the [Nix guide](docs/src/pages/nix.astro) for service policy and secret-file configuration.
+
+## Agent Skill
+
+The repository includes a standard Agent Skill at `.agents/skills/scorch/SKILL.md`. It is discovered automatically while working in this repository. The flake packages it for installation into another agent environment:
+
+```sh
+nix build github:Fractal-Tess/scorch/v0.1.0#skill
+mkdir -p ~/.agents/skills
+rm -rf ~/.agents/skills/scorch
+cp -R result/share/agent-skills/scorch ~/.agents/skills/scorch
+```
+
+See the [Agent Skill guide](docs/src/pages/skill.astro) for installation and behavior.
+
 ## Development
 
 ```sh
@@ -65,7 +114,7 @@ SCORCH_SEARCH_ENGINES=bing,wikipedia cargo run -p scorch-server --
 # installed binary: scorchd --search-engines bing,wikipedia
 ```
 
-Allowed engines are `bing`, `naver`, and `wikipedia`; all three are enabled by default. Engine selection is a server policy and cannot be overridden by individual search requests.
+Allowed engines are `bing`, `brave`, `duckduckgo`, `google`, `naver`, and `wikipedia`. Bing, DuckDuckGo, Naver, and Wikipedia are enabled by default; Brave and Google require credentials. Engine selection is a server policy and cannot be overridden by individual search requests.
 
 The native metasearch provider combines agreement with reciprocal-rank fusion, caches short-lived results, and stops waiting shortly after useful results arrive. It remains inside `scorchd`. See `docs/metasearch.md` for design details and engine verification.
 

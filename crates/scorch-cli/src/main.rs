@@ -12,7 +12,11 @@ use scorch_types::{
 use uuid::Uuid;
 
 #[derive(Parser)]
-#[command(version, about = "Command-line client for the Scorch HTTP API")]
+#[command(
+    name = "scorch",
+    version,
+    about = "Command-line client for the Scorch HTTP API"
+)]
 struct Cli {
     #[arg(
         long,

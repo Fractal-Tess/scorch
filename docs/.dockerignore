@@ -1,0 +1,7 @@
+.astro
+.git
+.DS_Store
+dist
+node_modules
+bun-error.log*
+.firecrawl

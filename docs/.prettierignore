@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.astro/
+api.md
+architecture.html
+architecture.md
+browser-evaluation.md
+metasearch.md

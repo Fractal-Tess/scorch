@@ -1,0 +1,208 @@
+---
+import BaseLayout from "./BaseLayout.astro";
+
+interface Heading {
+  label: string;
+  href: string;
+}
+interface Link {
+  label: string;
+  href: string;
+}
+interface Props {
+  title: string;
+  description: string;
+  eyebrow?: string;
+  headings?: Heading[];
+  previous?: Link;
+  next?: Link;
+}
+
+const {
+  title,
+  description,
+  eyebrow = "Documentation",
+  headings = [],
+  previous,
+  next,
+} = Astro.props;
+const path = Astro.url.pathname;
+const groups = [
+  {
+    title: "Start here",
+    links: [
+      { label: "Getting started", href: "/getting-started/" },
+      { label: "How Scorch works", href: "/architecture/" },
+      { label: "Configuration", href: "/configuration/" },
+    ],
+  },
+  {
+    title: "Use Scorch",
+    links: [
+      { label: "CLI reference", href: "/cli/" },
+      { label: "HTTP API", href: "/api/" },
+      { label: "MCP server", href: "/mcp/" },
+      { label: "Agent Skill", href: "/skill/" },
+    ],
+  },
+  {
+    title: "Deploy",
+    links: [{ label: "Nix installation", href: "/nix/" }],
+  },
+];
+---
+
+<BaseLayout title={title} description={description}>
+  <div class="mx-auto max-w-[1440px] px-5 sm:px-8 lg:px-10">
+    <div
+      class="grid min-h-[calc(100vh-4rem)] lg:grid-cols-[220px_minmax(0,1fr)] xl:grid-cols-[220px_minmax(0,760px)_190px]"
+    >
+      <aside class="border-border hidden border-r py-10 pr-6 lg:block">
+        <nav class="sticky top-26" aria-label="Documentation">
+          {
+            groups.map((group) => (
+              <div class="mb-8">
+                <p class="text-muted-foreground mb-2 px-2 text-[10px] font-semibold tracking-[0.14em] uppercase">
+                  {group.title}
+                </p>
+                <div class="grid gap-0.5">
+                  {group.links.map((link) => (
+                    <a
+                      href={link.href}
+                      aria-current={path === link.href ? "page" : undefined}
+                      class:list={[
+                        "rounded-md px-2 py-2 text-[13px] transition-colors",
+                        path === link.href
+                          ? "bg-accent-soft text-accent font-semibold"
+                          : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                      ]}
+                    >
+                      {link.label}
+                    </a>
+                  ))}
+                </div>
+              </div>
+            ))
+          }
+          <div class="border-border mt-10 border-t pt-5">
+            <a
+              href="https://github.com/Fractal-Tess/scorch"
+              class="text-muted-foreground hover:text-foreground flex items-center justify-between rounded-md px-2 py-2 text-xs font-medium"
+            >
+              View source
+              <svg
+                viewBox="0 0 24 24"
+                class="h-3.5 w-3.5"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.8"
+                aria-hidden="true"><path d="M7 17 17 7M7 7h10v10"></path></svg
+              >
+            </a>
+          </div>
+        </nav>
+      </aside>
+
+      <article class="min-w-0 py-10 lg:px-10 lg:py-14 xl:px-14">
+        <details class="border-border mb-8 rounded-lg border p-3 lg:hidden">
+          <summary class="cursor-pointer text-sm font-semibold"
+            >Documentation menu</summary
+          >
+          <div class="border-border mt-3 grid gap-1 border-t pt-3">
+            {
+              groups
+                .flatMap((group) => group.links)
+                .map((link) => (
+                  <a
+                    href={link.href}
+                    class="text-muted-foreground hover:bg-muted rounded px-2 py-2 text-sm"
+                  >
+                    {link.label}
+                  </a>
+                ))
+            }
+          </div>
+        </details>
+
+        <header class="mb-12">
+          <p
+            class="text-accent mb-3 font-mono text-[11px] font-semibold tracking-[0.18em] uppercase"
+          >
+            {eyebrow}
+          </p>
+          <h1
+            class="font-serif text-4xl leading-[1.08] tracking-[-0.025em] text-balance sm:text-5xl"
+          >
+            {title}
+          </h1>
+          <p
+            class="text-muted-foreground mt-5 max-w-2xl text-base leading-relaxed sm:text-lg"
+          >
+            {description}
+          </p>
+        </header>
+
+        <div class="prose-docs"><slot /></div>
+
+        {
+          (previous || next) && (
+            <nav
+              class="border-border mt-16 grid gap-3 border-t pt-7 sm:grid-cols-2"
+              aria-label="Page navigation"
+            >
+              {previous ? (
+                <a
+                  href={previous.href}
+                  class="border-border hover:bg-muted rounded-lg border p-4 transition-colors"
+                >
+                  <span class="text-muted-foreground block text-[10px] font-semibold tracking-[0.12em] uppercase">
+                    Previous
+                  </span>
+                  <strong class="mt-1 block text-sm">← {previous.label}</strong>
+                </a>
+              ) : (
+                <span />
+              )}
+              {next && (
+                <a
+                  href={next.href}
+                  class="border-border hover:bg-muted rounded-lg border p-4 text-right transition-colors"
+                >
+                  <span class="text-muted-foreground block text-[10px] font-semibold tracking-[0.12em] uppercase">
+                    Next
+                  </span>
+                  <strong class="mt-1 block text-sm">{next.label} →</strong>
+                </a>
+              )}
+            </nav>
+          )
+        }
+      </article>
+
+      <aside class="hidden py-14 pl-5 xl:block">
+        <nav
+          class="border-border sticky top-26 border-l pl-4"
+          aria-label="On this page"
+        >
+          <p
+            class="text-muted-foreground mb-3 text-[10px] font-semibold tracking-[0.14em] uppercase"
+          >
+            On this page
+          </p>
+          <div class="grid gap-2.5">
+            {
+              headings.map((heading) => (
+                <a
+                  href={heading.href}
+                  class="text-muted-foreground hover:text-foreground text-xs leading-snug transition-colors"
+                >
+                  {heading.label}
+                </a>
+              ))
+            }
+          </div>
+        </nav>
+      </aside>
+    </div>
+  </div>
+</BaseLayout>

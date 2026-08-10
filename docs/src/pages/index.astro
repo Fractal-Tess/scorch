@@ -1,0 +1,450 @@
+---
+import AsciiIcon from "../components/AsciiIcon.astro";
+import AsciiWaves from "../components/AsciiWaves.astro";
+import CoverageGrid from "../components/CoverageGrid.astro";
+import CutButton from "../components/CutButton.astro";
+import TerminalDemo from "../components/TerminalDemo.astro";
+import BaseLayout from "../layouts/BaseLayout.astro";
+
+const capabilities = [
+  {
+    shape: "scan" as const,
+    title: "Unified signal, less noise",
+    body: "Query allowed engines concurrently, normalize and merge URLs, then rerank agreement without exposing source-engine policy to callers.",
+    meta: "Search · reciprocal-rank fusion",
+    href: "/architecture/#metasearch",
+  },
+  {
+    shape: "page" as const,
+    title: "Clean content on demand",
+    body: "Fetch inexpensive static pages directly. Escalate JavaScript pages and screenshots to embedded Obscura or an allowed Chromium backend.",
+    meta: "Extract · Markdown · screenshots",
+    href: "/api/#scrape",
+  },
+  {
+    shape: "graph" as const,
+    title: "Bounded discovery",
+    body: "Discover sitemaps and same-site links, then run robots-aware crawl jobs with pagination, cancellation, retained-byte limits, and expiry.",
+    meta: "Map · breadth-first crawl",
+    href: "/api/#crawl",
+  },
+];
+const trust = [
+  ["2", "purpose-built binaries"],
+  ["0", "required runtime services"],
+  ["6", "focused Rust crates"],
+  ["MIT", "open-source license"],
+];
+---
+
+<BaseLayout>
+  <span id="top" class="sr-only"></span>
+  <section class="relative isolate overflow-hidden">
+    <div
+      class="pointer-events-none absolute inset-x-0 -top-16 bottom-0 -z-20 [mask-image:linear-gradient(to_bottom,transparent_0%,black_18%,black_82%,transparent_100%)]"
+      aria-hidden="true"
+    >
+      <AsciiWaves
+        class="opacity-60 dark:opacity-75"
+        interactive={true}
+        size={10}
+      />
+    </div>
+    <div
+      class="pointer-events-none absolute top-[31%] left-1/2 -z-10 h-[62%] w-[72%] -translate-x-1/2 -translate-y-1/2 bg-[radial-gradient(ellipse_at_center,var(--background)_0%,color-mix(in_srgb,var(--background)_82%,transparent)_46%,transparent_74%)]"
+      aria-hidden="true"
+    >
+    </div>
+
+    <div class="mx-auto max-w-[1440px] px-5 sm:px-8 lg:px-10">
+      <div
+        class="hero-sequence relative mx-auto flex max-w-2xl flex-col items-center pt-24 pb-12 text-center"
+      >
+        <h1
+          class="font-serif text-4xl leading-[1.08] font-normal tracking-[-0.015em] text-balance sm:text-5xl lg:text-[3.5rem]"
+        >
+          Search and extract the public web <span
+            class="font-sans font-semibold tracking-tight">at Rust speed</span
+          >
+        </h1>
+        <p
+          class="text-muted-foreground mt-5 max-w-xl text-[15px] leading-relaxed text-balance sm:text-base"
+        >
+          Scorch gives applications one guarded service for search, scraping,
+          mapping, and crawling—without a database, broker, browser farm, or
+          worker fleet.
+        </p>
+        <div class="mt-8 flex flex-wrap items-center justify-center gap-3">
+          <CutButton href="/getting-started/">Get started</CutButton>
+          <CutButton href="/architecture/" variant="outline"
+            >How it works</CutButton
+          >
+        </div>
+        <p
+          class="text-muted-foreground mt-6 font-mono text-[10px] tracking-[0.13em] uppercase"
+        >
+          API · 127.0.0.1:3000&nbsp;&nbsp; / &nbsp;&nbsp;Renderer · Obscura
+        </p>
+      </div>
+    </div>
+    <div
+      class="hero-window relative mx-auto max-w-[1180px] px-5 pb-24 sm:px-8 lg:px-10"
+    >
+      <TerminalDemo />
+    </div>
+  </section>
+
+  <section class="mx-auto max-w-[1440px] px-5 pb-24 sm:px-8 sm:pb-32 lg:px-10">
+    <div class="reference-frame grid sm:grid-cols-2 lg:grid-cols-4">
+      {
+        trust.map(([value, label], index) => (
+          <div
+            class:list={[
+              "flex items-center justify-between gap-4 px-6 py-6",
+              index > 0 && "border-border border-t sm:border-t-0 sm:border-l",
+              index === 2 && "sm:border-t lg:border-t-0",
+            ]}
+          >
+            <>
+              <strong class="font-serif text-3xl font-normal">{value}</strong>
+              <span class="text-muted-foreground max-w-[120px] text-right text-xs leading-relaxed">
+                {label}
+              </span>
+            </>
+          </div>
+        ))
+      }
+    </div>
+  </section>
+
+  <CoverageGrid />
+
+  <section
+    class="mx-auto max-w-[1440px] px-5 pt-24 pb-24 sm:px-8 sm:pt-32 sm:pb-32 lg:px-10"
+  >
+    <div class="reveal max-w-3xl">
+      <p class="text-muted-foreground text-sm font-medium">
+        One deliberate surface
+      </p>
+      <h2
+        class="mt-5 font-serif text-3xl leading-[1.12] font-normal tracking-[-0.015em] text-balance sm:text-4xl lg:text-[2.8rem]"
+      >
+        A single system that <span
+          class="font-sans font-semibold tracking-tight">finds</span
+        >, <span class="font-sans font-semibold tracking-tight">reads</span>,
+        and <span class="font-sans font-semibold tracking-tight">follows</span> the
+        web
+      </h2>
+      <p
+        class="text-muted-foreground mt-4 max-w-xl text-sm leading-relaxed sm:text-base"
+      >
+        Runtime and routing policy remain on the server. API, CLI, and MCP
+        callers get a compact contract without gaining access to forbidden
+        engines or backends.
+      </p>
+    </div>
+    <div class="mt-12 grid gap-5 lg:grid-cols-3 lg:gap-6">
+      {
+        capabilities.map((item) => (
+          <div class="feature-shell reveal bg-border p-px">
+            <article class="feature-shell bg-background flex h-full min-h-[500px] flex-col p-6 sm:p-7">
+              <h3 class="text-lg font-semibold tracking-tight">{item.title}</h3>
+              <div class="border-border my-5 border-t border-dotted" />
+              <div class="flex flex-1 items-center justify-center py-4">
+                <AsciiIcon shape={item.shape} />
+              </div>
+              <div class="border-border mb-6 border-t border-dotted" />
+              <p class="text-muted-foreground text-sm leading-relaxed">
+                {item.body}
+              </p>
+              <div class="mt-auto flex items-center justify-between gap-4 pt-8">
+                <>
+                  <span class="text-muted-foreground text-xs font-medium">
+                    {item.meta}
+                  </span>
+                  <a
+                    href={item.href}
+                    class="cut-corners-sm border-border hover:bg-muted grid h-10 w-10 place-items-center border transition-colors"
+                    aria-label={`Read about ${item.title}`}
+                  >
+                    →
+                  </a>
+                </>
+              </div>
+            </article>
+          </div>
+        ))
+      }
+    </div>
+  </section>
+
+  <section class="mx-auto max-w-[1440px] px-5 pb-24 sm:px-8 sm:pb-32 lg:px-10">
+    <div
+      class="reveal grid items-center gap-10 lg:grid-cols-[1.35fr_1fr] lg:gap-12"
+    >
+      <div
+        class="generated-art aspect-[4/3] overflow-hidden [clip-path:polygon(28px_0,100%_0,100%_calc(100%-28px),calc(100%-28px)_100%,0_100%,0_28px)] sm:aspect-square lg:order-2"
+      >
+        <img
+          src="/value-prop.webp"
+          alt="Abstract Scorch extraction flow transforming web data into clean documents"
+          loading="lazy"
+          class="h-full w-full object-cover"
+        />
+      </div>
+      <div class="lg:order-1">
+        <p class="text-muted-foreground text-sm font-medium">
+          Why self-contained
+        </p>
+        <h2
+          class="mt-5 max-w-2xl font-serif text-3xl leading-[1.12] font-normal tracking-[-0.015em] text-balance sm:text-4xl lg:text-[2.8rem]"
+        >
+          A complete web pipeline gives applications an edge, <span
+            class="font-sans font-semibold tracking-tight"
+            >but stitching services</span
+          > together creates <span
+            class="font-sans font-semibold tracking-tight">tradeoffs</span
+          >
+        </h2>
+        <dl class="mt-10">
+          <div class="border-border border-t border-dotted py-5">
+            <dt class="text-sm font-semibold tracking-tight">
+              The deployment gap
+            </dt><dd
+              class="text-muted-foreground mt-1.5 max-w-md text-sm leading-relaxed"
+            >
+              Every queue, browser sidecar, cache, and worker adds another
+              service to secure, observe, and recover.
+            </dd>
+          </div>
+          <div class="border-border border-y border-dotted py-5">
+            <dt class="text-sm font-semibold tracking-tight">
+              The policy gap
+            </dt><dd
+              class="text-muted-foreground mt-1.5 max-w-md text-sm leading-relaxed"
+            >
+              Separate fetch and browser paths drift unless they share URL
+              validation, DNS controls, redirects, limits, and deadlines.
+            </dd>
+          </div>
+        </dl>
+      </div>
+    </div>
+  </section>
+
+  <section
+    class="mx-auto grid max-w-[1440px] gap-10 px-5 pb-24 sm:px-8 sm:pb-32 lg:grid-cols-2 lg:gap-16 lg:px-10"
+  >
+    <div class="reveal lg:pt-6">
+      <p class="text-muted-foreground text-sm font-medium">
+        Operationally compact
+      </p>
+      <h2
+        class="mt-5 font-serif text-3xl leading-[1.12] font-normal tracking-[-0.015em] text-balance sm:text-4xl lg:text-[2.8rem]"
+      >
+        Clear boundaries from the first request
+      </h2>
+      <p
+        class="text-muted-foreground mt-4 max-w-md text-sm leading-relaxed sm:text-base"
+      >
+        The client only speaks HTTP. The service owns execution, isolation,
+        policy, and ephemeral crawl state.
+      </p>
+    </div>
+    <div class="reference-frame reveal">
+      <div
+        class="flex items-center justify-between gap-6 px-6 py-9 sm:px-8 sm:py-11"
+      >
+        <div>
+          <strong class="block font-serif text-5xl leading-none font-normal"
+            >2</strong
+          ><p class="text-muted-foreground mt-3 text-sm">
+            Strictly separated executables
+          </p>
+        </div><span class="text-muted-foreground font-mono text-[10px]"
+          >CLIENT / SERVICE</span
+        >
+      </div>
+      <div
+        class="border-border flex items-center justify-between gap-6 border-t px-6 py-9 sm:px-8 sm:py-11"
+      >
+        <div>
+          <strong class="block font-serif text-5xl leading-none font-normal"
+            >1</strong
+          ><p class="text-muted-foreground mt-3 text-sm">
+            Shared guarded egress policy
+          </p>
+        </div><span class="text-muted-foreground font-mono text-[10px]"
+          >DIRECT / BROWSER</span
+        >
+      </div>
+      <div
+        class="border-border flex items-center justify-between gap-6 border-t px-6 py-9 sm:px-8 sm:py-11"
+      >
+        <div>
+          <strong class="block font-serif text-5xl leading-none font-normal"
+            >0</strong
+          ><p class="text-muted-foreground mt-3 text-sm">
+            Durable services required
+          </p>
+        </div><span class="text-muted-foreground font-mono text-[10px]"
+          >SELF / CONTAINED</span
+        >
+      </div>
+    </div>
+  </section>
+
+  <section class="mx-auto max-w-[1440px] px-5 pb-24 sm:px-8 sm:pb-32 lg:px-10">
+    <div class="reference-frame reveal grid gap-y-8 lg:grid-cols-[1.55fr_1fr]">
+      <div class="px-6 py-10 sm:px-10 sm:py-14 lg:px-14 lg:py-16">
+        <h2
+          class="font-serif text-[1.8rem] leading-[1.2] font-normal tracking-[-0.015em] text-balance sm:text-4xl lg:text-[2.55rem]"
+        >
+          From one release build to a local API, <span
+            class="font-sans font-semibold tracking-tight"
+            >Scorch keeps the path short</span
+          > without hiding the security boundary.
+        </h2>
+      </div>
+      <div
+        class="lg:border-border relative flex flex-col justify-center gap-7 px-6 pb-10 sm:px-10 sm:pb-14 lg:border-l lg:px-12 lg:py-16"
+      >
+        <span
+          class="footer-plus text-accent absolute -top-[10px] -left-[7px] hidden font-mono lg:block"
+          >+</span
+        ><p class="text-muted-foreground text-sm leading-relaxed sm:text-base">
+          Enter the reproducible environment, build two optimized binaries,
+          start <code>scorchd</code>, and connect through the CLI, JSON API, or
+          MCP.
+        </p><CutButton href="/getting-started/" variant="outline"
+          >Read the quickstart</CutButton
+        >
+      </div>
+    </div>
+  </section>
+
+  <section class="mx-auto max-w-[1440px] px-5 pb-24 sm:px-8 sm:pb-32 lg:px-10">
+    <div class="reference-frame reveal grid lg:grid-cols-[.85fr_1.15fr]">
+      <div
+        class="border-border border-b py-10 lg:border-r lg:border-b-0 lg:py-16 lg:pr-12 lg:pl-12"
+      >
+        <h2
+          class="font-serif text-4xl leading-[1.05] font-normal tracking-[-0.02em] sm:text-5xl"
+        >
+          Frequently asked questions
+        </h2>
+        <p
+          class="text-muted-foreground mt-6 max-w-sm text-sm leading-relaxed sm:text-base"
+        >
+          The constraints that matter before putting Scorch to work.
+        </p>
+      </div>
+      <div class="lg:px-12">
+        <details class="group border-border border-b border-dotted py-6" open>
+          <summary
+            class="flex cursor-pointer list-none items-center justify-between gap-6 text-base font-medium tracking-tight sm:text-lg"
+            >Does Scorch need a database or queue?<span
+              class="text-muted-foreground text-xl font-light transition-transform group-open:rotate-45"
+              >+</span
+            ></summary
+          ><p
+            class="text-muted-foreground max-w-xl pt-3 pr-6 text-sm leading-relaxed"
+          >
+            No. Crawl jobs live in bounded memory and expire. Restarting <code
+              >scorchd</code
+            > removes them, so Scorch is not a durable crawl archive.
+          </p>
+        </details>
+        <details class="group border-border border-b border-dotted py-6">
+          <summary
+            class="flex cursor-pointer list-none items-center justify-between gap-6 text-base font-medium tracking-tight sm:text-lg"
+            >Can callers choose any engine or browser?<span
+              class="text-muted-foreground text-xl font-light transition-transform group-open:rotate-45"
+              >+</span
+            ></summary
+          ><p
+            class="text-muted-foreground max-w-xl pt-3 pr-6 text-sm leading-relaxed"
+          >
+            No. Search engines are server policy. A scrape may request a backend
+            only when it appears in <code>SCORCH_ALLOWED_BROWSERS</code>.
+          </p>
+        </details>
+        <details class="group border-border border-b border-dotted py-6">
+          <summary
+            class="flex cursor-pointer list-none items-center justify-between gap-6 text-base font-medium tracking-tight sm:text-lg"
+            >Is authentication built in?<span
+              class="text-muted-foreground text-xl font-light transition-transform group-open:rotate-45"
+              >+</span
+            ></summary
+          ><p
+            class="text-muted-foreground max-w-xl pt-3 pr-6 text-sm leading-relaxed"
+          >
+            Not in the local-first release. Keep the loopback bind, or place an
+            authenticated TLS gateway in front of the API.
+          </p>
+        </details>
+        <details class="group py-6">
+          <summary
+            class="flex cursor-pointer list-none items-center justify-between gap-6 text-base font-medium tracking-tight sm:text-lg"
+            >Does Obscura run as a sidecar?<span
+              class="text-muted-foreground text-xl font-light transition-transform group-open:rotate-45"
+              >+</span
+            ></summary
+          ><p
+            class="text-muted-foreground max-w-xl pt-3 pr-6 text-sm leading-relaxed"
+          >
+            No. It is embedded in <code>scorchd</code> as a Rust library, with fresh
+            context, page, and JavaScript state per request.
+          </p>
+        </details>
+      </div>
+    </div>
+  </section>
+
+  <section class="relative overflow-hidden">
+    <div
+      class="pointer-events-none absolute inset-0 -z-10 [mask-image:linear-gradient(to_bottom,transparent,black_20%,black_80%,transparent)]"
+      aria-hidden="true"
+    >
+      <AsciiWaves
+        class="opacity-55 dark:opacity-70"
+        interactive={false}
+        size={12}
+      />
+    </div>
+    <div
+      class="pointer-events-none absolute top-1/2 left-1/2 -z-[1] h-[130%] w-[70%] -translate-x-1/2 -translate-y-1/2 bg-[radial-gradient(ellipse_at_center,var(--background)_0%,color-mix(in_srgb,var(--background)_72%,transparent)_50%,transparent_78%)]"
+      aria-hidden="true"
+    >
+    </div>
+    <div class="mx-auto max-w-[1440px] px-5 sm:px-8 lg:px-10">
+      <div
+        class="reveal mx-auto flex max-w-2xl flex-col items-center py-28 text-center sm:py-36 lg:py-44"
+      >
+        <h2
+          class="font-serif text-4xl leading-[1.08] font-normal tracking-[-0.02em] text-balance sm:text-5xl lg:text-[3.75rem]"
+        >
+          Bring the public web closer to the systems that need it
+        </h2>
+        <p
+          class="text-muted-foreground mt-5 max-w-md text-[15px] leading-relaxed text-balance sm:text-base"
+        >
+          Build Scorch, start <code>scorchd</code>, and make the first request
+          through a runtime you control.
+        </p>
+        <div class="mt-8 flex flex-wrap items-center justify-center gap-3">
+          <CutButton href="/getting-started/">Get started</CutButton><CutButton
+            href="https://github.com/Fractal-Tess/scorch"
+            variant="outline">View source</CutButton
+          >
+        </div>
+      </div>
+    </div>
+  </section>
+</BaseLayout>
+
+<style>
+  .feature-shell {
+    clip-path: polygon(0 0, calc(100% - 34px) 0, 100% 34px, 100% 100%, 0 100%);
+  }
+</style>

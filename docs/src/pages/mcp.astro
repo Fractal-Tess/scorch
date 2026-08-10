@@ -1,0 +1,233 @@
+---
+import DocLayout from "../layouts/DocLayout.astro";
+const headings = [
+  { label: "Model", href: "#model" },
+  { label: "Start the service", href: "#start-the-service" },
+  { label: "Configure a client", href: "#configure-a-client" },
+  { label: "Tools", href: "#tools" },
+  { label: "Example prompts", href: "#example-prompts" },
+  { label: "Operations", href: "#operations" },
+  { label: "Troubleshooting", href: "#troubleshooting" },
+];
+---
+
+<DocLayout
+  title="MCP server"
+  description="Expose Scorch search, scraping, mapping, and crawl operations to MCP-compatible AI clients through a lightweight stdio adapter."
+  headings={headings}
+  previous={{ label: "HTTP API", href: "/api/" }}
+  next={{ label: "Agent Skill", href: "/skill/" }}
+>
+  <h2 id="model">Connection model</h2>
+  <div class="grid gap-3 sm:grid-cols-[1fr_auto_1fr_auto_1fr] sm:items-center">
+    <div class="cut-corners border-border bg-surface border p-4 text-center">
+      <strong class="block text-sm">AI client</strong><span
+        class="text-muted-foreground text-[10px]">MCP host</span
+      >
+    </div><span class="text-muted-foreground hidden sm:block">→</span>
+    <div class="cut-corners border-border bg-surface border p-4 text-center">
+      <strong class="block font-mono text-sm">scorch mcp</strong><span
+        class="text-muted-foreground text-[10px]">stdio adapter</span
+      >
+    </div><span class="text-muted-foreground hidden sm:block">→</span>
+    <div
+      class="cut-corners border-accent/40 bg-accent-soft border p-4 text-center"
+    >
+      <strong class="text-accent block font-mono text-sm">scorchd</strong><span
+        class="text-muted-foreground text-[10px]">HTTP runtime</span
+      >
+    </div>
+  </div>
+  <p>
+    <code>scorch mcp</code> does not fetch pages, start a browser, or construct an
+    engine. It translates Model Context Protocol tool calls into HTTP requests against
+    <code>SCORCH_API_URL</code>. Server-side search, browser, concurrency, and
+    network policy still apply.
+  </p>
+  <p>
+    The adapter uses the official Rust MCP SDK for JSON-RPC framing, generated
+    input schemas, tool discovery, cancellation tokens, and the stdio lifecycle.
+  </p>
+
+  <h2 id="start-the-service">Start the service</h2>
+  <pre><code>scorchd</code></pre>
+  <p>Confirm that the API is ready before starting an MCP host:</p>
+  <pre><code>curl -fsS http://127.0.0.1:3000/readyz | jq</code></pre>
+  <p>
+    The MCP adapter is not a service supervisor. Your process manager, shell, or
+    container runtime should keep <code>scorchd</code> running separately.
+  </p>
+
+  <h2 id="configure-a-client">Configure an MCP client</h2>
+  <p>
+    Add a stdio server entry to your MCP client's configuration. Use an absolute
+    executable path because GUI applications often have a minimal <code
+      >PATH</code
+    >.
+  </p>
+  <pre><code>&#123;
+  "mcpServers": &#123;
+    "scorch": &#123;
+      "command": "/absolute/path/to/scorch",
+      "args": ["mcp"],
+      "env": &#123;
+        "SCORCH_API_URL": "http://127.0.0.1:3000"
+      &#125;
+    &#125;
+  &#125;
+&#125;</code></pre>
+  <p>
+    Restart or reload the MCP client after changing its configuration. The
+    server should appear as <code>scorch</code> with six tools.
+  </p>
+  <h3>Connect to a gateway</h3>
+  <pre><code>&#123;
+  "mcpServers": &#123;
+    "scorch": &#123;
+      "command": "/home/user/.local/bin/scorch",
+      "args": ["mcp"],
+      "env": &#123;
+        "SCORCH_API_URL": "https://scorch.internal.example"
+      &#125;
+    &#125;
+  &#125;
+&#125;</code></pre>
+  <div class="callout">
+    <strong>Credentials belong at the gateway.</strong> The current client has no
+    Scorch-specific token setting. For remote access, use gateway controls appropriate
+    to your MCP host and deployment.
+  </div>
+
+  <h2 id="tools">Available tools</h2>
+  <div class="table-wrap">
+    <table>
+      <thead
+        ><tr><th>Tool</th><th>Purpose</th><th>Important inputs</th></tr></thead
+      ><tbody>
+        <tr
+          ><td><code>scorch_search</code></td><td
+            >Search the public web and optionally scrape each result.</td
+          ><td
+            ><code>query</code>, <code>limit</code>, <code>country</code>, <code
+              >language</code
+            >, optional <code>scrapeOptions</code>.</td
+          ></tr
+        >
+        <tr
+          ><td><code>scorch_scrape</code></td><td
+            >Fetch or render one public page and extract clean content.</td
+          ><td><code>url</code> and optional <code>options</code>.</td></tr
+        >
+        <tr
+          ><td><code>scorch_map</code></td><td
+            >Discover normalized public URLs belonging to a site.</td
+          ><td
+            ><code>url</code>, <code>limit</code>, subdomain and path filters.</td
+          ></tr
+        >
+        <tr
+          ><td><code>scorch_crawl_start</code></td><td
+            >Start a bounded in-memory crawl job.</td
+          ><td
+            ><code>url</code>, <code>limit</code>, <code>maxDepth</code>, <code
+              >concurrency</code
+            >, filters, scrape options.</td
+          ></tr
+        >
+        <tr
+          ><td><code>scorch_crawl_status</code></td><td
+            >Read one page of job state, documents, and errors.</td
+          ><td><code>id</code>, <code>cursor</code>, <code>pageSize</code>.</td
+          ></tr
+        >
+        <tr
+          ><td><code>scorch_crawl_cancel</code></td><td
+            >Cancel active work and remove a job.</td
+          ><td><code>id</code>.</td></tr
+        >
+      </tbody>
+    </table>
+  </div>
+  <p>
+    Tool schemas use the same contracts as the <a href="/api/">HTTP API</a>.
+    Unknown fields and out-of-range values are rejected by the service.
+  </p>
+
+  <h2 id="example-prompts">Example prompts</h2>
+  <ul>
+    <li>
+      “Use Scorch to search for the latest Rust async runtime documentation and
+      return five source URLs.”
+    </li>
+    <li>
+      “Scrape this page as Markdown and links. Render JavaScript only if Scorch
+      determines it is needed.”
+    </li>
+    <li>
+      “Map up to 200 URLs on this documentation site, excluding <code
+        >/blog/</code
+      >.”
+    </li>
+    <li>
+      “Start a 30-page crawl at depth two, then poll it until complete and
+      summarize the successful documents.”
+    </li>
+    <li>“Capture a full-page screenshot with Obscura.”</li>
+  </ul>
+  <p>
+    The AI client decides how to call and compose tools. Scorch enforces the
+    actual URL, browser, search-engine, capacity, and timeout rules.
+  </p>
+
+  <h2 id="operations">Cancellation and process behavior</h2>
+  <p>
+    When an MCP host cancels a tool call, the adapter drops the corresponding
+    HTTP request future. This stops waiting in the adapter. Crawl jobs have an
+    explicit cancel tool because a successfully created job continues
+    independently inside <code>scorchd</code>.
+  </p>
+  <p>
+    MCP JSON-RPC protocol traffic is written only to stdout. Diagnostics and
+    startup failures are written to stderr. Do not wrap the command in a script
+    that prints banners or log lines to stdout.
+  </p>
+  <p>Endpoint selection order is:</p>
+  <ol>
+    <li><code>--api-url</code> passed before <code>mcp</code></li><li>
+      <code>SCORCH_API_URL</code> in the MCP server environment
+    </li><li><code>http://127.0.0.1:3000</code></li>
+  </ol>
+  <pre><code>/absolute/path/to/scorch \
+  --api-url http://127.0.0.1:3000 \
+  mcp</code></pre>
+
+  <h2 id="troubleshooting">Troubleshooting</h2>
+  <h3>The MCP server exits immediately</h3>
+  <p>
+    Run the configured command from a terminal and inspect stderr. Confirm that
+    the binary path is absolute, executable, and built for the host
+    architecture.
+  </p>
+  <h3>Tools fail with connection errors</h3>
+  <p>Check the API separately:</p>
+  <pre><code>SCORCH_API_URL=http://127.0.0.1:3000 scorch search "health check"
+curl -v http://127.0.0.1:3000/readyz</code></pre>
+  <p>
+    If the MCP host is sandboxed or containerized, <code>127.0.0.1</code> refers to
+    that sandbox or container, not necessarily the machine running <code
+      >scorchd</code
+    >.
+  </p>
+  <h3>The client reports invalid JSON-RPC</h3>
+  <p>
+    Ensure no wrapper, shell startup file, or process supervisor writes
+    informational text to stdout. Scorch itself keeps diagnostics on stderr.
+  </p>
+  <h3>A browser choice is rejected</h3>
+  <p>
+    The MCP schema may allow both backend names, but the service allowlist is
+    authoritative. Inspect <code>/readyz</code> and update <code
+      >SCORCH_ALLOWED_BROWSERS</code
+    > only if the deployment intends to permit that backend.
+  </p>
+</DocLayout>

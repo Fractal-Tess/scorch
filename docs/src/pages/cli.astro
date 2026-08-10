@@ -1,0 +1,265 @@
+---
+import DocLayout from "../layouts/DocLayout.astro";
+const headings = [
+  { label: "Global options", href: "#global-options" },
+  { label: "scrape", href: "#scrape" },
+  { label: "search", href: "#search" },
+  { label: "map", href: "#map" },
+  { label: "crawl", href: "#crawl" },
+  { label: "benchmark", href: "#benchmark" },
+  { label: "mcp", href: "#mcp" },
+  { label: "Output and errors", href: "#output-and-errors" },
+];
+---
+
+<DocLayout
+  title="CLI reference"
+  description="Use the lightweight scorch executable to call a running API for search, extraction, discovery, crawling, benchmarking, and MCP."
+  headings={headings}
+  previous={{ label: "Configuration", href: "/configuration/" }}
+  next={{ label: "HTTP API", href: "/api/" }}
+>
+  <div class="callout">
+    <code>scorch</code> is an HTTP client. Start <code>scorchd</code> first, or point
+    the client at an existing service with <code>SCORCH_API_URL</code>.
+  </div>
+
+  <h2 id="global-options">Global options</h2>
+  <pre><code>scorch [--api-url URL] &lt;COMMAND&gt;</code></pre>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Option</th><th>Default</th><th>Meaning</th></tr></thead
+      ><tbody>
+        <tr
+          ><td><code>--api-url &lt;URL&gt;</code></td><td
+            ><code>http://127.0.0.1:3000</code></td
+          ><td
+            >Scorch HTTP API base URL. Also read from <code>SCORCH_API_URL</code
+            >.</td
+          ></tr
+        >
+        <tr
+          ><td><code>-h, --help</code></td><td>—</td><td
+            >Print top-level or subcommand help.</td
+          ></tr
+        >
+        <tr
+          ><td><code>-V, --version</code></td><td>—</td><td
+            >Print the client version.</td
+          ></tr
+        >
+      </tbody>
+    </table>
+  </div>
+  <p>The global option may appear before the subcommand:</p>
+  <pre><code>scorch --api-url https://scorch.internal.example search "rust"</code></pre>
+
+  <h2 id="scrape">scorch scrape</h2>
+  <pre><code>scorch scrape [OPTIONS] &lt;URL&gt;</code></pre>
+  <p>
+    Fetch or render one public page and print the API response as formatted
+    JSON.
+  </p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Option</th><th>Default</th><th>Values</th></tr></thead
+      ><tbody>
+        <tr
+          ><td><code>--format</code></td><td><code>markdown</code></td><td
+            >Comma-separated: <code>markdown</code>, <code>html</code>, <code
+              >text</code
+            >, <code>links</code>, <code>metadata</code>, <code>screenshot</code
+            >.</td
+          ></tr
+        >
+        <tr
+          ><td><code>--render</code></td><td><code>auto</code></td><td
+            ><code>auto</code>, <code>always</code>, or <code>never</code>.</td
+          ></tr
+        >
+        <tr
+          ><td><code>--browser</code></td><td>service default</td><td
+            ><code>obscura</code> or <code>chromium</code>; must be allowed by
+            server policy.</td
+          ></tr
+        >
+        <tr
+          ><td><code>--timeout-ms</code></td><td><code>30000</code></td><td
+            >Total scrape deadline from 100 to 120,000 ms.</td
+          ></tr
+        >
+        <tr
+          ><td><code>--wait-for-ms</code></td><td><code>0</code></td><td
+            >Explicit wait after load; server caps it at 60,000 ms.</td
+          ></tr
+        >
+        <tr
+          ><td><code>--full-content</code></td><td>off</td><td
+            >Keep the full page instead of focusing extraction on main content.</td
+          ></tr
+        >
+        <tr
+          ><td><code>--full-page-screenshot</code></td><td>off</td><td
+            >Capture the complete page instead of the viewport.</td
+          ></tr
+        >
+      </tbody>
+    </table>
+  </div>
+  <pre><code># Direct-first Markdown and links
+scorch scrape https://example.com --format markdown,links
+
+# Force JavaScript rendering with an allowed backend
+scorch scrape https://example.com/app \
+  --render always \
+  --browser obscura \
+  --wait-for-ms 500
+
+# Return a full-page PNG data URI
+scorch scrape https://example.com \
+  --format screenshot \
+  --full-page-screenshot</code></pre>
+
+  <h2 id="search">scorch search</h2>
+  <pre><code>scorch search [OPTIONS] &lt;QUERY&gt;</code></pre>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Option</th><th>Default</th><th>Meaning</th></tr></thead
+      ><tbody>
+        <tr
+          ><td><code>--limit</code></td><td><code>5</code></td><td
+            >Number of results, from 1 to 20.</td
+          ></tr
+        >
+        <tr
+          ><td><code>--scrape</code></td><td>off</td><td
+            >Enrich each result through the guarded scrape pipeline.</td
+          ></tr
+        >
+        <tr
+          ><td><code>--country</code></td><td><code>us</code></td><td
+            >Country hint sent to applicable engines.</td
+          ></tr
+        >
+        <tr
+          ><td><code>--language</code></td><td><code>en</code></td><td
+            >Language hint sent to applicable engines.</td
+          ></tr
+        >
+      </tbody>
+    </table>
+  </div>
+  <pre><code>scorch search "rust async runtime" --limit 8
+scorch search "web extraction" --country gb --language en --scrape</code></pre>
+  <p>
+    There is no engine option. Metasearch routing is controlled exclusively by <code
+      >scorchd</code
+    >.
+  </p>
+
+  <h2 id="map">scorch map</h2>
+  <pre><code>scorch map [OPTIONS] &lt;URL&gt;</code></pre>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Option</th><th>Default</th><th>Meaning</th></tr></thead
+      ><tbody>
+        <tr
+          ><td><code>--limit</code></td><td><code>100</code></td><td
+            >Maximum normalized URLs; server maximum is 1,000.</td
+          ></tr
+        >
+        <tr
+          ><td><code>--include-subdomains</code></td><td>off</td><td
+            >Allow discovered links on subdomains of the requested site.</td
+          ></tr
+        >
+      </tbody>
+    </table>
+  </div>
+  <pre><code>scorch map https://docs.example.com --limit 300 --include-subdomains</code></pre>
+
+  <h2 id="crawl">scorch crawl</h2>
+  <pre><code>scorch crawl [OPTIONS] &lt;URL&gt;</code></pre>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Option</th><th>Default</th><th>Meaning</th></tr></thead
+      ><tbody>
+        <tr
+          ><td><code>--limit</code></td><td><code>20</code></td><td
+            >Maximum pages; server maximum is 100.</td
+          ></tr
+        >
+        <tr
+          ><td><code>--max-depth</code></td><td><code>2</code></td><td
+            >Discovery depth; server maximum is 5.</td
+          ></tr
+        >
+        <tr
+          ><td><code>--concurrency</code></td><td><code>4</code></td><td
+            >Per-job concurrency, capped by the service global limit.</td
+          ></tr
+        >
+        <tr
+          ><td><code>--wait</code></td><td>off</td><td
+            >Poll until the job completes, is cancelled, or fails.</td
+          ></tr
+        >
+      </tbody>
+    </table>
+  </div>
+  <pre><code># Start and return the job summary immediately
+scorch crawl https://example.com --limit 40 --max-depth 3
+
+# Wait and print the first result page at terminal state
+scorch crawl https://example.com --limit 20 --wait</code></pre>
+  <h3 id="crawl-status">Read crawl status</h3>
+  <pre><code>scorch crawl-status &lt;ID&gt; --cursor 0 --page-size 10</code></pre>
+  <p>
+    <code>--cursor</code> defaults to 0 and <code>--page-size</code> defaults to 10.
+    API page sizes range from 1 to 50. Use <code>nextCursor</code> from a response
+    to continue.
+  </p>
+  <h3 id="crawl-cancel">Cancel and remove a crawl</h3>
+  <pre><code>scorch crawl-cancel &lt;ID&gt;</code></pre>
+  <p>
+    Cancellation removes the job. A later status request for that ID returns not
+    found.
+  </p>
+
+  <h2 id="benchmark">scorch benchmark</h2>
+  <pre><code>scorch benchmark [--runs N] &lt;URLS&gt;...</code></pre>
+  <p>
+    The benchmark command calls the configured API, not the engine directly. It
+    runs scrape requests using fetch, auto, and browser modes and prints
+    comparative JSON.
+  </p>
+  <pre><code>scorch benchmark --runs 5 \
+  https://example.com \
+  https://example.org</code></pre>
+  <p>
+    The default is three runs per input. Use optimized <code>scorchd</code> builds
+    when measurements need to represent production behavior.
+  </p>
+
+  <h2 id="mcp">scorch mcp</h2>
+  <pre><code>SCORCH_API_URL=http://127.0.0.1:3000 scorch mcp</code></pre>
+  <p>
+    Starts a Model Context Protocol server over stdio. It is designed to be
+    launched by an MCP host rather than used interactively. Every tool call is
+    forwarded over HTTP to the configured API. See the <a href="/mcp/"
+      >MCP integration guide</a
+    >.
+  </p>
+
+  <h2 id="output-and-errors">Output and errors</h2>
+  <p>
+    Normal command results are pretty-printed JSON on stdout. Diagnostics are
+    written to stderr. This makes piping reliable:
+  </p>
+  <pre><code>scorch search "rust scraping" --limit 10 | jq '.results[].url'</code></pre>
+  <p>
+    HTTP errors include the API error code and message. Every API response
+    carries an <code>x-request-id</code> header; service logs use the same ID for
+    correlation.
+  </p>
+</DocLayout>

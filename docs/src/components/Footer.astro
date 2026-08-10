@@ -1,0 +1,141 @@
+---
+import Logo from "./Logo.astro";
+
+const columns = [
+  {
+    title: "Explore",
+    links: [
+      ["Getting started", "/getting-started/"],
+      ["Configuration", "/configuration/"],
+      ["CLI reference", "/cli/"],
+      ["HTTP API", "/api/"],
+      ["Nix installation", "/nix/"],
+    ],
+  },
+  {
+    title: "Understand",
+    links: [
+      ["Architecture", "/architecture/"],
+      ["MCP integration", "/mcp/"],
+      ["Agent Skill", "/skill/"],
+      ["Browser policy", "/configuration/#browser-policy"],
+      ["Security boundary", "/architecture/#security-boundary"],
+    ],
+  },
+  {
+    title: "Project",
+    links: [
+      ["GitHub", "https://github.com/Fractal-Tess/scorch"],
+      [
+        "Changelog",
+        "https://github.com/Fractal-Tess/scorch/blob/main/CHANGELOG.md",
+      ],
+      [
+        "MIT License",
+        "https://github.com/Fractal-Tess/scorch/blob/main/LICENSE",
+      ],
+      ["Source code", "https://github.com/Fractal-Tess/scorch"],
+      ["Report an issue", "https://github.com/Fractal-Tess/scorch/issues"],
+    ],
+  },
+];
+---
+
+<footer class="mx-auto max-w-[1440px] px-5 pb-10 sm:px-8 lg:px-10">
+  <div class="footer-panel bg-border p-px">
+    <div class="footer-panel bg-background p-8 sm:p-10 lg:p-14">
+      <Logo />
+      <div
+        class="mt-12 grid grid-cols-2 gap-x-8 gap-y-10 md:mt-14 md:grid-cols-4 md:gap-x-0"
+      >
+        {
+          columns.map((column, index) => (
+            <div
+              class:list={[
+                "relative md:px-8",
+                index > 0 && "md:border-border md:border-l",
+              ]}
+            >
+              {index > 0 && (
+                <>
+                  <span class="footer-plus -top-[9px] -left-[7px] hidden md:block">
+                    +
+                  </span>
+                  <span class="footer-plus -bottom-[9px] -left-[7px] hidden md:block">
+                    +
+                  </span>
+                </>
+              )}
+              <h3 class="text-sm font-semibold tracking-tight">
+                {column.title}
+              </h3>
+              <ul class="mt-4 space-y-3">
+                {column.links.map(([label, href]) => (
+                  <li>
+                    <a
+                      href={href}
+                      class="text-muted-foreground hover:text-foreground text-sm transition-colors"
+                    >
+                      {label}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))
+        }
+        <div class="md:border-border relative md:border-l md:px-8 md:pr-0">
+          <span class="footer-plus -top-[9px] -left-[7px] hidden md:block"
+            >+</span
+          ><span class="footer-plus -bottom-[9px] -left-[7px] hidden md:block"
+            >+</span
+          >
+          <h3 class="text-sm font-semibold tracking-tight">Start here</h3>
+          <p
+            class="text-muted-foreground mt-4 max-w-[220px] text-sm leading-relaxed"
+          >
+            Build the service, run it locally, and make the first guarded
+            request.
+          </p>
+          <div class="mt-6 flex flex-col items-start gap-2.5">
+            <a
+              href="/getting-started/"
+              class="cut-corners-sm bg-foreground text-background inline-flex h-10 items-center px-5 text-sm font-medium"
+              >Get started</a
+            >
+            <a
+              href="https://github.com/Fractal-Tess/scorch"
+              class="cut-corners-sm border-border hover:bg-muted inline-flex h-10 items-center border px-5 text-sm font-medium"
+              >View GitHub</a
+            >
+          </div>
+        </div>
+      </div>
+      <div
+        class="border-border text-muted-foreground mt-12 flex flex-col-reverse items-start justify-between gap-5 border-t pt-6 text-xs sm:flex-row sm:items-center md:mt-14"
+      >
+        <p>© 2026 Fractal-Tess. MIT licensed.</p>
+        <p>Built in Rust · Documented with Astro</p>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<style>
+  .footer-panel {
+    clip-path: polygon(
+      28px 0,
+      100% 0,
+      100% calc(100% - 28px),
+      calc(100% - 28px) 100%,
+      0 100%,
+      0 28px
+    );
+  }
+  .footer-plus {
+    position: absolute;
+    z-index: 2;
+    color: #2f80ff;
+    font-family: var(--font-mono);
+  }
+</style>

@@ -1,0 +1,180 @@
+---
+interface Props {
+  class?: string;
+  interactive?: boolean;
+  size?: number;
+}
+const { class: className = "", interactive = true, size = 10 } = Astro.props;
+---
+
+<div
+  class:list={["ascii-waves", className]}
+  data-ascii-waves
+  data-interactive={interactive}
+  data-cell-size={size}
+  aria-hidden="true"
+>
+  <canvas></canvas>
+</div>
+
+<script>
+  const GLYPHS = " .·:+*xX#%@";
+  const clamp = (value: number) => Math.min(1, Math.max(0, value));
+  const mix = (from: number, to: number, amount: number) =>
+    Math.round(from + (to - from) * amount);
+
+  function mountAsciiWave(root: HTMLElement) {
+    if (root.dataset.mounted === "true") return;
+    root.dataset.mounted = "true";
+    const canvas = root.querySelector("canvas");
+    if (!(canvas instanceof HTMLCanvasElement)) return;
+    const context = canvas.getContext("2d", { alpha: true });
+    if (!context) return;
+
+    const cell = Number(root.dataset.cellSize ?? 10);
+    const interactive = root.dataset.interactive === "true";
+    const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)");
+    let width = 0;
+    let height = 0;
+    let columns = 0;
+    let rows = 0;
+    let frame = 0;
+    let running = false;
+    let lastPaint = 0;
+    let elapsed = 0;
+    const pointer = { x: 0.5, y: 0.5, active: 0 };
+
+    const resize = () => {
+      const bounds = root.getBoundingClientRect();
+      width = Math.max(1, Math.round(bounds.width));
+      height = Math.max(1, Math.round(bounds.height));
+      const dpr = Math.min(devicePixelRatio || 1, 2);
+      canvas.width = Math.round(width * dpr);
+      canvas.height = Math.round(height * dpr);
+      canvas.style.width = `${width}px`;
+      canvas.style.height = `${height}px`;
+      context.setTransform(dpr, 0, 0, dpr, 0, 0);
+      columns = Math.ceil(width / cell);
+      rows = Math.ceil(height / cell);
+    };
+
+    root.addEventListener(
+      "pointermove",
+      (event) => {
+        if (!interactive) return;
+        const bounds = root.getBoundingClientRect();
+        pointer.x = (event.clientX - bounds.left) / bounds.width;
+        pointer.y = (event.clientY - bounds.top) / bounds.height;
+        pointer.active = 1;
+      },
+      { passive: true },
+    );
+    root.addEventListener("pointerleave", () => {
+      pointer.active = 0;
+    });
+
+    const paint = (now: number) => {
+      if (!running) return;
+      frame = requestAnimationFrame(paint);
+      if (now - lastPaint < 38) return;
+      elapsed += Math.min(100, now - lastPaint) * 0.001;
+      lastPaint = now;
+      context.clearRect(0, 0, width, height);
+      context.textAlign = "center";
+      context.textBaseline = "middle";
+      context.font = `600 ${Math.max(8, cell - 1)}px ui-monospace, SFMono-Regular, Menlo, monospace`;
+      const aspect = width / Math.max(1, height);
+
+      for (let row = 0; row < rows; row += 1) {
+        for (let column = 0; column < columns; column += 1) {
+          const normalizedX = column / Math.max(1, columns - 1);
+          const normalizedY = row / Math.max(1, rows - 1);
+          const x = (normalizedX - 0.5) * aspect * 2;
+          const y = (normalizedY - 0.5) * 2;
+
+          const pathOne =
+            Math.sin(x * 2.8 + elapsed * 0.72) * 0.26 +
+            Math.sin(x * 7.2 - elapsed) * 0.065;
+          const pathTwo =
+            Math.cos(x * 2.1 - elapsed * 0.58) * 0.34 -
+            Math.sin(x * 5.4 + elapsed * 0.8) * 0.055;
+          const emberPath = Math.sin(x * 3.8 - elapsed * 0.9) * 0.18 + 0.08;
+          const ridgeOne = Math.exp(-Math.abs(y - pathOne) * 7.2);
+          const ridgeTwo = Math.exp(-Math.abs(y - pathTwo) * 8.4) * 0.78;
+          const ember =
+            Math.exp(-Math.abs(y - emberPath) * 15) *
+            (0.45 + 0.35 * Math.sin(x * 4 + elapsed));
+          const nodePulse =
+            Math.pow(
+              Math.max(
+                0,
+                Math.sin(x * 8 - elapsed * 1.4) * Math.cos(y * 9 + elapsed),
+              ),
+              8,
+            ) * 0.42;
+
+          const dx = normalizedX - pointer.x;
+          const dy = normalizedY - pointer.y;
+          const radius = Math.hypot(dx, dy);
+          const pointerWave =
+            interactive && pointer.active
+              ? Math.max(0, 1 - radius * 4.2) *
+                Math.sin(radius * 32 - elapsed * 6)
+              : 0;
+          const edgeFade =
+            clamp(Math.sin(normalizedX * Math.PI) * 1.4) *
+            clamp(Math.sin(normalizedY * Math.PI) * 1.7);
+          const luminance = clamp(
+            (Math.max(ridgeOne, ridgeTwo) * 0.82 +
+              nodePulse +
+              ember * 0.25 +
+              pointerWave * 0.2) *
+              edgeFade,
+          );
+          if (luminance < 0.085) continue;
+
+          const orange = clamp(ember * 1.65);
+          const cyan = clamp(ridgeOne * 0.8 + nodePulse);
+          const blueRed = mix(35, 12, cyan);
+          const blueGreen = mix(84, 181, cyan);
+          const blueBlue = 255;
+          const red = mix(blueRed, 255, orange);
+          const green = mix(blueGreen, 92, orange);
+          const blue = mix(blueBlue, 24, orange);
+          const glyphIndex = Math.min(
+            GLYPHS.length - 1,
+            Math.floor(luminance * GLYPHS.length),
+          );
+          const alpha = Math.min(0.94, 0.12 + luminance * 0.88);
+          context.fillStyle = `rgba(${red}, ${green}, ${blue}, ${alpha})`;
+          context.fillText(
+            GLYPHS[glyphIndex] ?? "+",
+            column * cell + cell / 2,
+            row * cell + cell / 2 + pointerWave * cell * 0.6,
+          );
+        }
+      }
+      if (reduceMotion.matches) stop();
+    };
+
+    const start = () => {
+      if (running) return;
+      running = true;
+      frame = requestAnimationFrame(paint);
+    };
+    const stop = () => {
+      running = false;
+      cancelAnimationFrame(frame);
+    };
+    new IntersectionObserver(([entry]) =>
+      entry?.isIntersecting ? start() : stop(),
+    ).observe(root);
+    new ResizeObserver(resize).observe(root);
+    resize();
+    start();
+  }
+
+  document
+    .querySelectorAll<HTMLElement>("[data-ascii-waves]")
+    .forEach(mountAsciiWave);
+</script>

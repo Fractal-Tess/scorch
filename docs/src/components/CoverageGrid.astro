@@ -1,0 +1,176 @@
+---
+import CutButton from "./CutButton.astro";
+
+const images = Array.from(
+  { length: 9 },
+  (_, index) => `/grid/${String(index + 1).padStart(2, "0")}.webp`,
+);
+const columns = [0, 1, 2].map((column) =>
+  images.filter((_, index) => index % 3 === column),
+);
+---
+
+<section class="coverage-scroll relative h-[390vh]" data-coverage-scroll>
+  <div
+    class="bg-background sticky top-0 h-screen overflow-hidden"
+    data-coverage-stage
+  >
+    <div
+      class="coverage-grid absolute inset-0 flex items-center justify-center opacity-0"
+      data-coverage-grid
+    >
+      <div
+        class="coverage-grid-inner grid w-[min(86vw,760px)] grid-cols-3 gap-3 sm:gap-4"
+        data-coverage-inner
+      >
+        {
+          columns.map((column, columnIndex) => (
+            <div
+              class="coverage-column flex flex-col gap-3 sm:gap-4"
+              data-coverage-column={columnIndex}
+            >
+              {column.map((src, position) => (
+                <div
+                  class="coverage-tile generated-art aspect-square overflow-hidden"
+                  data-position={position}
+                >
+                  <img
+                    src={src}
+                    alt=""
+                    loading="lazy"
+                    class="h-full w-full object-cover"
+                  />
+                </div>
+              ))}
+            </div>
+          ))
+        }
+      </div>
+    </div>
+
+    <div
+      class="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center px-5 text-center"
+    >
+      <div data-coverage-title class="translate-y-7 opacity-0">
+        <p
+          class="text-accent mb-4 font-mono text-[10px] font-semibold tracking-[0.18em] uppercase"
+        >
+          One guarded runtime
+        </p>
+        <h2
+          class="mx-auto max-w-4xl font-serif text-4xl leading-[1.06] font-normal tracking-[-0.02em] text-balance sm:text-5xl lg:text-[3.6rem]"
+        >
+          Total <span class="font-sans font-semibold tracking-[-0.045em]"
+            >visibility</span
+          > from source to document
+        </h2>
+      </div>
+      <div
+        data-coverage-action
+        class="pointer-events-none mt-8 translate-y-4 opacity-0"
+      >
+        <CutButton href="/architecture/"
+          >Explore the pipeline <span aria-hidden="true">→</span></CutButton
+        >
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+  function clamp(value: number, minimum = 0, maximum = 1) {
+    return Math.min(maximum, Math.max(minimum, value));
+  }
+  function range(value: number, start: number, end: number) {
+    return clamp((value - start) / (end - start));
+  }
+
+  function mountCoverage(section: HTMLElement) {
+    if (section.dataset.mounted) return;
+    section.dataset.mounted = "true";
+    const grid = section.querySelector<HTMLElement>("[data-coverage-grid]");
+    const inner = section.querySelector<HTMLElement>("[data-coverage-inner]");
+    const title = section.querySelector<HTMLElement>("[data-coverage-title]");
+    const action = section.querySelector<HTMLElement>("[data-coverage-action]");
+    const columns = [
+      ...section.querySelectorAll<HTMLElement>("[data-coverage-column]"),
+    ];
+    if (!grid || !inner || !title || !action) return;
+
+    const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)");
+    let ticking = false;
+    const update = () => {
+      ticking = false;
+      const bounds = section.getBoundingClientRect();
+      const distance = Math.max(1, section.offsetHeight - innerHeight);
+      const progress = clamp(-bounds.top / distance);
+      if (reduceMotion.matches || innerWidth < 640) {
+        grid.style.opacity = "0.56";
+        inner.style.transform = "scale(1.45)";
+        title.style.opacity = "1";
+        title.style.transform = "translateY(0)";
+        action.style.opacity = "1";
+        action.style.transform = "translateY(0)";
+        action.style.pointerEvents = "auto";
+        columns.forEach((column) => {
+          column.style.transform = "none";
+        });
+        section
+          .querySelectorAll<HTMLElement>(".coverage-tile")
+          .forEach((tile) => {
+            tile.style.transform = "none";
+          });
+        return;
+      }
+
+      const visible =
+        range(progress, 0.015, 0.08) * (1 - range(progress, 0.9, 0.995));
+      grid.style.opacity = String(visible);
+      const scale = 1 + range(progress, 0.5, 0.92) * 1.08;
+      inner.style.transform = `scale(${scale})`;
+      title.style.opacity = String(range(progress, 0.02, 0.14));
+      title.style.transform = `translateY(${(1 - range(progress, 0.02, 0.14)) * 28 - range(progress, 0.68, 0.84) * 10}px)`;
+      const actionProgress = range(progress, 0.64, 0.8);
+      action.style.opacity = String(actionProgress);
+      action.style.transform = `translateY(${(1 - actionProgress) * 16}px)`;
+      action.style.pointerEvents = actionProgress > 0.7 ? "auto" : "none";
+
+      columns.forEach((column, columnIndex) => {
+        const horizontal = range(progress, 0.52, 0.92) * 55;
+        const direction = columnIndex === 0 ? -1 : columnIndex === 2 ? 1 : 0;
+        column.style.transform = `translateX(${horizontal * direction}%)`;
+        const tiles = [
+          ...column.querySelectorAll<HTMLElement>(".coverage-tile"),
+        ];
+        tiles.forEach((tile, position) => {
+          const fromTop = columnIndex % 2 === 0;
+          const order = fromTop ? tiles.length - 1 - position : position;
+          const reveal = range(
+            progress,
+            0.055 + order * 0.042,
+            0.34 + order * 0.042,
+          );
+          const entrance = (1 - reveal) * (fromTop ? -90 : 90);
+          const centerSpread =
+            columnIndex === 1 && progress > 0.54
+              ? range(progress, 0.54, 0.9) *
+                (position < Math.floor(tiles.length / 2) ? -42 : 42)
+              : 0;
+          tile.style.transform = `translateY(calc(${entrance}vh + ${centerSpread}%))`;
+        });
+      });
+    };
+    const requestUpdate = () => {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(update);
+    };
+    addEventListener("scroll", requestUpdate, { passive: true });
+    addEventListener("resize", requestUpdate, { passive: true });
+    update();
+  }
+
+  document
+    .querySelectorAll<HTMLElement>("[data-coverage-scroll]")
+    .forEach(mountCoverage);
+</script>

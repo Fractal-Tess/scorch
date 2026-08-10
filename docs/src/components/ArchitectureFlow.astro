@@ -1,0 +1,53 @@
+<div
+  class="border-border bg-surface relative overflow-hidden rounded-xl border p-5 sm:p-7"
+>
+  <div class="dot-grid absolute inset-0 opacity-40" aria-hidden="true"></div>
+  <div
+    class="relative grid items-stretch gap-3 lg:grid-cols-[1fr_42px_1.15fr_42px_1fr]"
+  >
+    <div class="cut-corners border-border-strong bg-background border p-5">
+      <span
+        class="text-accent font-mono text-[9px] font-semibold tracking-[0.15em] uppercase"
+        >Client process</span
+      >
+      <h3 class="mt-2 text-lg font-semibold tracking-tight">scorch</h3>
+      <p class="text-muted-foreground mt-2 text-xs leading-relaxed">
+        CLI, benchmark, and MCP adapter. It only speaks HTTP.
+      </p>
+    </div>
+    <div class="hidden items-center justify-center lg:flex" aria-hidden="true">
+      <span class="bg-border-strong h-px w-full"></span><span
+        class="text-muted-foreground">›</span
+      >
+    </div>
+    <div
+      class="cut-corners border-accent/35 bg-background border p-5 shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--accent)_7%,transparent)]"
+    >
+      <span
+        class="text-accent font-mono text-[9px] font-semibold tracking-[0.15em] uppercase"
+        >Service process</span
+      >
+      <h3 class="mt-2 text-lg font-semibold tracking-tight">scorchd</h3>
+      <p class="text-muted-foreground mt-2 text-xs leading-relaxed">
+        Axum API, policy, metasearch, browser runtime, extraction, and crawl
+        jobs.
+      </p>
+    </div>
+    <div class="hidden items-center justify-center lg:flex" aria-hidden="true">
+      <span class="bg-border-strong h-px w-full"></span><span
+        class="text-muted-foreground">›</span
+      >
+    </div>
+    <div class="cut-corners border-border-strong bg-background border p-5">
+      <span
+        class="text-accent font-mono text-[9px] font-semibold tracking-[0.15em] uppercase"
+        >Public web</span
+      >
+      <h3 class="mt-2 text-lg font-semibold tracking-tight">Guarded egress</h3>
+      <p class="text-muted-foreground mt-2 text-xs leading-relaxed">
+        Pinned direct fetch or isolated browser work through the validating
+        proxy.
+      </p>
+    </div>
+  </div>
+</div>

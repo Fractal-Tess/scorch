@@ -4,5 +4,7 @@
 /devenv.local.nix
 /.env
 /references/
+/result
+/result-*
 __pycache__/
 *.py[cod]

@@ -1,0 +1,260 @@
+---
+import ArchitectureFlow from "../components/ArchitectureFlow.astro";
+import DocLayout from "../layouts/DocLayout.astro";
+const headings = [
+  { label: "Process boundary", href: "#process-boundary" },
+  { label: "Scrape pipeline", href: "#scrape-pipeline" },
+  { label: "Browser rendering", href: "#browser-rendering" },
+  { label: "Metasearch", href: "#metasearch" },
+  { label: "Mapping and crawl", href: "#mapping-and-crawl" },
+  { label: "Security boundary", href: "#security-boundary" },
+  { label: "Runtime state", href: "#runtime-state" },
+];
+---
+
+<DocLayout
+  title="How Scorch works"
+  description="A small HTTP boundary separates callers from one bounded runtime that finds, fetches, renders, extracts, and follows public web content."
+  headings={headings}
+  previous={{ label: "Getting started", href: "/getting-started/" }}
+  next={{ label: "Configuration", href: "/configuration/" }}
+>
+  <h2 id="process-boundary">Process boundary</h2>
+  <p>
+    Scorch is a six-crate Rust workspace that produces two executables. The
+    split is architectural, not cosmetic: client operations always cross HTTP,
+    while runtime policy stays inside the service.
+  </p>
+  <ArchitectureFlow />
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Crate</th><th>Responsibility</th></tr></thead><tbody>
+        <tr
+          ><td><code>metasearch</code></td><td
+            >Engine adapters, concurrent routing, normalization, cache, circuit
+            breakers, and reranking.</td
+          ></tr
+        >
+        <tr
+          ><td><code>scorch-types</code></td><td
+            >Shared HTTP request and response contracts.</td
+          ></tr
+        >
+        <tr
+          ><td><code>scorch-engine</code></td><td
+            >Network policy, validating proxy, fetch, browsers, extraction,
+            search, mapping, and crawl jobs.</td
+          ></tr
+        >
+        <tr
+          ><td><code>scorch-api</code></td><td
+            >Axum routes, strict request parsing, response headers, and HTTP
+            error mapping.</td
+          ></tr
+        >
+        <tr
+          ><td><code>scorch-server</code></td><td
+            >The <code>scorchd</code> executable, service configuration, logging,
+            and lifecycle.</td
+          ></tr
+        >
+        <tr
+          ><td><code>scorch-cli</code></td><td
+            >The <code>scorch</code> HTTP client, benchmark command, and API-backed
+            MCP adapter.</td
+          ></tr
+        >
+      </tbody>
+    </table>
+  </div>
+  <p>
+    The client does not link <code>scorch-engine</code>, <code>scorch-api</code
+    >, metasearch, Obscura, or Chromium. This prevents a CLI or MCP caller from
+    accidentally bypassing service policy.
+  </p>
+
+  <h2 id="scrape-pipeline">Scrape pipeline</h2>
+  <ol>
+    <li>
+      <strong>Parse a strict contract.</strong> Unknown JSON fields are rejected and
+      option ranges are checked before work starts.
+    </li>
+    <li>
+      <strong>Validate the target.</strong> Scorch accepts only HTTP and HTTPS URLs
+      without embedded credentials, blocks unsafe ports, and resolves the host against
+      local and special-purpose address policy.
+    </li>
+    <li>
+      <strong>Direct fetch first.</strong> Redirects are handled manually, each hop
+      is revalidated, DNS answers are pinned to the outbound connection, and response
+      bytes are capped.
+    </li>
+    <li>
+      <strong>Choose an engine.</strong> Static content stays on the direct path.
+      JavaScript-dependent content, explicit rendering, and screenshots select an
+      allowed browser.
+    </li>
+    <li>
+      <strong>Extract.</strong> The resulting HTML becomes requested Markdown, HTML,
+      text, links, metadata, and optionally a PNG screenshot data URI.
+    </li>
+    <li>
+      <strong>Return only requested large fields.</strong> The response identifies
+      the final URL, selected engine, elapsed time, metadata, warnings, and formats.
+    </li>
+  </ol>
+  <div class="grid gap-3 sm:grid-cols-3">
+    <div class="border-border bg-surface border p-4">
+      <span class="text-accent font-mono text-[10px]">RENDER / AUTO</span><p
+        class="mt-2 text-sm"
+      >
+        Fetch first, then render only when needed.
+      </p>
+    </div>
+    <div class="border-border bg-surface border p-4">
+      <span class="text-accent font-mono text-[10px]">RENDER / ALWAYS</span><p
+        class="mt-2 text-sm"
+      >
+        Force the selected allowed browser.
+      </p>
+    </div>
+    <div class="border-border bg-surface border p-4">
+      <span class="text-accent font-mono text-[10px]">RENDER / NEVER</span><p
+        class="mt-2 text-sm"
+      >
+        Return direct-fetch extraction only.
+      </p>
+    </div>
+  </div>
+
+  <h2 id="browser-rendering">Browser rendering</h2>
+  <p>
+    <strong>Obscura is the default renderer.</strong> It runs in-process as a Rust
+    library—there is no Obscura sidecar, executable, CDP server, or subprocess. Chromium
+    remains an optional compatibility backend.
+  </p>
+  <p>
+    Each Obscura request receives a fresh browser context, page, and V8 state.
+    Scorch does not pool contexts or pages across callers because that could
+    leak cookies, authenticated cache entries, DOM state, or JavaScript state.
+    Browser concurrency is bounded, and one absolute deadline covers validation,
+    queueing, navigation, explicit waiting, serialization, and screenshots.
+  </p>
+  <p>
+    Stealth transport is enabled by default. It provides Chrome-like TLS and
+    HTTP behavior, ordered headers, aligned user-agent/client-hint/JavaScript
+    identity, and blocking of common tracker or fingerprinting domains. It does <strong
+      >not</strong
+    > hide the source IP, provide anonymity, guarantee CAPTCHA bypass, or weaken SSRF
+    controls.
+  </p>
+  <div class="callout">
+    A request may name <code>obscura</code> or <code>chromium</code>, but only
+    the service allowlist decides whether that choice is legal. Backend
+    selection cannot escape <code>SCORCH_ALLOWED_BROWSERS</code>.
+  </div>
+
+  <h2 id="metasearch">Metasearch</h2>
+  <p>
+    Metasearch is Scorch's only search provider. Source engines are internal
+    adapters and cannot be selected by API, CLI, or MCP requests. The server may
+    allow Bing, Brave, DuckDuckGo, Google, Naver, and Wikipedia; Brave and
+    Google require operator credentials.
+  </p>
+  <ol>
+    <li>
+      Start every enabled and healthy engine concurrently under per-engine
+      limits.
+    </li>
+    <li>
+      Accept the first useful result, then hold a short collection window for
+      additional agreement.
+    </li>
+    <li>
+      Cancel unfinished work rather than letting one slow engine determine total
+      latency.
+    </li>
+    <li>
+      Normalize URLs by removing fragments and common tracking parameters.
+    </li>
+    <li>Merge duplicates and rank with weighted reciprocal-rank fusion.</li>
+    <li>
+      Report contributing sources and completed-engine failures in warnings.
+    </li>
+  </ol>
+  <p>
+    The runtime maintains a bounded 60-second in-memory result cache and
+    temporary circuit breakers after repeated failures. Search is best-effort:
+    provider markup changes, rate limits, and challenges are treated as failures
+    rather than authoritative empty results.
+  </p>
+
+  <h2 id="mapping-and-crawl">Mapping and crawl</h2>
+  <p>
+    Mapping is sitemap-first. Scorch checks robots-declared sitemaps, the
+    conventional sitemap URL, bounded nested sitemap indexes, and finally links
+    on the root page. URLs are normalized, deduplicated, path-filtered, and
+    restricted to the requested site.
+  </p>
+  <p>
+    Crawling starts from mapped URLs, follows same-origin links breadth-first,
+    applies include and exclude paths, and respects <code>robots.txt</code> as <code
+      >ScorchBot</code
+    >. Jobs run in bounded batches and preserve individual page failures beside
+    successful documents.
+  </p>
+  <ul>
+    <li>Maximum 100 pages and discovery depth 5 per crawl.</li>
+    <li>Maximum four active crawl jobs.</li>
+    <li>Five-minute absolute crawl deadline.</li>
+    <li>32 MiB retained data per job and 128 retained jobs.</li>
+    <li>
+      Paginated status responses, cancellation, and configurable completed-job
+      TTL.
+    </li>
+  </ul>
+
+  <h2 id="security-boundary">Security boundary</h2>
+  <p>
+    Pages, search results, browser output, sitemaps, robots files, and extracted
+    links are untrusted data. They cannot change process configuration or
+    trigger command execution.
+  </p>
+  <div class="grid gap-3 sm:grid-cols-2">
+    <div class="cut-corners border-border border p-5">
+      <strong>Direct path</strong><p class="mt-2 text-sm">
+        Manual redirects, DNS validation and pinning, HTTP(S)-only URLs,
+        unsafe-port rejection, and response caps.
+      </p>
+    </div>
+    <div class="cut-corners border-border border p-5">
+      <strong>Browser path</strong><p class="mt-2 text-sm">
+        The same target checks plus an embedded HTTP/CONNECT proxy that
+        validates browser redirects and subresources.
+      </p>
+    </div>
+  </div>
+  <p>
+    Obscura receives only the validating proxy endpoint and retains its own
+    private-address guard. Chromium is configured without a direct network
+    route: HTTP, HTTPS, WebSocket, iframe, worker, redirect, and subresource
+    connections use the proxy; QUIC and non-proxied WebRTC UDP are disabled.
+  </p>
+  <div class="callout warning">
+    <strong>Authentication is outside this boundary.</strong> The local-first API
+    has no built-in authentication or TLS. Use loopback or an authenticated TLS gateway
+    when serving other machines.
+  </div>
+
+  <h2 id="runtime-state">Runtime state</h2>
+  <p>
+    <code>scorchd</code> owns one Axum server, one globally bounded direct-fetch runtime,
+    bounded isolated Obscura work, an optional lazy Chromium backend, one validating
+    proxy, and a bounded in-memory crawl registry.
+  </p>
+  <p>
+    There is no durable state. A restart clears crawl jobs, metasearch cache
+    entries, and circuit-breaker state. This keeps deployment self-contained but
+    means clients must persist any results they need to retain.
+  </p>
+</DocLayout>

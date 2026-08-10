@@ -1,0 +1,19 @@
+---
+interface Props {
+  href: string;
+  variant?: "solid" | "outline";
+}
+const { href, variant = "solid" } = Astro.props;
+---
+
+<a
+  href={href}
+  class:list={[
+    "cut-corners-sm inline-flex h-10 items-center justify-center gap-2 px-4 text-[13px] font-semibold transition-transform hover:-translate-y-0.5",
+    variant === "solid"
+      ? "bg-foreground text-background"
+      : "border-border-strong bg-background text-foreground hover:bg-muted border",
+  ]}
+>
+  <slot />
+</a>

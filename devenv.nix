@@ -2,6 +2,7 @@
 
 {
   packages = with pkgs; [
+    bun
     chromium
     clang
     cmake
@@ -39,6 +40,7 @@
 
   enterShell = ''
     echo "Scorch development environment"
+    bun --version
     rustc --version
     chromium --version
     jj --version

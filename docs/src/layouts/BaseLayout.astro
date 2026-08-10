@@ -1,0 +1,227 @@
+---
+import Footer from "../components/Footer.astro";
+import Header from "../components/Header.astro";
+import "../styles/global.css";
+
+interface Props {
+  title?: string;
+  description?: string;
+  image?: string;
+  hideFooter?: boolean;
+}
+
+const {
+  title = "Scorch — web search and extraction infrastructure",
+  description = "Self-contained web search, scraping, mapping, and crawling in Rust.",
+  image = "/brand/scorch-mark.png",
+  hideFooter = false,
+} = Astro.props;
+const canonical = Astro.site
+  ? new URL(Astro.url.pathname, Astro.site)
+  : undefined;
+const socialImage = Astro.site ? new URL(image, Astro.site) : undefined;
+const fullTitle = title.startsWith("Scorch") ? title : `${title} · Scorch`;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width" />
+    <meta name="generator" content={Astro.generator} />
+    <meta name="description" content={description} />
+    <meta name="theme-color" content="#0a0b0d" />
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <link rel="apple-touch-icon" href="/brand/scorch-mark.png" />
+    {canonical && <link rel="canonical" href={canonical} />}
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content={fullTitle} />
+    <meta property="og:description" content={description} />
+    {canonical && <meta property="og:url" content={canonical} />}
+    {socialImage && <meta property="og:image" content={socialImage} />}
+    <meta name="twitter:card" content="summary" />
+    <title>{fullTitle}</title>
+    <script is:inline>
+      (() => {
+        document.documentElement.classList.add("js");
+        const saved = localStorage.getItem("scorch-theme");
+        const dark =
+          saved === "dark" ||
+          (!saved && matchMedia("(prefers-color-scheme: dark)").matches);
+        document.documentElement.classList.toggle("dark", dark);
+      })();
+    </script>
+  </head>
+  <body class="bg-background text-foreground min-h-screen">
+    <a
+      href="#main-content"
+      class="bg-foreground text-background fixed top-3 left-3 z-[100] -translate-y-20 rounded-md px-4 py-2 text-xs font-semibold transition-transform focus:translate-y-0"
+      >Skip to content</a
+    >
+    <Header />
+    <main id="main-content" class="pt-16"><slot /></main>
+    {!hideFooter && <Footer />}
+
+    <script>
+      const themeButton =
+        document.querySelector<HTMLButtonElement>("#theme-toggle");
+      themeButton?.addEventListener("click", () => {
+        const dark = document.documentElement.classList.toggle("dark");
+        localStorage.setItem("scorch-theme", dark ? "dark" : "light");
+      });
+
+      const siteHeader =
+        document.querySelector<HTMLElement>("[data-site-header]");
+      const updateHeader = () =>
+        siteHeader?.classList.toggle("is-scrolled", scrollY > 8);
+      addEventListener("scroll", updateHeader, { passive: true });
+      updateHeader();
+
+      const mobileButton =
+        document.querySelector<HTMLButtonElement>("#mobile-toggle");
+      const mobileMenu = document.querySelector<HTMLElement>("#mobile-menu");
+      mobileButton?.addEventListener("click", () => {
+        const open = mobileMenu?.classList.toggle("hidden") === false;
+        mobileButton.setAttribute("aria-expanded", String(open));
+        siteHeader?.classList.toggle("is-open", open);
+      });
+
+      const docs = [
+        {
+          title: "Getting started",
+          detail: "Install, build, and run scorchd",
+          href: "/getting-started/",
+        },
+        {
+          title: "How Scorch works",
+          detail: "Process boundary, scrape pipeline, and security",
+          href: "/architecture/",
+        },
+        {
+          title: "Configuration",
+          detail: "Every server and client environment variable",
+          href: "/configuration/",
+        },
+        {
+          title: "CLI reference",
+          detail: "scrape, search, map, crawl, benchmark",
+          href: "/cli/",
+        },
+        {
+          title: "HTTP API",
+          detail: "Endpoints, request bodies, limits, and errors",
+          href: "/api/",
+        },
+        {
+          title: "MCP server",
+          detail: "Connect AI clients to Scorch over stdio",
+          href: "/mcp/",
+        },
+        {
+          title: "Agent Skill",
+          detail:
+            "Install safe operating guidance for compatible coding agents",
+          href: "/skill/",
+        },
+        {
+          title: "Nix installation",
+          detail: "Flake packages, NixOS service, and Home Manager module",
+          href: "/nix/",
+        },
+        {
+          title: "Browser backends",
+          detail: "Obscura defaults and Chromium policy",
+          href: "/configuration/#browser-policy",
+        },
+        {
+          title: "Metasearch",
+          detail: "Concurrent engines, deduplication, and ranking",
+          href: "/architecture/#metasearch",
+        },
+        {
+          title: "Security boundary",
+          detail: "SSRF controls, DNS pinning, proxying, and limits",
+          href: "/architecture/#security-boundary",
+        },
+        {
+          title: "Connect to the API",
+          detail: "SCORCH_API_URL, health checks, and gateways",
+          href: "/getting-started/#connect-a-client",
+        },
+      ];
+      const dialog =
+        document.querySelector<HTMLDialogElement>("#search-dialog");
+      const input = document.querySelector<HTMLInputElement>("#search-input");
+      const results = document.querySelector<HTMLElement>("#search-results");
+      const empty = document.querySelector<HTMLElement>("#search-empty");
+      const renderSearch = () => {
+        if (!results || !empty) return;
+        const query = input?.value.trim().toLowerCase() ?? "";
+        const matches = docs.filter((item) =>
+          `${item.title} ${item.detail}`.toLowerCase().includes(query),
+        );
+        results.innerHTML = matches
+          .map(
+            (item) =>
+              `<a href="${item.href}" class="block rounded-lg px-3 py-3 hover:bg-muted"><strong class="block text-sm font-semibold text-foreground">${item.title}</strong><span class="mt-0.5 block text-xs text-muted-foreground">${item.detail}</span></a>`,
+          )
+          .join("");
+        empty.classList.toggle("hidden", matches.length > 0);
+      };
+      const openSearch = () => {
+        dialog?.showModal();
+        renderSearch();
+        requestAnimationFrame(() => input?.focus());
+      };
+      document
+        .querySelector("#search-open")
+        ?.addEventListener("click", openSearch);
+      input?.addEventListener("input", renderSearch);
+      document.addEventListener("keydown", (event) => {
+        if (
+          (event.metaKey || event.ctrlKey) &&
+          event.key.toLowerCase() === "k"
+        ) {
+          event.preventDefault();
+          openSearch();
+        }
+      });
+      dialog?.addEventListener("click", (event) => {
+        if (event.target === dialog) dialog.close();
+      });
+
+      document.querySelectorAll("pre").forEach((pre) => {
+        if (pre.querySelector(".copy-code")) return;
+        const button = document.createElement("button");
+        button.className = "copy-code";
+        button.type = "button";
+        button.textContent = "Copy";
+        button.addEventListener("click", async () => {
+          const code =
+            pre.querySelector("code")?.textContent ?? pre.textContent ?? "";
+          await navigator.clipboard.writeText(code.replace("Copy", "").trim());
+          button.textContent = "Copied";
+          setTimeout(() => {
+            button.textContent = "Copy";
+          }, 1300);
+        });
+        pre.append(button);
+      });
+
+      const observer = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((entry) => {
+            if (entry.isIntersecting) {
+              entry.target.classList.add("is-visible");
+              observer.unobserve(entry.target);
+            }
+          });
+        },
+        { threshold: 0.08 },
+      );
+      document
+        .querySelectorAll(".reveal")
+        .forEach((element) => observer.observe(element));
+    </script>
+  </body>
+</html>

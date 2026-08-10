@@ -1,0 +1,264 @@
+---
+import DocLayout from "../layouts/DocLayout.astro";
+const headings = [
+  { label: "Precedence", href: "#precedence" },
+  { label: "Server variables", href: "#server-variables" },
+  { label: "Client variables", href: "#client-variables" },
+  { label: "Browser policy", href: "#browser-policy" },
+  { label: "Search engines", href: "#search-engines" },
+  { label: "Logging", href: "#logging" },
+  { label: "Deployment recipes", href: "#deployment-recipes" },
+];
+---
+
+<DocLayout
+  title="Configuration"
+  description="Every public setting for scorchd, the scorch client, browser policy, metasearch credentials, limits, and structured logging."
+  headings={headings}
+  previous={{ label: "How Scorch works", href: "/architecture/" }}
+  next={{ label: "CLI reference", href: "/cli/" }}
+>
+  <h2 id="precedence">Precedence</h2>
+  <p>
+    Most <code>scorchd</code> settings have three layers. The first defined value
+    wins:
+  </p>
+  <ol>
+    <li>A command-line flag such as <code>--max-concurrency 8</code></li><li>
+      The corresponding environment variable such as <code
+        >SCORCH_MAX_CONCURRENCY=8</code
+      >
+    </li><li>The compiled default</li>
+  </ol>
+  <p>
+    Use <code>scorchd --help</code> to inspect the active binary. Logging variables
+    are environment-only. The lightweight client has its own endpoint setting and
+    does not read server runtime configuration.
+  </p>
+
+  <h2 id="server-variables">Server environment variables</h2>
+  <div class="table-wrap">
+    <table>
+      <thead
+        ><tr
+          ><th>Variable</th><th>Default</th><th>Values / meaning</th><th
+            >CLI flag</th
+          ></tr
+        ></thead
+      ><tbody>
+        <tr
+          ><td><code>SCORCH_BIND</code></td><td><code>127.0.0.1:3000</code></td
+          ><td>Socket address for the HTTP API.</td><td><code>--bind</code></td
+          ></tr
+        >
+        <tr
+          ><td><code>SCORCH_BROWSER</code></td><td><code>obscura</code></td><td
+            >Default renderer: <code>obscura</code> or <code>chromium</code
+            >.</td
+          ><td><code>--browser</code></td></tr
+        >
+        <tr
+          ><td><code>SCORCH_ALLOWED_BROWSERS</code></td><td
+            ><code>obscura</code></td
+          ><td>Comma-separated request allowlist.</td><td
+            ><code>--allowed-browsers</code></td
+          ></tr
+        >
+        <tr
+          ><td><code>SCORCH_BROWSER_PATH</code></td><td
+            ><code>chromium</code></td
+          ><td
+            >Chromium executable path or command name. Used only by Chromium.</td
+          ><td><code>--browser-path</code></td></tr
+        >
+        <tr
+          ><td><code>SCORCH_OBSCURA_STEALTH</code></td><td><code>true</code></td
+          ><td
+            ><code>true</code> for Chrome-like transport identity; <code
+              >false</code
+            > for faster standard transport.</td
+          ><td><code>--obscura-stealth</code></td></tr
+        >
+        <tr
+          ><td><code>SCORCH_MAX_CONCURRENCY</code></td><td><code>4</code></td
+          ><td
+            >Global concurrent operation ceiling. Crawl concurrency cannot
+            exceed it.</td
+          ><td><code>--max-concurrency</code></td></tr
+        >
+        <tr
+          ><td><code>SCORCH_MAX_RESPONSE_BYTES</code></td><td
+            ><code>5242880</code></td
+          ><td
+            >Maximum bytes accepted from one remote response; default 5 MiB.</td
+          ><td><code>--max-response-bytes</code></td></tr
+        >
+        <tr
+          ><td><code>SCORCH_JOB_TTL_SECS</code></td><td><code>900</code></td><td
+            >Retention after crawl completion; default 15 minutes.</td
+          ><td><code>--job-ttl-secs</code></td></tr
+        >
+        <tr
+          ><td><code>SCORCH_SEARCH_ENGINES</code></td><td
+            ><code>bing,duckduckgo,naver,wikipedia</code></td
+          ><td>Comma-separated server allowlist for internal search engines.</td
+          ><td><code>--search-engines</code></td></tr
+        >
+        <tr
+          ><td><code>SCORCH_BRAVE_SEARCH_API_KEY</code></td><td>unset</td><td
+            >Required when <code>brave</code> is enabled.</td
+          ><td><code>--brave-search-api-key</code></td></tr
+        >
+        <tr
+          ><td><code>SCORCH_GOOGLE_SEARCH_API_KEY</code></td><td>unset</td><td
+            >Google Custom Search JSON API key.</td
+          ><td><code>--google-search-api-key</code></td></tr
+        >
+        <tr
+          ><td><code>SCORCH_GOOGLE_SEARCH_ENGINE_ID</code></td><td>unset</td><td
+            >Google Programmable Search Engine ID; required with the Google key.</td
+          ><td><code>--google-search-engine-id</code></td></tr
+        >
+        <tr
+          ><td><code>RUST_LOG</code></td><td>service default</td><td
+            >Tracing filter, for example <code>scorch=debug</code> or <code
+              >scorch=info,tower_http=debug</code
+            >.</td
+          ><td>—</td></tr
+        >
+        <tr
+          ><td><code>SCORCH_LOG_FORMAT</code></td><td>compact</td><td
+            >Set to <code>json</code> for newline-delimited JSON logs.</td
+          ><td>—</td></tr
+        >
+      </tbody>
+    </table>
+  </div>
+
+  <h2 id="client-variables">Client environment variables</h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Variable</th><th>Default</th><th>Used by</th></tr></thead
+      ><tbody>
+        <tr
+          ><td><code>SCORCH_API_URL</code></td><td
+            ><code>http://127.0.0.1:3000</code></td
+          ><td
+            >Every <code>scorch</code> web command, benchmark, and the MCP adapter.</td
+          ></tr
+        >
+      </tbody>
+    </table>
+  </div>
+  <p>
+    The global <code>--api-url</code> option overrides this variable for one invocation:
+  </p>
+  <pre><code>scorch --api-url https://scorch.internal.example search "browser automation"</code></pre>
+  <p>
+    The client does not inspect <code>SCORCH_BIND</code>. The bind address
+    describes the server's listening socket; the API URL describes how a client
+    reaches it through local networking or a gateway.
+  </p>
+
+  <h2 id="browser-policy">Browser policy</h2>
+  <p>Browser configuration has two independent parts:</p>
+  <ul>
+    <li>
+      <code>SCORCH_BROWSER</code> chooses the backend used when a request omits <code
+        >options.browser</code
+      >.
+    </li><li>
+      <code>SCORCH_ALLOWED_BROWSERS</code> defines every backend a request is permitted
+      to select.
+    </li>
+  </ul>
+  <p>The default is intentionally narrow:</p>
+  <pre><code>SCORCH_BROWSER=obscura
+SCORCH_ALLOWED_BROWSERS=obscura
+SCORCH_OBSCURA_STEALTH=true
+scorchd</code></pre>
+  <p>Enable Chromium as a request-selectable compatibility backend:</p>
+  <pre><code>SCORCH_ALLOWED_BROWSERS=obscura,chromium \
+SCORCH_BROWSER_PATH=/usr/bin/chromium \
+scorchd</code></pre>
+  <p>Make Chromium the only backend:</p>
+  <pre><code>SCORCH_BROWSER=chromium \
+SCORCH_ALLOWED_BROWSERS=chromium \
+SCORCH_BROWSER_PATH=/usr/bin/chromium \
+scorchd</code></pre>
+  <p>
+    If a request names a backend outside the allowlist, Scorch returns HTTP 400
+    rather than silently switching it. The configured default should therefore
+    also appear in the allowlist.
+  </p>
+  <div class="callout">
+    <strong>Stealth versus throughput:</strong> leave Obscura stealth enabled for
+    Chrome-like network behavior. Set <code>SCORCH_OBSCURA_STEALTH=false</code> only
+    where the standard transport's higher throughput is preferable.
+  </div>
+
+  <h2 id="search-engines">Search engine policy</h2>
+  <p>
+    The allowed values are <code>bing</code>, <code>brave</code>, <code
+      >duckduckgo</code
+    >, <code>google</code>, <code>naver</code>, and <code>wikipedia</code>.
+    Search requests never carry this list.
+  </p>
+  <h3>Credential-free default</h3>
+  <pre><code>SCORCH_SEARCH_ENGINES=bing,duckduckgo,naver,wikipedia scorchd</code></pre>
+  <h3>Add Brave</h3>
+  <pre><code>SCORCH_SEARCH_ENGINES=bing,brave,duckduckgo,naver,wikipedia \
+SCORCH_BRAVE_SEARCH_API_KEY='...' \
+scorchd</code></pre>
+  <h3>Add Google Custom Search</h3>
+  <pre><code>SCORCH_SEARCH_ENGINES=google,wikipedia \
+SCORCH_GOOGLE_SEARCH_API_KEY='...' \
+SCORCH_GOOGLE_SEARCH_ENGINE_ID='...' \
+scorchd</code></pre>
+  <p>
+    Missing credentials for an enabled credentialed engine are startup
+    configuration errors. Secrets are redacted from Scorch's diagnostics.
+  </p>
+
+  <h2 id="logging">Logging</h2>
+  <p>
+    Operational logs are written to stderr. CLI result JSON and MCP JSON-RPC
+    framing stay on stdout, so they can be piped without log contamination.
+  </p>
+  <pre><code># Human-readable debug output
+RUST_LOG=scorch=debug scorchd
+
+# Production-friendly newline-delimited JSON
+SCORCH_LOG_FORMAT=json RUST_LOG=scorch=info scorchd</code></pre>
+  <p>
+    Info-level logs include startup and shutdown, request IDs, method, status
+    and latency, operation outcomes, browser lifecycle, engine selection, and
+    crawl lifecycle. Request bodies, search text, credentials, and URL query
+    strings are not logged at info level.
+  </p>
+
+  <h2 id="deployment-recipes">Deployment recipes</h2>
+  <h3>Local development</h3>
+  <pre><code>RUST_LOG=scorch=debug scorchd</code></pre>
+  <h3>Private service behind a gateway</h3>
+  <pre><code>SCORCH_BIND=127.0.0.1:3000 \
+SCORCH_MAX_CONCURRENCY=8 \
+SCORCH_LOG_FORMAT=json \
+RUST_LOG=scorch=info \
+scorchd</code></pre>
+  <p>
+    Terminate TLS and enforce authentication, request size, rate, and network
+    policy at the gateway. Preserve or generate request IDs for log correlation.
+  </p>
+  <h3>Throughput-oriented Obscura</h3>
+  <pre><code>SCORCH_BROWSER=obscura \
+SCORCH_ALLOWED_BROWSERS=obscura \
+SCORCH_OBSCURA_STEALTH=false \
+SCORCH_MAX_CONCURRENCY=8 \
+scorchd</code></pre>
+  <div class="callout warning">
+    <strong>Do not bind publicly without a gateway.</strong>
+    <code>SCORCH_BIND=0.0.0.0:3000</code> exposes an unauthenticated web-fetching
+    API. Scorch's SSRF policy does not replace caller authentication.
+  </div>
+</DocLayout>
