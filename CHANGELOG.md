@@ -4,6 +4,38 @@ All notable changes to Scorch are documented in this file. The project follows [
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-08-11
+
+### Added
+
+- Added checksum-verifying release installation, documented MCP setup for major coding agents, and generated third-party license notices.
+- Added dependency license, source, and RustSec policy checks with Cargo Deny.
+- Added source manifests and exact source-revision validation to immutable release promotion.
+
+### Changed
+
+- Made embedded Obscura the sole browser renderer while keeping stealth transport enabled by default.
+- Simplified readiness output to report Obscura directly without backend allowlist or executable-path fields.
+- Raised the minimum Rust version from 1.88 to 1.97 and refreshed direct dependencies to their latest stable releases.
+- Replaced the GPL-licensed HTML-to-Markdown dependency with Apache-2.0-licensed `htmd`.
+- Made crawl admission atomic, cancellation prompt, terminal TTLs accurate, and progress totals consistent.
+- Enforced absolute scrape, map, search-queue, and crawl deadlines and bounded CLI API responses.
+- Hardened release preparation with formatting, checking, strict Clippy, tests, dependency policy, version validation, and third-party notices.
+- Added a dedicated 1200×630 Open Graph splash image, large-card social metadata, structured data, and image loading optimizations to the documentation site.
+
+### Security
+
+- Rejected NAT64-embedded private targets and canonicalized trailing-dot hosts before DNS pinning.
+- Restricted sitemap discovery and crawl seeding to the requested origin.
+- Extended bounded browser proxy streams without truncating slow page loads.
+
+### Removed
+
+- Removed the Chromium backend, `chromiumoxide`, and all Chromium runtime code and development dependencies.
+- Removed scrape `options.browser`, CLI `--browser`, and the `SCORCH_BROWSER`, `SCORCH_ALLOWED_BROWSERS`, and `SCORCH_BROWSER_PATH` server settings.
+- Removed the NixOS `browser`, `allowedBrowsers`, and `browserPath` options and the `scorchd-with-chromium` flake package.
+- Removed the CLI benchmark command, repository benchmark harnesses, Devenv configuration, vendored dependency copies, and obsolete non-Astro documentation.
+
 ## [0.1.3] - 2026-08-10
 
 ### Changed
@@ -46,7 +78,8 @@ All notable changes to Scorch are documented in this file. The project follows [
 - Embedded Obscura requests use fresh context, page, cookie, cache, and JavaScript state to prevent caller data leakage.
 - Render requests enforce one caller-visible deadline across validation, queueing, navigation, execution, serialization, and screenshots.
 
-[Unreleased]: https://github.com/Fractal-Tess/scorch/compare/v0.1.3...HEAD
+[Unreleased]: https://github.com/Fractal-Tess/scorch/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/Fractal-Tess/scorch/compare/v0.1.3...v0.3.0
 [0.1.3]: https://github.com/Fractal-Tess/scorch/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/Fractal-Tess/scorch/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/Fractal-Tess/scorch/compare/v0.1.0...v0.1.1

@@ -37,8 +37,8 @@ const headings = [
       <strong class="text-accent font-mono">scorch</strong><p
         class="mt-2 text-sm"
       >
-        The lightweight HTTP client. It exposes CLI commands, API benchmarking,
-        and an MCP stdio adapter.
+        The lightweight HTTP client. It exposes web commands and an MCP stdio
+        adapter.
       </p>
     </div>
   </div>
@@ -51,27 +51,27 @@ const headings = [
   <h2 id="install">Install</h2>
   <h3 id="nix-flake">Option A: Nix flake</h3>
   <p>Run either released executable without cloning the repository:</p>
-  <pre><code>nix run github:Fractal-Tess/scorch/v0.1.3#scorch -- --help
-nix run github:Fractal-Tess/scorch/v0.1.3#scorchd -- --help</code></pre>
+  <pre><code>nix run github:Fractal-Tess/scorch/v0.3.0#scorch -- --help
+nix run github:Fractal-Tess/scorch/v0.3.0#scorchd -- --help</code></pre>
   <p>
     For a declarative NixOS service and client installation, continue to the <a
       href="/nix/">Nix installation guide</a
     >.
   </p>
 
-  <h3 id="reproducible-environment">
-    Option B: reproducible development environment
-  </h3>
+  <h3 id="reproducible-environment">Option B: Nix development shell</h3>
   <p>
-    The repository includes <code>devenv.nix</code> with Rust, CMake, Clang, libclang,
-    pkg-config, Chromium, Git, and Jujutsu. Install <a
-      href="https://devenv.sh/getting-started/">devenv</a
-    >, then run:
+    The repository flake provides Rust, CMake, Clang, libclang, pkg-config, Git,
+    Bun, and Jujutsu. Its <code>.envrc</code> loads that shell automatically when
+    using <a href="https://direnv.net/">direnv</a>:
   </p>
   <pre><code>git clone https://github.com/Fractal-Tess/scorch.git
 cd scorch
-devenv shell
+direnv allow
 cargo build --release --workspace</code></pre>
+  <p>
+    Without direnv, run <code>nix develop</code> before building instead.
+  </p>
 
   <h3 id="native-toolchain">Option C: native toolchain</h3>
   <p>Install stable Rust plus the native tools needed by embedded Obscura:</p>
@@ -79,9 +79,6 @@ cargo build --release --workspace</code></pre>
     <li>Rust stable with Cargo, Clippy, and rustfmt</li>
     <li>CMake, Clang, libclang, and pkg-config</li>
     <li>Git</li>
-    <li>
-      Chromium only if you intend to enable the optional compatibility backend
-    </li>
   </ul>
   <p>
     If libclang is not discovered automatically, point <code>LIBCLANG_PATH</code
@@ -105,13 +102,13 @@ install -Dm755 target/release/scorch ~/.local/bin/scorch</code></pre>
   <pre><code>curl -sS http://127.0.0.1:33000/health
 curl -sS http://127.0.0.1:33000/ready | jq</code></pre>
   <p>
-    <code>/ready</code> reports the default and allowed browser backends, Obscura
-    stealth setting, global concurrency, search provider, and enabled search engines.
+    <code>/ready</code> reports Obscura availability and stealth mode, global concurrency,
+    search provider, and enabled search engines.
   </p>
   <div class="callout">
-    <strong>Browser startup:</strong> Obscura is embedded and requires no executable
-    or sidecar. Chromium starts lazily only when it is compiled, allowed, selected,
-    and needed.
+    <strong>Browser startup:</strong> Obscura is embedded and requires no browser
+    executable, sidecar, or separately managed process. Stealth mode is enabled by
+    default.
   </div>
 
   <h2 id="connect-a-client">Connect a client</h2>
@@ -161,10 +158,6 @@ scorch crawl https://example.com --limit 20 --max-depth 2 --wait</code></pre>
     <li>
       <strong>Do not treat crawl jobs as durable data.</strong> Poll and export results
       before their TTL or a service restart.
-    </li>
-    <li>
-      <strong>Keep the browser allowlist narrow.</strong> Requests cannot select a
-      backend outside <code>SCORCH_ALLOWED_BROWSERS</code>.
     </li>
     <li>
       <strong>Watch stderr.</strong> Protocol and result output stays on stdout; structured

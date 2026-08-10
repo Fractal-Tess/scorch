@@ -9,11 +9,10 @@ rust-version.workspace = true
 
 [dependencies]
 base64.workspace = true
-chromiumoxide.workspace = true
 dashmap.workspace = true
 dom_smoothie.workspace = true
 futures-util.workspace = true
-html2md.workspace = true
+htmd.workspace = true
 metasearch = { path = "../metasearch" }
 obscura-browser.workspace = true
 quick-xml.workspace = true
@@ -23,7 +22,6 @@ scorch-types = { path = "../scorch-types" }
 scraper.workspace = true
 serde.workspace = true
 thiserror.workspace = true
-tempfile.workspace = true
 tokio.workspace = true
 tokio-util.workspace = true
 tracing.workspace = true

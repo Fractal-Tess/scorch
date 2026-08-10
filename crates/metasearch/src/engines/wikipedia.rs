@@ -30,7 +30,11 @@ impl Wikipedia {
         let client = Client::builder()
             .redirect(Policy::none())
             .no_proxy()
-            .user_agent("ScorchBot/0.1 metasearch")
+            .user_agent(concat!(
+                "ScorchBot/",
+                env!("CARGO_PKG_VERSION"),
+                " metasearch"
+            ))
             .build()
             .map_err(|error| Error::Request {
                 engine: NAME,

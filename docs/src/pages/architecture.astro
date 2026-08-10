@@ -60,8 +60,7 @@ const headings = [
         >
         <tr
           ><td><code>scorch-cli</code></td><td
-            >The <code>scorch</code> HTTP client, benchmark command, and API-backed
-            MCP adapter.</td
+            >The <code>scorch</code> HTTP client and API-backed MCP adapter.</td
           ></tr
         >
       </tbody>
@@ -69,7 +68,7 @@ const headings = [
   </div>
   <p>
     The client does not link <code>scorch-engine</code>, <code>scorch-api</code
-    >, metasearch, Obscura, or Chromium. This prevents a CLI or MCP caller from
+    >, metasearch, or Obscura. This prevents a CLI or MCP caller from
     accidentally bypassing service policy.
   </p>
 
@@ -91,8 +90,8 @@ const headings = [
     </li>
     <li>
       <strong>Choose an engine.</strong> Static content stays on the direct path.
-      JavaScript-dependent content, explicit rendering, and screenshots select an
-      allowed browser.
+      JavaScript-dependent content, explicit rendering, and screenshots use embedded
+      Obscura.
     </li>
     <li>
       <strong>Extract.</strong> The resulting HTML becomes requested Markdown, HTML,
@@ -115,7 +114,7 @@ const headings = [
       <span class="text-accent font-mono text-[10px]">RENDER / ALWAYS</span><p
         class="mt-2 text-sm"
       >
-        Force the selected allowed browser.
+        Force embedded Obscura rendering.
       </p>
     </div>
     <div class="border-border bg-surface border p-4">
@@ -129,9 +128,8 @@ const headings = [
 
   <h2 id="browser-rendering">Browser rendering</h2>
   <p>
-    <strong>Obscura is the default renderer.</strong> It runs in-process as a Rust
-    library—there is no Obscura sidecar, executable, CDP server, or subprocess. Chromium
-    remains an optional compatibility backend.
+    <strong>Obscura is the only renderer.</strong> It runs in-process as a Rust library—there
+    is no browser executable, sidecar, CDP server, or subprocess.
   </p>
   <p>
     Each Obscura request receives a fresh browser context, page, and V8 state.
@@ -141,7 +139,7 @@ const headings = [
     queueing, navigation, explicit waiting, serialization, and screenshots.
   </p>
   <p>
-    Stealth transport is enabled by default. It provides Chrome-like TLS and
+    Stealth transport is enabled by default. It provides browser-aligned TLS and
     HTTP behavior, ordered headers, aligned user-agent/client-hint/JavaScript
     identity, and blocking of common tracker or fingerprinting domains. It does <strong
       >not</strong
@@ -149,10 +147,58 @@ const headings = [
     controls.
   </p>
   <div class="callout">
-    A request may name <code>obscura</code> or <code>chromium</code>, but only
-    the service allowlist decides whether that choice is legal. Backend
-    selection cannot escape <code>SCORCH_ALLOWED_BROWSERS</code>.
+    Requests do not select a browser backend. Every browser render uses isolated
+    embedded Obscura state, with stealth transport enabled by default.
   </div>
+  <h3>Why Obscura replaced the older renderer</h3>
+  <p>
+    Before removing the legacy renderer, both paths were measured in the same
+    optimized build on the same 16-thread Linux host. Three alternating-order
+    trials covered four public pages, with four sequential requests followed by
+    eight requests at concurrency four.
+  </p>
+  <div class="table-wrap">
+    <table>
+      <thead
+        ><tr
+          ><th>Measurement</th><th>Obscura stealth</th><th>Legacy Chromium</th
+          ><th>Difference</th></tr
+        ></thead
+      ><tbody>
+        <tr
+          ><td>First warm render</td><td>0.266 s</td><td>0.661 s</td><td
+            >2.5× faster startup</td
+          ></tr
+        >
+        <tr
+          ><td>PSS after warm-up</td><td>38.3 MiB</td><td>407.9 MiB</td><td
+            >10.7× less memory</td
+          ></tr
+        >
+        <tr
+          ><td>Parallel peak PSS</td><td>90.6 MiB</td><td>467.7 MiB</td><td
+            >5.2× less memory</td
+          ></tr
+        >
+        <tr
+          ><td>Parallel throughput</td><td>1.41 req/s</td><td>3.03 req/s</td><td
+            >Legacy renderer was 2.2× faster</td
+          ></tr
+        >
+        <tr
+          ><td>Peak process count</td><td>1</td><td>14</td><td
+            >Obscura stayed in-process</td
+          ></tr
+        >
+      </tbody>
+    </table>
+  </div>
+  <p>
+    The legacy path delivered higher steady-state throughput, but its warm start
+    was slower and its runtime substantially larger. Scorch prioritizes the
+    smaller self-contained renderer for local Pi agent workflows and predictable
+    deployment.
+  </p>
 
   <h2 id="metasearch">Metasearch</h2>
   <p>
@@ -236,9 +282,8 @@ const headings = [
   </div>
   <p>
     Obscura receives only the validating proxy endpoint and retains its own
-    private-address guard. Chromium is configured without a direct network
-    route: HTTP, HTTPS, WebSocket, iframe, worker, redirect, and subresource
-    connections use the proxy; QUIC and non-proxied WebRTC UDP are disabled.
+    private-address guard. Browser redirects and subresources remain inside the
+    same proxy-enforced network boundary.
   </p>
   <div class="callout warning">
     <strong>Authentication is outside this boundary.</strong> The local-first API
@@ -249,8 +294,8 @@ const headings = [
   <h2 id="runtime-state">Runtime state</h2>
   <p>
     <code>scorchd</code> owns one Axum server, one globally bounded direct-fetch runtime,
-    bounded isolated Obscura work, an optional lazy Chromium backend, one validating
-    proxy, and a bounded in-memory crawl registry.
+    bounded isolated Obscura work, one validating proxy, and a bounded in-memory crawl
+    registry.
   </p>
   <p>
     There is no durable state. A restart clears crawl jobs, metasearch cache

@@ -168,17 +168,12 @@ impl MetaSearch {
                 break;
             };
             match result {
-                Ok(output) if !output.hits.is_empty() => {
+                Ok(output) => {
                     slot.record_success();
-                    if collection_deadline.is_none() {
+                    if !output.hits.is_empty() && collection_deadline.is_none() {
                         collection_deadline = Some(Instant::now() + self.config.collection_window);
                     }
                     outputs.push((slot.engine.weight(), output));
-                }
-                Ok(_) => {
-                    let message = format!("{} returned no results", slot.engine.name());
-                    slot.record_failure(&self.config);
-                    failures.push(message);
                 }
                 Err(error) => {
                     warn!(engine = slot.engine.name(), %error, "metasearch engine failed");
@@ -283,7 +278,7 @@ impl EngineSlot {
         {
             return false;
         }
-        state.disabled_until = None;
+        *state = EngineState::default();
         true
     }
 
@@ -565,6 +560,45 @@ mod tests {
         assert_eq!(output.hits.len(), 1);
         assert_eq!(output.hits[0].sources, vec!["one", "two"]);
         assert_eq!(output.engines_used, vec!["one", "two"]);
+    }
+
+    #[tokio::test]
+    async fn empty_results_are_a_successful_search() {
+        let engines: Vec<Arc<dyn SearchEngine>> = vec![Arc::new(FakeEngine {
+            name: "empty",
+            delay: Duration::from_millis(1),
+            hits: Vec::new(),
+        })];
+        let search = MetaSearch::with_engines(MetaSearchConfig::default(), engines);
+        let output = search
+            .search(&SearchQuery::new("no matches", 5))
+            .await
+            .unwrap();
+        assert!(output.hits.is_empty());
+        assert!(output.engine_failures.is_empty());
+        assert_eq!(output.engines_used, ["empty"]);
+    }
+
+    #[test]
+    fn expired_cooldown_resets_failure_count() {
+        let slot = EngineSlot::new(
+            Arc::new(FakeEngine {
+                name: "test",
+                delay: Duration::ZERO,
+                hits: Vec::new(),
+            }),
+            1,
+        );
+        let config = MetaSearchConfig {
+            failure_threshold: 2,
+            engine_cooldown: Duration::ZERO,
+            ..Default::default()
+        };
+        slot.record_failure(&config);
+        slot.record_failure(&config);
+        assert!(slot.available());
+        slot.record_failure(&config);
+        assert!(slot.available());
     }
 
     #[tokio::test]

@@ -21,8 +21,14 @@ pub async fn map(fetcher: &SafeFetcher, request: &MapRequest) -> Result<MapRespo
             "map limit must be between 1 and 1000".into(),
         ));
     }
-    let root = Url::parse(&request.url)
+    let mut root = Url::parse(&request.url)
         .map_err(|error| EngineError::InvalidRequest(format!("invalid map URL: {error}")))?;
+    if !matches!(root.scheme(), "http" | "https") || root.host_str().is_none() {
+        return Err(EngineError::InvalidRequest(
+            "map URL must use HTTP or HTTPS and include a host".into(),
+        ));
+    }
+    root.set_fragment(None);
     let mut links = Vec::new();
     let mut seen = HashSet::new();
     let mut sources = Vec::new();
@@ -41,7 +47,10 @@ pub async fn map(fetcher: &SafeFetcher, request: &MapRequest) -> Result<MapRespo
             if let Some((key, value)) = line.split_once(':')
                 && key.trim().eq_ignore_ascii_case("sitemap")
             {
-                sitemap_queue.push_back(value.trim().to_owned());
+                let sitemap = value.trim();
+                if in_scope(&root, sitemap, request) {
+                    sitemap_queue.push_back(sitemap.to_owned());
+                }
             }
         }
         sources.push("robots.txt".into());
@@ -72,7 +81,9 @@ pub async fn map(fetcher: &SafeFetcher, request: &MapRequest) -> Result<MapRespo
         let (urls, nested) = parse_sitemap(&xml);
         sources.push(sitemap_url);
         for nested in nested {
-            sitemap_queue.push_back(nested);
+            if in_scope(&root, &nested, request) {
+                sitemap_queue.push_back(nested);
+            }
         }
         for url in urls {
             if in_scope(&root, &url, request) && seen.insert(url.clone()) {
@@ -169,6 +180,12 @@ pub fn in_scope(root: &Url, candidate: &str, request: &MapRequest) -> bool {
     let Ok(url) = Url::parse(candidate) else {
         return false;
     };
+    if !matches!(url.scheme(), "http" | "https")
+        || url.scheme() != root.scheme()
+        || url.port_or_known_default() != root.port_or_known_default()
+    {
+        return false;
+    }
     let root_host = root.host_str().unwrap_or_default();
     let host = url.host_str().unwrap_or_default();
     let host_matches = host == root_host
@@ -184,6 +201,23 @@ pub fn path_allowed(path: &str, includes: &[String], excludes: &[String]) -> boo
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn rejects_cross_origin_and_non_web_links() {
+        let root = Url::parse("https://example.com/").unwrap();
+        let request = MapRequest {
+            url: root.to_string(),
+            limit: 100,
+            include_subdomains: false,
+            include_paths: Vec::new(),
+            exclude_paths: Vec::new(),
+        };
+        assert!(in_scope(&root, "https://example.com/docs", &request));
+        assert!(!in_scope(&root, "http://example.com/docs", &request));
+        assert!(!in_scope(&root, "https://example.com:8443/docs", &request));
+        assert!(!in_scope(&root, "https://other.example/docs", &request));
+        assert!(!in_scope(&root, "file:///tmp/page", &request));
+    }
 
     #[test]
     fn parses_urlset_and_index() {

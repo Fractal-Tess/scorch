@@ -44,14 +44,13 @@ const headings = [
   <pre><code>&#123; "status": "ok" &#125;</code></pre>
   <h3><span class="text-accent font-mono">GET</span> /ready</h3>
   <p>
-    Reports runtime policy and browser availability. It returns HTTP 200 when
-    the configured browser is available, or 503 when unavailable.
+    Reports runtime policy and Obscura availability. It returns HTTP 200 when
+    the embedded renderer is available, or 503 when unavailable.
   </p>
   <pre><code>&#123;
   "status": "ready",
   "browserAvailable": true,
   "browser": "obscura",
-  "allowedBrowsers": ["obscura"],
   "obscuraStealth": true,
   "maxConcurrency": 4,
   "searchProvider": "metasearch",
@@ -65,7 +64,6 @@ const headings = [
   "options": &#123;
     "formats": ["markdown", "html", "text", "links", "metadata"],
     "render": "auto",
-    "browser": "obscura",
     "timeoutMs": 30000,
     "waitForMs": 0,
     "onlyMainContent": true,
@@ -92,12 +90,6 @@ const headings = [
         <tr
           ><td><code>render</code></td><td><code>auto</code></td><td
             ><code>auto</code>, <code>always</code>, or <code>never</code>.</td
-          ></tr
-        >
-        <tr
-          ><td><code>browser</code></td><td>service default</td><td
-            >Optional <code>obscura</code> or <code>chromium</code>; must be
-            server-allowed.</td
           ></tr
         >
         <tr
@@ -131,7 +123,7 @@ const headings = [
   <p>
     Screenshot output is a PNG data URI. The response <code>engine</code> is <code
       >fetch</code
-    >, <code>obscura</code>, or <code>chromium</code>.
+    > or <code>obscura</code>.
   </p>
   <pre><code>&#123;
   "url": "https://example.com",

@@ -15,10 +15,6 @@ let
   system = pkgs.stdenv.hostPlatform.system;
   client = config.programs.scorch;
   server = config.services.scorchd;
-  browserType = types.enum [
-    "obscura"
-    "chromium"
-  ];
   engineType = types.enum [
     "bing"
     "brave"
@@ -32,33 +28,41 @@ let
       "[${server.address}]:${toString server.port}"
     else
       "${server.address}:${toString server.port}";
-  serverCommand = lib.escapeShellArgs (
-    [
-      "${server.package}/bin/scorchd"
-      "--bind"
-      bindAddress
-      "--browser"
-      server.browser
-      "--allowed-browsers"
-      (lib.concatStringsSep "," server.allowedBrowsers)
-      "--obscura-stealth"
-      (lib.boolToString server.obscuraStealth)
-      "--max-concurrency"
-      (toString server.maxConcurrency)
-      "--max-response-bytes"
-      (toString server.maxResponseBytes)
-      "--job-ttl-secs"
-      (toString server.jobTtlSeconds)
-      "--search-engines"
-      (lib.concatStringsSep "," server.searchEngines)
-    ]
-    ++ lib.optionals (server.browserPath != null) [
-      "--browser-path"
-      server.browserPath
-    ]
-  );
+  serverCommand = lib.escapeShellArgs ([
+    "${server.package}/bin/scorchd"
+    "--bind"
+    bindAddress
+    "--obscura-stealth"
+    (lib.boolToString server.obscuraStealth)
+    "--max-concurrency"
+    (toString server.maxConcurrency)
+    "--max-response-bytes"
+    (toString server.maxResponseBytes)
+    "--job-ttl-secs"
+    (toString server.jobTtlSeconds)
+    "--search-engines"
+    (lib.concatStringsSep "," server.searchEngines)
+  ]);
 in
 {
+  imports = [
+    (lib.mkRemovedOptionModule [
+      "services"
+      "scorchd"
+      "browser"
+    ] "Scorch now uses embedded Obscura exclusively.")
+    (lib.mkRemovedOptionModule [
+      "services"
+      "scorchd"
+      "allowedBrowsers"
+    ] "Browser backend selection was removed; Scorch always uses Obscura.")
+    (lib.mkRemovedOptionModule [
+      "services"
+      "scorchd"
+      "browserPath"
+    ] "Scorch no longer launches an external browser executable.")
+  ];
+
   options = {
     programs.scorch = {
       enable = mkEnableOption "the Scorch HTTP client and MCP adapter";
@@ -98,22 +102,6 @@ in
         type = types.bool;
         default = false;
         description = "Open the configured TCP port in the NixOS firewall.";
-      };
-      browser = mkOption {
-        type = browserType;
-        default = "obscura";
-        description = "Default browser renderer.";
-      };
-      allowedBrowsers = mkOption {
-        type = types.listOf browserType;
-        default = [ "obscura" ];
-        description = "Browser renderers requests are allowed to select.";
-      };
-      browserPath = mkOption {
-        type = types.nullOr types.str;
-        default = null;
-        example = lib.literalExpression "\"\${pkgs.chromium}/bin/chromium\"";
-        description = "Chromium-compatible executable used when Chromium is enabled.";
       };
       obscuraStealth = mkOption {
         type = types.bool;
@@ -193,25 +181,8 @@ in
     (mkIf server.enable {
       assertions = [
         {
-          assertion = server.allowedBrowsers != [ ];
-          message = "services.scorchd.allowedBrowsers must not be empty";
-        }
-        {
-          assertion = builtins.elem server.browser server.allowedBrowsers;
-          message = "services.scorchd.browser must be present in allowedBrowsers";
-        }
-        {
           assertion = server.searchEngines != [ ];
           message = "services.scorchd.searchEngines must not be empty";
-        }
-        {
-          assertion = !(builtins.elem "chromium" server.allowedBrowsers) || server.browserPath != null;
-          message = "services.scorchd.browserPath is required when Chromium is allowed";
-        }
-        {
-          assertion =
-            !(builtins.elem "chromium" server.allowedBrowsers) || config.security.allowUserNamespaces;
-          message = "services.scorchd Chromium support requires security.allowUserNamespaces";
         }
       ];
 

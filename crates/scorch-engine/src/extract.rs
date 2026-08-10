@@ -5,7 +5,10 @@ use scorch_types::{Link, PageMetadata, ScrapeDocument, ScrapeEngine, ScrapeForma
 use scraper::{Html, Selector};
 use url::Url;
 
-use crate::{error::Result, fetch::FetchResponse};
+use crate::{
+    error::{EngineError, Result},
+    fetch::FetchResponse,
+};
 
 pub struct ExtractInput<'a> {
     pub requested_url: &'a str,
@@ -45,7 +48,14 @@ pub fn extract(input: ExtractInput<'_>, options: &ScrapeOptions) -> Result<Scrap
 
     let wants = |format| options.formats.contains(&format);
     let needs_markdown = wants(ScrapeFormat::Markdown);
-    let mut markdown = needs_markdown.then(|| html2md::parse_html(&content_html));
+    let mut markdown = if needs_markdown {
+        Some(
+            htmd::convert(&content_html)
+                .map_err(|error| EngineError::Extraction(error.to_string()))?,
+        )
+    } else {
+        None
+    };
     if let (Some(markdown), Some(title)) = (&mut markdown, &title) {
         let first_line = markdown.lines().next().unwrap_or_default();
         if !first_line

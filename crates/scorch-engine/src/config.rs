@@ -1,13 +1,11 @@
-use std::{path::PathBuf, time::Duration};
+use std::time::Duration;
 
 use metasearch::{EngineCredentials, EngineKind};
-use scorch_types::BrowserBackend;
+
+use crate::error::{EngineError, Result};
 
 #[derive(Debug, Clone)]
 pub struct EngineConfig {
-    pub browser: BrowserBackend,
-    pub allowed_browsers: Vec<BrowserBackend>,
-    pub browser_path: PathBuf,
     pub obscura_stealth: bool,
     pub max_concurrency: usize,
     pub max_response_bytes: usize,
@@ -24,12 +22,42 @@ pub struct EngineConfig {
     pub max_crawl_depth: usize,
 }
 
+impl EngineConfig {
+    pub fn validate(&self) -> Result<()> {
+        let positive_values = [
+            ("max_concurrency", self.max_concurrency),
+            ("max_response_bytes", self.max_response_bytes),
+            ("max_jobs", self.max_jobs),
+            ("max_active_crawls", self.max_active_crawls),
+            ("max_job_bytes", self.max_job_bytes),
+            ("max_crawl_limit", self.max_crawl_limit),
+        ];
+        if let Some((name, _)) = positive_values.into_iter().find(|(_, value)| *value == 0) {
+            return Err(EngineError::InvalidRequest(format!(
+                "{name} must be greater than zero"
+            )));
+        }
+        if self.connect_timeout.is_zero()
+            || self.request_timeout.is_zero()
+            || self.job_ttl.is_zero()
+            || self.crawl_timeout.is_zero()
+        {
+            return Err(EngineError::InvalidRequest(
+                "engine timeouts and TTLs must be greater than zero".into(),
+            ));
+        }
+        if self.search_engines.is_empty() {
+            return Err(EngineError::InvalidRequest(
+                "at least one search engine is required".into(),
+            ));
+        }
+        Ok(())
+    }
+}
+
 impl Default for EngineConfig {
     fn default() -> Self {
         Self {
-            browser: BrowserBackend::Obscura,
-            allowed_browsers: vec![BrowserBackend::Obscura],
-            browser_path: "chromium".into(),
             obscura_stealth: true,
             max_concurrency: 4,
             max_response_bytes: 5 * 1024 * 1024,
@@ -45,5 +73,19 @@ impl Default for EngineConfig {
             max_crawl_limit: 100,
             max_crawl_depth: 5,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn rejects_zero_capacity() {
+        let config = EngineConfig {
+            max_concurrency: 0,
+            ..Default::default()
+        };
+        assert!(config.validate().is_err());
     }
 }

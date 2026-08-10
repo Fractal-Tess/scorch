@@ -1,10 +1,7 @@
 /target/
-/.devenv/
 /.direnv/
-/devenv.local.nix
+/.omo/
 /.env
 /references/
 /result
 /result-*
-__pycache__/
-*.py[cod]

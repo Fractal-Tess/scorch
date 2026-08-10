@@ -1,0 +1,45 @@
+accepted = [
+  "Apache-2.0",
+  "Apache-2.0 WITH LLVM-exception",
+  "BSD-2-Clause",
+  "BSD-3-Clause",
+  "BSL-1.0",
+  "CC0-1.0",
+  "CDLA-Permissive-2.0",
+  "ISC",
+  "MIT",
+  "MPL-2.0",
+  "Unicode-3.0",
+  "Zlib",
+]
+targets = [
+  "x86_64-unknown-linux-gnu",
+  "aarch64-unknown-linux-gnu",
+]
+ignore-build-dependencies = false
+ignore-dev-dependencies = true
+ignore-transitive-dependencies = false
+
+[obscura-browser.clarify]
+license = "Apache-2.0"
+[[obscura-browser.clarify.git]]
+path = "LICENSE"
+checksum = "50e6751797c50dedd75ef1b8a0d9e42f5f8472e9fbce91f34718e9f97b0c780a"
+
+[obscura-dom.clarify]
+license = "Apache-2.0"
+[[obscura-dom.clarify.git]]
+path = "LICENSE"
+checksum = "50e6751797c50dedd75ef1b8a0d9e42f5f8472e9fbce91f34718e9f97b0c780a"
+
+[obscura-js.clarify]
+license = "Apache-2.0"
+[[obscura-js.clarify.git]]
+path = "LICENSE"
+checksum = "50e6751797c50dedd75ef1b8a0d9e42f5f8472e9fbce91f34718e9f97b0c780a"
+
+[obscura-net.clarify]
+license = "Apache-2.0"
+[[obscura-net.clarify.git]]
+path = "LICENSE"
+checksum = "50e6751797c50dedd75ef1b8a0d9e42f5f8472e9fbce91f34718e9f97b0c780a"

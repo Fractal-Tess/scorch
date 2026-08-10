@@ -13,6 +13,7 @@ use crate::{error::EngineError, security::SecurityPolicy};
 
 const MAX_HEADER_BYTES: usize = 64 * 1024;
 const IO_TIMEOUT: Duration = Duration::from_secs(15);
+const STREAM_TIMEOUT: Duration = Duration::from_secs(125);
 
 pub struct SafeProxy {
     address: SocketAddr,
@@ -102,7 +103,7 @@ async fn tunnel_connect(
             .map_err(|error| EngineError::Fetch(error.to_string()))?;
     }
     timeout(
-        IO_TIMEOUT,
+        STREAM_TIMEOUT,
         tokio::io::copy_bidirectional(&mut client, &mut upstream),
     )
     .await
@@ -144,7 +145,7 @@ async fn forward_http(
         .map_err(|error| EngineError::Fetch(error.to_string()))?;
 
     timeout(
-        IO_TIMEOUT,
+        STREAM_TIMEOUT,
         tokio::io::copy_bidirectional(&mut client, &mut upstream),
     )
     .await
@@ -176,7 +177,9 @@ async fn read_headers(stream: &mut TcpStream) -> Result<Vec<u8>, EngineError> {
             ));
         }
         let mut buffer = [0_u8; 4096];
-        let count = timeout(IO_TIMEOUT, stream.read(&mut buffer))
+        let remaining = MAX_HEADER_BYTES - request.len();
+        let buffer_len = remaining.min(buffer.len());
+        let count = timeout(IO_TIMEOUT, stream.read(&mut buffer[..buffer_len]))
             .await
             .map_err(|_| EngineError::Timeout)?
             .map_err(|error| EngineError::Fetch(error.to_string()))?;

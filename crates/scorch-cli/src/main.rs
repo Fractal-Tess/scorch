@@ -1,13 +1,13 @@
 mod client;
 mod mcp;
 
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use clap::{Args, Parser, Subcommand, ValueEnum};
 use client::ApiClient;
 use scorch_types::{
-    BrowserBackend, CrawlRequest, CrawlStatus, MapRequest, RenderMode, ScrapeFormat, ScrapeOptions,
-    ScrapeRequest, SearchRequest,
+    CrawlRequest, CrawlStatus, MapRequest, RenderMode, ScrapeFormat, ScrapeOptions, ScrapeRequest,
+    SearchRequest,
 };
 use uuid::Uuid;
 
@@ -39,7 +39,6 @@ enum Command {
     CrawlStatus(CrawlStatusArgs),
     CrawlCancel { id: Uuid },
     Mcp,
-    Benchmark(BenchmarkArgs),
 }
 
 #[derive(Debug, Clone, Copy, ValueEnum)]
@@ -82,21 +81,6 @@ impl From<RenderArg> for RenderMode {
     }
 }
 
-#[derive(Debug, Clone, Copy, ValueEnum)]
-enum BrowserArg {
-    Obscura,
-    Chromium,
-}
-
-impl From<BrowserArg> for BrowserBackend {
-    fn from(value: BrowserArg) -> Self {
-        match value {
-            BrowserArg::Obscura => Self::Obscura,
-            BrowserArg::Chromium => Self::Chromium,
-        }
-    }
-}
-
 #[derive(Args)]
 struct ScrapeArgs {
     url: String,
@@ -104,8 +88,6 @@ struct ScrapeArgs {
     format: Vec<FormatArg>,
     #[arg(long, value_enum, default_value = "auto")]
     render: RenderArg,
-    #[arg(long, value_enum)]
-    browser: Option<BrowserArg>,
     #[arg(long, default_value_t = 30_000)]
     timeout_ms: u64,
     #[arg(long, default_value_t = 0)]
@@ -123,7 +105,6 @@ impl ScrapeArgs {
             options: ScrapeOptions {
                 formats: self.format.iter().copied().map(Into::into).collect(),
                 render: self.render.into(),
-                browser: self.browser.map(Into::into),
                 timeout_ms: self.timeout_ms,
                 wait_for_ms: self.wait_for_ms,
                 only_main_content: !self.full_content,
@@ -178,21 +159,12 @@ struct CrawlStatusArgs {
     page_size: usize,
 }
 
-#[derive(Args)]
-struct BenchmarkArgs {
-    #[arg(required = true)]
-    urls: Vec<String>,
-    #[arg(long, default_value_t = 3)]
-    runs: usize,
-}
-
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
     let client = ApiClient::new(&cli.api_url)?;
     match cli.command {
         Command::Mcp => mcp::run(client).await?,
-        Command::Benchmark(args) => benchmark(&client, args).await?,
         command => run_client(&client, command).await?,
     }
     Ok(())
@@ -256,55 +228,27 @@ async fn run_client(client: &ApiClient, command: Command) -> anyhow::Result<()> 
                 .await?,
         )?,
         Command::CrawlCancel { id } => serde_json::to_value(client.cancel_crawl(id).await?)?,
-        Command::Mcp | Command::Benchmark(_) => unreachable!(),
+        Command::Mcp => unreachable!(),
     };
     println!("{}", serde_json::to_string_pretty(&value)?);
     Ok(())
 }
 
-async fn benchmark(client: &ApiClient, args: BenchmarkArgs) -> anyhow::Result<()> {
-    if args.runs == 0 || args.runs > 20 {
-        anyhow::bail!("runs must be between 1 and 20");
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn removed_browser_flag_is_rejected() {
+        assert!(
+            Cli::try_parse_from([
+                "scorch",
+                "scrape",
+                "https://example.com",
+                "--browser",
+                "obscura",
+            ])
+            .is_err()
+        );
     }
-    let mut reports = Vec::new();
-    for url in args.urls {
-        for render in [RenderMode::Never, RenderMode::Always] {
-            let mut timings = Vec::new();
-            let mut bytes = 0;
-            let mut failures = Vec::new();
-            for _ in 0..args.runs {
-                let request = ScrapeRequest {
-                    url: url.clone(),
-                    options: ScrapeOptions {
-                        formats: vec![ScrapeFormat::Html],
-                        render,
-                        only_main_content: false,
-                        ..Default::default()
-                    },
-                };
-                let started = Instant::now();
-                match client.scrape(&request).await {
-                    Ok(document) => {
-                        timings.push(started.elapsed().as_millis() as u64);
-                        bytes = document.html.map_or(0, |html| html.len());
-                    }
-                    Err(error) => failures.push(error.to_string()),
-                }
-            }
-            timings.sort_unstable();
-            reports.push(serde_json::json!({
-                "url": url,
-                "engine": if render == RenderMode::Never { "fetch" } else { "browser" },
-                "runs": args.runs,
-                "successfulRuns": timings.len(),
-                "medianMs": timings.get(timings.len() / 2),
-                "minMs": timings.first(),
-                "maxMs": timings.last(),
-                "htmlBytes": bytes,
-                "failures": failures,
-            }));
-        }
-    }
-    println!("{}", serde_json::to_string_pretty(&reports)?);
-    Ok(())
 }

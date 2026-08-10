@@ -1,221 +1,223 @@
-# Scorch
+<p align="center">
+  <img src="docs/public/brand/scorch-mark.png" alt="Scorch flame mark" width="160" height="160">
+</p>
 
-Scorch is a self-contained web search, scraping, mapping, and crawling service written in Rust. `scorchd` runs the HTTP API, browser, metasearch, and bounded in-memory crawl runtime. The separate `scorch` executable is a lightweight HTTP client for convenient API, benchmark, and MCP access. It uses direct HTTP for inexpensive static pages and embeds Obscura for JavaScript rendering and screenshots. Chromium remains an optional operator-enabled compatibility backend.
+<h1 align="center">Scorch</h1>
 
-Scorch does not require a database, broker, cache server, browser service, or external worker deployment. Crawl state is intentionally ephemeral and is lost when the process restarts.
+<p align="center">
+  Self-contained web search, scraping, mapping, and crawling in Rust.
+</p>
 
-## Install with Nix
+<p align="center">
+  <a href="https://github.com/Fractal-Tess/scorch/actions/workflows/release.yml"><img src="https://img.shields.io/github/actions/workflow/status/Fractal-Tess/scorch/release.yml?label=build" alt="Release build status"></a>
+  <a href="https://github.com/Fractal-Tess/scorch/actions/workflows/promote-release.yml"><img src="https://img.shields.io/github/actions/workflow/status/Fractal-Tess/scorch/promote-release.yml?label=publish" alt="Release publication status"></a>
+  <a href="https://github.com/Fractal-Tess/scorch/releases/latest"><img src="https://img.shields.io/github/v/release/Fractal-Tess/scorch?sort=semver" alt="Latest release"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/Fractal-Tess/scorch" alt="MIT license"></a>
+</p>
 
-Run either executable directly from the flake. Versioned Linux binaries are built by GitHub Actions and fetched by Nix, so installation does not compile the Rust workspace locally:
+## What is Scorch?
 
-```sh
-nix run github:Fractal-Tess/scorch/v0.1.3#scorch -- --help
-nix run github:Fractal-Tess/scorch/v0.1.3#scorchd -- --help
-```
+Scorch is a local-first web retrieval service for people and AI agents. It searches multiple public engines, extracts clean page content, renders JavaScript and screenshots, discovers site URLs, and runs bounded crawls behind one HTTP API. It is designed for private, self-hosted deployments without a database or external browser stack.
 
-Or enable the client and service declaratively on NixOS:
+Scorch has two executables:
 
-```nix
-{
-  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-  inputs.scorch.url = "github:Fractal-Tess/scorch/v0.1.3";
+- `scorchd` — HTTP API, metasearch, embedded Obscura rendering, and bounded crawl runtime.
+- `scorch` — lightweight HTTP client and MCP stdio adapter.
 
-  outputs = { nixpkgs, scorch, ... }: {
-    nixosConfigurations.host = nixpkgs.lib.nixosSystem {
-      system = "x86_64-linux";
-      modules = [
-        scorch.nixosModules.default
-        {
-          programs.scorch = {
-            enable = true;
-            apiUrl = "http://127.0.0.1:33000";
-          };
-          services.scorchd.enable = true;
-        }
-      ];
-    };
-  };
-}
-```
+Static pages use direct HTTP. JavaScript rendering and screenshots use embedded Obscura with stealth transport enabled by default. Scorch needs no database, broker, external browser service, or worker deployment.
 
-The flake also exports an optional `scorchd-with-chromium` package, an overlay, a Home Manager module, checks, and the Scorch Agent Skill. See the [Nix guide](docs/src/pages/nix.astro) for service policy and secret-file configuration.
+## Examples
 
-## Agent Skill
-
-The repository includes a standard Agent Skill at `.agents/skills/scorch/SKILL.md`. It is discovered automatically while working in this repository. The flake packages it for installation into another agent environment:
+Start `scorchd`, then search, extract, render, map, or crawl with the lightweight client:
 
 ```sh
-nix build github:Fractal-Tess/scorch/v0.1.3#skill
-mkdir -p ~/.agents/skills
-rm -rf ~/.agents/skills/scorch
-cp -R result/share/agent-skills/scorch ~/.agents/skills/scorch
+scorchd
+
+scorch search "rust async runtime" --limit 5
+scorch scrape https://example.com --format markdown,links
+scorch scrape https://example.com --render always --format markdown
+scorch scrape https://example.com --format screenshot --full-page-screenshot
+scorch map https://example.com --limit 100
+scorch crawl https://example.com --limit 20 --max-depth 2 --wait
 ```
 
-See the [Agent Skill guide](docs/src/pages/skill.astro) for installation and behavior.
+The default endpoint is `http://127.0.0.1:33000`. Override it with `SCORCH_API_URL` or `--api-url`. Metasearch combines Bing, DuckDuckGo, Naver, and Wikipedia by default; Brave and Google are optional credential-backed engines.
 
-## Development
+## Smaller than self-hosted Firecrawl
+
+Firecrawl's [official self-hosted stack](https://github.com/firecrawl/firecrawl/blob/e72fe3acac88651c31fc2ac8398926d7fa2fcdd3/docker-compose.yaml) runs six long-lived services. Scorch runs one daemon with no database, cache, or message broker.
+
+| | Self-hosted Firecrawl | Scorch |
+| --- | ---: | ---: |
+| Long-running services | 6 | **1** |
+| First render | 0.661 s | **0.192 s** |
+| Warm renderer memory | 407.9 MiB | **37.3 MiB** |
+| Peak renderer processes | 14 | **1** |
+| Parallel render speed | 3.03 req/s | 1.99 req/s |
+| Database, cache, and broker | PostgreSQL, Redis, RabbitMQ | **None** |
+
+Scorch is lighter because Obscura runs inside `scorchd`, static pages skip the browser, and crawl jobs stay in bounded memory. That means less startup and coordination before a crawl begins.
+
+The Scorch figures were confirmed on an optimized `0.2.0` release-candidate build using the median of three trials, four public pages, and eight parallel renders at concurrency four; all requests succeeded. The Firecrawl column uses the same host's Chromium baseline because Firecrawl uses Playwright with Chromium and publishes no equivalent reproducible self-hosted benchmark. This is not an end-to-end crawl-speed claim. See the [architecture guide](docs/src/pages/architecture.astro) for details.
+
+## Install
+
+### Installer
+
+Install the latest release into `~/.local/bin` with either curl or wget:
 
 ```sh
-devenv shell
-cargo run -p scorch-server --
+curl -fsSL https://github.com/Fractal-Tess/scorch/releases/latest/download/install.sh | sh
 ```
-
-The API listens on `127.0.0.1:33000` by default. Authentication is intentionally not built into this local-first release; do not expose it to an untrusted network without an authenticated TLS gateway.
-
-## Logging
-
-Scorch writes structured operational logs to stderr. The default compact output records startup and shutdown, request IDs, methods, response statuses and latency, engine selection, operation outcomes, browser lifecycle, and crawl lifecycle. Request bodies, search text, and URL query strings are not logged at info level.
-
-Use `RUST_LOG` for filtering and `SCORCH_LOG_FORMAT=json` for newline-delimited JSON:
 
 ```sh
-RUST_LOG=scorch=debug cargo run -p scorch-server --
-SCORCH_LOG_FORMAT=json RUST_LOG=scorch=info cargo run -p scorch-server --
+wget -qO- https://github.com/Fractal-Tess/scorch/releases/latest/download/install.sh | sh
 ```
 
-CLI and MCP JSON protocol output remains isolated on stdout.
-
-## CLI
-
-Every web command calls the configured HTTP API:
+The installer detects the Linux architecture and verifies the release checksum. Pin a version or choose another directory with:
 
 ```sh
-cargo run -p scorch-cli -- scrape https://example.com --format markdown,links
-cargo run -p scorch-cli -- search "rust async runtime" --limit 5 --scrape
-cargo run -p scorch-cli -- map https://example.com --limit 100
-cargo run -p scorch-cli -- crawl https://example.com --limit 20 --max-depth 2 --wait
+curl -fsSL https://raw.githubusercontent.com/Fractal-Tess/scorch/v0.3.0/install.sh \
+  | sh -s -- --version 0.3.0 --install-dir ~/.local/bin
 ```
 
-Set `SCORCH_API_URL` or pass `--api-url` to use another server.
+### Release archive
 
-`scorch` contains no engine, browser, or API-server dependencies. Server and runtime options belong exclusively to `scorchd`:
+Download the archive from [GitHub Releases](https://github.com/Fractal-Tess/scorch/releases) for the current Linux architecture and verify its published checksum:
 
 ```sh
-cargo run -p scorch-server -- --help
+VERSION=0.3.0
+TARGET="$(uname -m)-unknown-linux-gnu"
+ARCHIVE="scorch-v${VERSION}-${TARGET}.tar.xz"
+BASE="https://github.com/Fractal-Tess/scorch/releases/download/v${VERSION}"
+
+curl -fLO "${BASE}/${ARCHIVE}"
+curl -fLO "${BASE}/${ARCHIVE}.sha256"
+sha256sum --check "${ARCHIVE}.sha256"
+tar -xJf "${ARCHIVE}"
+sudo install -Dm755 \
+  "scorch-v${VERSION}-${TARGET}/bin/scorch" \
+  "scorch-v${VERSION}-${TARGET}/bin/scorchd" \
+  /usr/local/bin/
 ```
 
-Obscura is the default and only allowed browser. Operators can enable Chromium, or make it the default, without letting requests escape that policy:
+Release archives support `x86_64-linux` and `aarch64-linux`.
+
+### Nix
+
+Nix downloads the same fixed-hash CI binaries rather than compiling the Rust workspace:
 
 ```sh
-SCORCH_ALLOWED_BROWSERS=obscura,chromium scorchd
-SCORCH_BROWSER=chromium SCORCH_ALLOWED_BROWSERS=chromium scorchd
+nix run github:Fractal-Tess/scorch/v0.3.0#scorch -- --help
+nix run github:Fractal-Tess/scorch/v0.3.0#scorchd -- --help
 ```
 
-A scrape request may select an allowed backend with `options.browser`; omitted selection uses `SCORCH_BROWSER`. The service rejects a request that selects a backend not listed in `SCORCH_ALLOWED_BROWSERS`.
+Use `github:Fractal-Tess/scorch/v0.3.0` as a flake input. The flake exports packages, an overlay, NixOS and Home Manager modules, checks, and the Agent Skill. See the [Nix guide](docs/src/pages/nix.astro) for a complete declarative configuration.
 
-Obscura uses its stealth transport by default. For higher throughput where transport-level browser fingerprinting is not required, select the standard transport with `SCORCH_OBSCURA_STEALTH=false` or `scorchd --obscura-stealth false`.
+## MCP and agent setup
 
-### Metasearch engines
+Start `scorchd` first. Each agent spawns `scorch mcp` as a local stdio child process, discovers its six tools, and forwards tool calls to the daemon at `http://127.0.0.1:33000` by default. The `scorch` executable must be available on the agent's `PATH`.
 
-Metasearch is Scorch's only search provider. It owns engine routing, concurrent searching, result merging, and reranking. Configure the engines it is allowed to use independently when starting the API:
+### [Claude Code](https://code.claude.com/docs/en/mcp)
 
 ```sh
-SCORCH_SEARCH_ENGINES=bing,wikipedia cargo run -p scorch-server --
-# installed binary: scorchd --search-engines bing,wikipedia
+claude mcp add --scope user scorch -- scorch mcp
 ```
 
-Allowed engines are `bing`, `brave`, `duckduckgo`, `google`, `naver`, and `wikipedia`. Bing, DuckDuckGo, Naver, and Wikipedia are enabled by default; Brave and Google require credentials. Engine selection is a server policy and cannot be overridden by individual search requests.
-
-The native metasearch provider combines agreement with reciprocal-rank fusion, caches short-lived results, and stops waiting shortly after useful results arrive. It remains inside `scorchd`. See `docs/metasearch.md` for design details and engine verification.
-
-### Concurrent search dashboard
-
-With the API running, launch the dependency-free Python terminal dashboard:
+### [Codex](https://developers.openai.com/codex/mcp/)
 
 ```sh
-python3 scripts/concurrent_search_demo.py \
-  --requests 8 \
-  --concurrency 4
+codex mcp add scorch -- scorch mcp
 ```
 
-Pass custom queries as positional arguments, add `--scrape` to enrich results, or use `--plain` for non-interactive output. Each request receives a distinct `x-request-id` that also appears in Scorch's service logs.
+### [OpenCode](https://opencode.ai/docs/mcp-servers/)
 
-## HTTP API
-
-```sh
-curl -sS http://127.0.0.1:33000/v1/scrape \
-  -H 'content-type: application/json' \
-  -d '{
-    "url": "https://example.com",
-    "options": {
-      "formats": ["markdown", "links"],
-      "render": "auto",
-      "browser": "obscura"
-    }
-  }' | jq
-```
-
-| Method | Path | Purpose |
-| --- | --- | --- |
-| `GET` | `/health` | Process liveness |
-| `GET` | `/ready` | Browser readiness and concurrency |
-| `POST` | `/v1/scrape` | Fetch or render one page |
-| `POST` | `/v1/search` | Search, optionally scraping results |
-| `POST` | `/v1/map` | Discover normalized same-site URLs |
-| `POST` | `/v1/crawls` | Start an in-memory crawl |
-| `GET` | `/v1/crawls/{id}` | Read paginated status and results |
-| `DELETE` | `/v1/crawls/{id}` | Cancel and remove a crawl |
-
-See `docs/api.md` for request contracts and limits.
-
-## MCP
-
-Run the API-backed stdio adapter directly:
-
-```sh
-cargo run -p scorch-cli -- mcp
-```
-
-The adapter performs no web or browser work itself; every tool call is forwarded to `SCORCH_API_URL`.
-
-A client configuration can point at a release build:
+Merge this into `~/.config/opencode/opencode.json`:
 
 ```json
 {
-  "mcpServers": {
+  "mcp": {
     "scorch": {
-      "command": "/absolute/path/to/scorch",
-      "args": ["mcp"],
-      "env": {
-        "SCORCH_API_URL": "http://127.0.0.1:33000"
-      }
+      "type": "local",
+      "command": ["scorch", "mcp"],
+      "enabled": true
     }
   }
 }
 ```
 
-The tools are `scorch_search`, `scorch_scrape`, `scorch_map`, `scorch_crawl_start`, `scorch_crawl_status`, and `scorch_crawl_cancel`. MCP protocol traffic is written only to stdout; diagnostics go to stderr.
-
-## Browser and security
-
-Obscura runs as an in-process Rust library rather than a sidecar or executable. Obscura and optional Chromium traffic are forced through an embedded validating HTTP/CONNECT proxy. Direct fetches and browser connections reject local, private, link-local, reserved, and unsafe targets, repin DNS addresses, and revalidate redirects. Response sizes, redirects, browser work, crawl depth, crawl count, retained bytes, request bodies, and job lifetimes are bounded.
-
-The browser choice and measured tradeoffs are documented in `docs/browser-evaluation.md`.
-
-## Build profiles
-
-The production profile uses thin LTO, one code-generation unit, symbol stripping, and overflow checks while retaining unwind behavior for panic isolation:
+### [Gemini CLI](https://geminicli.com/docs/tools/mcp-server/)
 
 ```sh
-cargo build --release --workspace
-# target/release/scorch and target/release/scorchd
+gemini mcp add --scope user scorch scorch mcp
 ```
 
-For production-equivalent profiling with debug symbols:
+### Other MCP clients
+
+Clients using the common `mcpServers` format can launch Scorch with:
+
+```json
+{
+  "mcpServers": {
+    "scorch": {
+      "command": "scorch",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
+Scorch exposes six tools: `scorch_search`, `scorch_scrape`, `scorch_map`, `scorch_crawl_start`, `scorch_crawl_status`, and `scorch_crawl_cancel`. Some clients prefix tool names with the server name; OpenCode therefore displays names such as `scorch_scorch_search`. Protocol output stays isolated on stdout. Check connections with `claude mcp list`, `codex mcp list`, `opencode mcp list`, or `gemini mcp list`.
+
+## Agent Skill
+
+The standard skill lives at [`.agents/skills/scorch/SKILL.md`](.agents/skills/scorch/SKILL.md). Build its installable Nix package with:
 
 ```sh
-cargo build --profile release-debug --workspace
+nix build github:Fractal-Tess/scorch/v0.3.0#skill
 ```
 
-## Checks
+## Development
+
+The included `.envrc` loads the flake development shell:
 
 ```sh
-check
-fmt --check
-lint
-test
+direnv allow
+cargo run -p scorch-server --
 ```
+
+Without direnv, use `nix develop`.
+
+Run the core checks with:
+
+```sh
+cargo fmt --all --check
+cargo check --workspace --all-targets --locked
+cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
+cargo test --workspace --all-targets --locked
+cargo deny check advisories licenses sources
+```
+
+Documentation uses Astro and Bun:
+
+```sh
+cd docs
+bun install --frozen-lockfile
+bun run build
+```
+
+## Security
+
+Direct fetches and Obscura traffic share SSRF, DNS, redirect, unsafe-port, response-size, concurrency, and deadline controls. Crawl state is bounded, ephemeral, and lost when `scorchd` restarts. Authentication and TLS belong at the deployment gateway; do not expose Scorch to an untrusted network without them.
+
+## Documentation
+
+- [Getting started](docs/src/pages/getting-started.astro)
+- [HTTP API](docs/src/pages/api.astro)
+- [Architecture](docs/src/pages/architecture.astro)
+- [Configuration](docs/src/pages/configuration.astro)
+- [Nix](docs/src/pages/nix.astro)
 
 ## License
 
-Licensed under the MIT License. Copyright © 2026 Fractal-Tess.
+Scorch is MIT licensed © 2026 Fractal-Tess. Dependency licenses and attributions are recorded in [THIRD_PARTY_LICENSES.html](THIRD_PARTY_LICENSES.html).

@@ -7,20 +7,41 @@ interface Props {
   title?: string;
   description?: string;
   image?: string;
+  imageAlt?: string;
   hideFooter?: boolean;
+  noindex?: boolean;
 }
 
 const {
-  title = "Scorch — web search and extraction infrastructure",
-  description = "Self-contained web search, scraping, mapping, and crawling in Rust.",
-  image = "/brand/scorch-mark.png",
+  title = "Scorch — self-hosted web intelligence in Rust",
+  description = "Self-contained web search, scraping, mapping, and crawling with embedded Obscura rendering and an HTTP-only agent client.",
+  image = "/brand/scorch-og.png",
+  imageAlt = "Scorch — web intelligence, self-hosted",
   hideFooter = false,
+  noindex = false,
 } = Astro.props;
 const canonical = Astro.site
   ? new URL(Astro.url.pathname, Astro.site)
   : undefined;
-const socialImage = Astro.site ? new URL(image, Astro.site) : undefined;
+const socialImage = image.startsWith("http")
+  ? new URL(image)
+  : Astro.site
+    ? new URL(image, Astro.site)
+    : new URL(
+        `https://raw.githubusercontent.com/Fractal-Tess/scorch/main/docs/public${image}`,
+      );
 const fullTitle = title.startsWith("Scorch") ? title : `${title} · Scorch`;
+const structuredData = {
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  name: "Scorch",
+  description,
+  applicationCategory: "DeveloperApplication",
+  operatingSystem: "Linux",
+  codeRepository: "https://github.com/Fractal-Tess/scorch",
+  license: "https://opensource.org/license/mit",
+  image: socialImage.toString(),
+};
 ---
 
 <!doctype html>
@@ -30,16 +51,41 @@ const fullTitle = title.startsWith("Scorch") ? title : `${title} · Scorch`;
     <meta name="viewport" content="width=device-width" />
     <meta name="generator" content={Astro.generator} />
     <meta name="description" content={description} />
+    <meta name="author" content="Fractal-Tess" />
+    <meta
+      name="robots"
+      content={noindex
+        ? "noindex, nofollow"
+        : "index, follow, max-image-preview:large"}
+    />
     <meta name="theme-color" content="#0a0b0d" />
+    <meta name="color-scheme" content="dark light" />
     <link rel="icon" type="image/png" href="/favicon.png" />
     <link rel="apple-touch-icon" href="/brand/scorch-mark.png" />
+    <link rel="manifest" href="/site.webmanifest" />
     {canonical && <link rel="canonical" href={canonical} />}
     <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Scorch" />
+    <meta property="og:locale" content="en_US" />
     <meta property="og:title" content={fullTitle} />
     <meta property="og:description" content={description} />
     {canonical && <meta property="og:url" content={canonical} />}
-    {socialImage && <meta property="og:image" content={socialImage} />}
-    <meta name="twitter:card" content="summary" />
+    <meta property="og:image" content={socialImage} />
+    <meta property="og:image:secure_url" content={socialImage} />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content={imageAlt} />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={fullTitle} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={socialImage} />
+    <meta name="twitter:image:alt" content={imageAlt} />
+    <script
+      is:inline
+      type="application/ld+json"
+      set:html={JSON.stringify(structuredData)}
+    />
     <title>{fullTitle}</title>
     <script is:inline>
       (() => {
@@ -104,7 +150,7 @@ const fullTitle = title.startsWith("Scorch") ? title : `${title} · Scorch`;
         },
         {
           title: "CLI reference",
-          detail: "scrape, search, map, crawl, benchmark",
+          detail: "scrape, search, map, crawl, and MCP",
           href: "/cli/",
         },
         {
@@ -129,8 +175,8 @@ const fullTitle = title.startsWith("Scorch") ? title : `${title} · Scorch`;
           href: "/nix/",
         },
         {
-          title: "Browser backends",
-          detail: "Obscura defaults and Chromium policy",
+          title: "Obscura renderer",
+          detail: "Stealth defaults and rendering policy",
           href: "/configuration/#browser-policy",
         },
         {

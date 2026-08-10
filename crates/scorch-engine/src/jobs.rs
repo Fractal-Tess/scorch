@@ -1,6 +1,6 @@
 use std::{
     collections::{HashSet, VecDeque},
-    sync::Arc,
+    sync::{Arc, Mutex},
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
@@ -36,6 +36,7 @@ pub struct JobStore {
     max_jobs: usize,
     max_job_bytes: usize,
     active: Arc<Semaphore>,
+    admission: Mutex<()>,
 }
 
 impl JobStore {
@@ -53,6 +54,7 @@ impl JobStore {
             max_jobs,
             max_job_bytes,
             active: Arc::new(Semaphore::new(max_active_crawls)),
+            admission: Mutex::new(()),
         }
     }
 
@@ -61,6 +63,18 @@ impl JobStore {
         engine: Arc<ScorchEngine>,
         request: CrawlRequest,
     ) -> Result<CrawlJob> {
+        let root = Url::parse(&request.url)
+            .map_err(|error| EngineError::InvalidRequest(format!("invalid crawl URL: {error}")))?;
+        if !matches!(root.scheme(), "http" | "https") || root.host_str().is_none() {
+            return Err(EngineError::InvalidRequest(
+                "crawl URL must use HTTP or HTTPS and include a host".into(),
+            ));
+        }
+        if !root.username().is_empty() || root.password().is_some() {
+            return Err(EngineError::InvalidRequest(
+                "credentials in crawl URLs are not allowed".into(),
+            ));
+        }
         if !(1..=engine.config().max_crawl_limit).contains(&request.limit) {
             return Err(EngineError::InvalidRequest(format!(
                 "crawl limit must be between 1 and {}",
@@ -80,6 +94,10 @@ impl JobStore {
             )));
         }
 
+        let _admission = self
+            .admission
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         self.cleanup();
         if self.jobs.len() >= self.max_jobs {
             return Err(EngineError::Capacity(format!(
@@ -148,12 +166,42 @@ impl JobStore {
         request: CrawlRequest,
         cancel: CancellationToken,
     ) {
-        let Ok(_active_permit) = Arc::clone(&self.active).acquire_owned().await else {
-            self.fail(id, &request.url, "crawl runtime is shutting down");
-            return;
+        let failed_url = request.url.clone();
+        if tokio::time::timeout(
+            self.crawl_timeout,
+            self.run_inner(engine, id, request, cancel.clone()),
+        )
+        .await
+        .is_err()
+        {
+            cancel.cancel();
+            self.fail(id, &failed_url, "crawl exceeded its absolute deadline");
+        }
+    }
+
+    async fn run_inner(
+        &self,
+        engine: Arc<ScorchEngine>,
+        id: Uuid,
+        request: CrawlRequest,
+        cancel: CancellationToken,
+    ) {
+        let _active_permit = tokio::select! {
+            biased;
+            () = cancel.cancelled() => {
+                self.finish(id, CrawlStatus::Cancelled);
+                return;
+            }
+            permit = Arc::clone(&self.active).acquire_owned() => {
+                let Ok(permit) = permit else {
+                    self.fail(id, &request.url, "crawl runtime is shutting down");
+                    return;
+                };
+                permit
+            }
         };
         if cancel.is_cancelled() {
-            self.mutate(id, |job| job.status = CrawlStatus::Cancelled);
+            self.finish(id, CrawlStatus::Cancelled);
             info!(operation = "crawl", crawl_id = %id, "crawl cancelled before start");
             return;
         }
@@ -177,8 +225,11 @@ impl JobStore {
         };
         if let Ok(mapped) = engine.map(&map_request).await {
             for url in mapped.links {
-                if seen.insert(url.clone()) {
-                    queue.push_back((url, 1));
+                let Ok(candidate) = Url::parse(&url) else {
+                    continue;
+                };
+                if same_origin(&root, &candidate) && seen.insert(normalized(&candidate)) {
+                    queue.push_back((candidate.to_string(), 1));
                 }
             }
         }
@@ -189,7 +240,7 @@ impl JobStore {
                 return;
             }
             if cancel.is_cancelled() {
-                self.mutate(id, |job| job.status = CrawlStatus::Cancelled);
+                self.finish(id, CrawlStatus::Cancelled);
                 info!(
                     operation = "crawl",
                     crawl_id = %id,
@@ -214,24 +265,32 @@ impl JobStore {
                     options.formats.push(ScrapeFormat::Links);
                 }
                 let engine = Arc::clone(&engine);
+                let task_cancel = cancel.clone();
                 batch.push(
                     async move {
-                        let result = engine
-                            .scrape(&ScrapeRequest {
-                                url: url.clone(),
-                                options,
-                            })
-                            .await;
+                        let scrape_request = ScrapeRequest {
+                            url: url.clone(),
+                            options,
+                        };
+                        let result = tokio::select! {
+                            biased;
+                            () = task_cancel.cancelled() => None,
+                            result = engine.scrape(&scrape_request) => Some(result),
+                        };
                         (url, depth, result)
                     }
                     .boxed(),
                 );
             }
             self.mutate(id, |job| {
-                job.total = (job.completed + batch.len() + queue.len()).min(request.limit)
+                let discovered = (job.completed + batch.len() + queue.len()).min(request.limit);
+                job.total = job.total.max(discovered);
             });
 
             while let Some((url, depth, result)) = batch.next().await {
+                let Some(result) = result else {
+                    continue;
+                };
                 match result {
                     Ok(document) => {
                         if depth < request.max_depth
@@ -272,14 +331,15 @@ impl JobStore {
             }
         }
 
-        self.mutate(id, |job| {
-            job.total = job.completed + job.errors.len();
-            job.status = if cancel.is_cancelled() {
+        self.mutate(id, |job| job.total = job.completed);
+        self.finish(
+            id,
+            if cancel.is_cancelled() {
                 CrawlStatus::Cancelled
             } else {
                 CrawlStatus::Completed
-            };
-        });
+            },
+        );
         if let Some(entry) = self.jobs.get(&id) {
             info!(
                 operation = "crawl",
@@ -328,11 +388,19 @@ impl JobStore {
             "crawl failed"
         );
         self.mutate(id, |job| {
-            job.status = CrawlStatus::Failed;
             job.errors.push(CrawlError {
                 url: url.into(),
                 message: message.into(),
             });
+        });
+        self.finish(id, CrawlStatus::Failed);
+    }
+
+    fn finish(&self, id: Uuid, status: CrawlStatus) {
+        let expires_at_ms = now_ms().saturating_add(self.ttl.as_millis() as u64);
+        self.mutate(id, |job| {
+            job.status = status;
+            job.expires_at_ms = expires_at_ms;
         });
     }
 
@@ -344,7 +412,13 @@ impl JobStore {
 
     fn cleanup(&self) {
         let now = now_ms();
-        self.jobs.retain(|_, entry| entry.job.expires_at_ms > now);
+        self.jobs.retain(|_, entry| {
+            let retained = entry.job.expires_at_ms > now;
+            if !retained {
+                entry.cancel.cancel();
+            }
+            retained
+        });
     }
 }
 

@@ -40,9 +40,9 @@ const headings = [
   </div>
   <p>
     <code>scorch mcp</code> does not fetch pages, start a browser, or construct an
-    engine. It translates Model Context Protocol tool calls into HTTP requests against
-    <code>SCORCH_API_URL</code>. Server-side search, browser, concurrency, and
-    network policy still apply.
+    engine. It translates Model Context Protocol tool calls into HTTP requests to
+    <code>http://127.0.0.1:33000</code> by default. Server-side search, browser, concurrency,
+    and network policy still apply.
   </p>
   <p>
     The adapter uses the official Rust MCP SDK for JSON-RPC framing, generated
@@ -69,10 +69,7 @@ const headings = [
   "mcpServers": &#123;
     "scorch": &#123;
       "command": "/absolute/path/to/scorch",
-      "args": ["mcp"],
-      "env": &#123;
-        "SCORCH_API_URL": "http://127.0.0.1:33000"
-      &#125;
+      "args": ["mcp"]
     &#125;
   &#125;
 &#125;</code></pre>
@@ -85,10 +82,7 @@ const headings = [
   "mcpServers": &#123;
     "scorch": &#123;
       "command": "/home/user/.local/bin/scorch",
-      "args": ["mcp"],
-      "env": &#123;
-        "SCORCH_API_URL": "https://scorch.internal.example"
-      &#125;
+      "args": ["--api-url", "https://scorch.internal.example", "mcp"]
     &#125;
   &#125;
 &#125;</code></pre>
@@ -191,12 +185,11 @@ const headings = [
     startup failures are written to stderr. Do not wrap the command in a script
     that prints banners or log lines to stdout.
   </p>
-  <p>Endpoint selection order is:</p>
-  <ol>
-    <li><code>--api-url</code> passed before <code>mcp</code></li><li>
-      <code>SCORCH_API_URL</code> in the MCP server environment
-    </li><li><code>http://127.0.0.1:33000</code></li>
-  </ol>
+  <p>
+    The adapter connects to <code>http://127.0.0.1:33000</code> unless <code
+      >--api-url</code
+    > is passed before <code>mcp</code>.
+  </p>
   <pre><code>/absolute/path/to/scorch \
   --api-url http://127.0.0.1:33000 \
   mcp</code></pre>
@@ -210,7 +203,7 @@ const headings = [
   </p>
   <h3>Tools fail with connection errors</h3>
   <p>Check the API separately:</p>
-  <pre><code>SCORCH_API_URL=http://127.0.0.1:33000 scorch search "health check"
+  <pre><code>scorch search "health check"
 curl -v http://127.0.0.1:33000/ready</code></pre>
   <p>
     If the MCP host is sandboxed or containerized, <code>127.0.0.1</code> refers to
@@ -223,11 +216,10 @@ curl -v http://127.0.0.1:33000/ready</code></pre>
     Ensure no wrapper, shell startup file, or process supervisor writes
     informational text to stdout. Scorch itself keeps diagnostics on stderr.
   </p>
-  <h3>A browser choice is rejected</h3>
+  <h3>A browser field is rejected</h3>
   <p>
-    The MCP schema may allow both backend names, but the service allowlist is
-    authoritative. Inspect <code>/ready</code> and update <code
-      >SCORCH_ALLOWED_BROWSERS</code
-    > only if the deployment intends to permit that backend.
+    Browser selection is no longer part of the scrape contract. Remove the
+    field; all rendered requests use embedded Obscura with service-managed
+    stealth policy.
   </p>
 </DocLayout>

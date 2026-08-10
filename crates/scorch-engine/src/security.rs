@@ -1,7 +1,7 @@
 use std::net::{IpAddr, SocketAddr};
 
 use tokio::{net::lookup_host, time::timeout};
-use url::Url;
+use url::{Host, Url};
 
 use crate::error::{EngineError, Result};
 
@@ -37,11 +37,7 @@ impl SecurityPolicy {
         }
 
         url.set_fragment(None);
-        let host = url
-            .host_str()
-            .ok_or_else(|| EngineError::InvalidRequest("URL has no host".into()))?
-            .trim_end_matches('.')
-            .to_ascii_lowercase();
+        let (host, literal_ip) = normalize_url_host(&mut url)?;
         if host == "localhost" || host.ends_with(".localhost") || host.ends_with(".local") {
             return Err(EngineError::UnsafeUrl(format!(
                 "host {host} is local or private"
@@ -56,15 +52,19 @@ impl SecurityPolicy {
                 "port {port} is not allowed for web requests"
             )));
         }
-        let mut addresses: Vec<_> = timeout(
-            std::time::Duration::from_secs(5),
-            lookup_host((host.as_str(), port)),
-        )
-        .await
-        .map_err(|_| EngineError::Dns("resolution timed out".into()))?
-        .map_err(|error| EngineError::Dns(error.to_string()))?
-        .take(16)
-        .collect();
+        let mut addresses = if let Some(ip) = literal_ip {
+            vec![SocketAddr::new(ip, port)]
+        } else {
+            timeout(
+                std::time::Duration::from_secs(5),
+                lookup_host((host.as_str(), port)),
+            )
+            .await
+            .map_err(|_| EngineError::Dns("resolution timed out".into()))?
+            .map_err(|error| EngineError::Dns(error.to_string()))?
+            .take(16)
+            .collect()
+        };
         addresses.sort_unstable();
         addresses.dedup();
 
@@ -83,6 +83,32 @@ impl SecurityPolicy {
             host,
             addresses,
         })
+    }
+}
+
+fn normalize_url_host(url: &mut Url) -> Result<(String, Option<IpAddr>)> {
+    match url
+        .host()
+        .ok_or_else(|| EngineError::InvalidRequest("URL has no host".into()))?
+    {
+        Host::Domain(domain) => {
+            let host = domain.trim_end_matches('.').to_ascii_lowercase();
+            url.set_host(Some(&host))
+                .map_err(|_| EngineError::InvalidRequest("URL has an invalid host".into()))?;
+            Ok((host, None))
+        }
+        Host::Ipv4(address) => {
+            let address = IpAddr::V4(address);
+            url.set_ip_host(address)
+                .map_err(|_| EngineError::InvalidRequest("URL has an invalid host".into()))?;
+            Ok((address.to_string(), Some(address)))
+        }
+        Host::Ipv6(address) => {
+            let address = IpAddr::V6(address);
+            url.set_ip_host(address)
+                .map_err(|_| EngineError::InvalidRequest("URL has an invalid host".into()))?;
+            Ok((address.to_string(), Some(address)))
+        }
     }
 }
 
@@ -111,6 +137,7 @@ fn is_public_ip(ip: IpAddr) -> bool {
                 (first == 0x2001 && segments[1] == 0x0db8) || first & 0xfff0 == 0x3ff0;
             let protocol_assignments = first == 0x2001 && segments[1] < 0x0200;
             let discarded = (first == 0x0100 && segments[1..4] == [0, 0, 0])
+                || segments[..6] == [0x0064, 0xff9b, 0, 0, 0, 0]
                 || (first == 0x0064 && segments[1] == 0xff9b && segments[2] == 1)
                 || first == 0x2002
                 || first == 0x5f00;
@@ -167,6 +194,20 @@ mod tests {
     }
 
     #[test]
+    fn canonicalizes_trailing_dot_hosts() {
+        let mut url = Url::parse("https://EXAMPLE.com./path").unwrap();
+        let (host, ip) = normalize_url_host(&mut url).unwrap();
+        assert_eq!(host, "example.com");
+        assert!(ip.is_none());
+        assert_eq!(url.as_str(), "https://example.com/path");
+
+        let mut ipv6 = Url::parse("https://[2606:4700:4700::1111]/").unwrap();
+        let (host, ip) = normalize_url_host(&mut ipv6).unwrap();
+        assert_eq!(host, "2606:4700:4700::1111");
+        assert_eq!(ip, Some("2606:4700:4700::1111".parse().unwrap()));
+    }
+
+    #[test]
     fn rejects_special_purpose_addresses() {
         for address in [
             "0.0.0.0",
@@ -182,6 +223,8 @@ mod tests {
             "fc00::1",
             "2001:db8::1",
             "::ffff:127.0.0.1",
+            "64:ff9b::7f00:1",
+            "64:ff9b:1::7f00:1",
         ] {
             assert!(!is_public_ip(address.parse().unwrap()), "{address}");
         }

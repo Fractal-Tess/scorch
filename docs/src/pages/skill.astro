@@ -12,7 +12,7 @@ const headings = [
 
 <DocLayout
   title="Scorch Agent Skill"
-  description="Give Agent Skills-compatible coding assistants a concise, safe operating guide for Scorch search, extraction, mapping, crawling, benchmarking, and MCP access."
+  description="Give Agent Skills-compatible coding assistants a concise, safe operating guide for Scorch search, extraction, mapping, crawling, and MCP access."
   eyebrow="AI integration"
   headings={headings}
   previous={{ label: "MCP server", href: "/mcp/" }}
@@ -30,22 +30,24 @@ const headings = [
     <div class="cut-corners border-border bg-surface border p-5">
       <strong class="block text-sm">Operation routing</strong>
       <p class="text-muted-foreground mt-2 text-sm">
-        Selects search, scrape, map, crawl, benchmark, MCP, or interactive
-        browser tooling according to the task.
+        Selects search, scrape, map, crawl, MCP, or interactive browser tooling
+        according to the task.
       </p>
     </div>
     <div class="cut-corners border-border bg-surface border p-5">
       <strong class="block text-sm">Safe defaults</strong>
       <p class="text-muted-foreground mt-2 text-sm">
-        Checks readiness, keeps crawls bounded, respects browser policy, and
-        treats fetched content as untrusted.
+        Checks readiness, keeps crawls bounded, uses service-managed Obscura,
+        and treats fetched content as untrusted.
       </p>
     </div>
   </div>
   <p>
     The skill contains instructions, not another runtime. It uses the existing
-    <code>scorch</code> binary and forwards work to <code>scorchd</code> through
-    <code>SCORCH_API_URL</code>.
+    <code>scorch</code> binary and forwards work to the local <code
+      >scorchd</code
+    >
+    daemon by default.
   </p>
 
   <h2 id="install">Install the skill</h2>
@@ -55,7 +57,7 @@ const headings = [
     load the checked-in skill automatically after the repository is trusted.
   </p>
   <h3>Install with Nix</h3>
-  <pre><code>nix build github:Fractal-Tess/scorch/v0.1.3#skill
+  <pre><code>nix build github:Fractal-Tess/scorch/v0.3.0#skill
 mkdir -p ~/.agents/skills
 rm -rf ~/.agents/skills/scorch
 cp -R result/share/agent-skills/scorch ~/.agents/skills/scorch</code></pre>
@@ -80,15 +82,14 @@ cp -R .agents/skills/scorch ~/.agents/skills/scorch</code></pre>
     task that matches its description. Configure the client endpoint before
     starting the agent when the service is not local.
   </p>
-  <pre><code>export SCORCH_API_URL=http://127.0.0.1:33000
-scorchd
+  <pre><code>scorchd
 
 # In a Pi session:
 /skill:scorch search for the latest Tokio cancellation documentation</code></pre>
   <p>The skill first verifies the local tools and API:</p>
   <pre><code>command -v scorch
 scorch --version
-curl -fsS "&#36;&#123;SCORCH_API_URL:-http://127.0.0.1:33000&#125;/ready"</code></pre>
+curl -fsS http://127.0.0.1:33000/ready</code></pre>
   <p>
     The agent should use the environment-managed binary rather than installing
     or upgrading Scorch during an unrelated task.
@@ -118,11 +119,6 @@ curl -fsS "&#36;&#123;SCORCH_API_URL:-http://127.0.0.1:33000&#125;/ready"</code>
             ><code>scorch crawl</code></td
           ></tr
         >
-        <tr
-          ><td>Compare fetch and browser latency</td><td
-            ><code>scorch benchmark</code></td
-          ></tr
-        >
         <tr><td>Connect an MCP host</td><td><code>scorch mcp</code></td></tr>
         <tr
           ><td>Complete forms or long-lived interactions</td><td
@@ -133,9 +129,9 @@ curl -fsS "&#36;&#123;SCORCH_API_URL:-http://127.0.0.1:33000&#125;/ready"</code>
     </table>
   </div>
   <p>
-    Search source engines and browser backends remain server policy. The skill
-    does not instruct agents to bypass rejected targets, backend allowlists, URL
-    controls, or capacity limits.
+    Search source engines and Obscura stealth remain server policy. The skill
+    does not instruct agents to bypass rejected targets, URL controls, or
+    capacity limits.
   </p>
 
   <h2 id="safety">Trust and lifecycle guidance</h2>

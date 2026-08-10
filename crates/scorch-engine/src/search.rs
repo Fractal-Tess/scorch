@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 use metasearch::{MetaSearch, MetaSearchConfig, MetaSearchOutput, SearchHit, SearchQuery};
 use scorch_types::{SearchRequest, SearchResponse, SearchResult};
@@ -12,6 +12,7 @@ use crate::{
 pub struct SearchService {
     metasearch: MetaSearch,
     limit: Arc<Semaphore>,
+    request_timeout: Duration,
 }
 
 impl SearchService {
@@ -27,16 +28,16 @@ impl SearchService {
         .map_err(search_error)?;
         Ok(Self {
             metasearch,
-            limit: Arc::new(Semaphore::new(config.max_concurrency.max(1))),
+            limit: Arc::new(Semaphore::new(config.max_concurrency)),
+            request_timeout: config.request_timeout,
         })
     }
 
     pub async fn search(&self, request: &SearchRequest) -> Result<SearchResponse> {
         validate(request)?;
-        let _permit = self
-            .limit
-            .acquire()
+        let _permit = tokio::time::timeout(self.request_timeout, self.limit.acquire())
             .await
+            .map_err(|_| EngineError::Timeout)?
             .map_err(|_| EngineError::Capacity("search runtime is shutting down".into()))?;
         let query = SearchQuery {
             query: request.query.trim().into(),
@@ -67,6 +68,20 @@ fn validate(request: &SearchRequest) -> Result<()> {
         return Err(EngineError::InvalidRequest(
             "search limit must be between 1 and 20".into(),
         ));
+    }
+    for (name, value) in [
+        ("country", request.country.as_str()),
+        ("language", request.language.as_str()),
+    ] {
+        if !(2..=16).contains(&value.len())
+            || !value
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-')
+        {
+            return Err(EngineError::InvalidRequest(format!(
+                "search {name} must be 2-16 ASCII letters, digits, or hyphens"
+            )));
+        }
     }
     Ok(())
 }
@@ -124,6 +139,18 @@ mod tests {
             limit: 5,
             scrape_options: None,
             country: "us".into(),
+            language: "en".into(),
+        };
+        assert!(validate(&request).is_err());
+    }
+
+    #[test]
+    fn rejects_invalid_locale_values() {
+        let request = SearchRequest {
+            query: "Rust".into(),
+            limit: 5,
+            scrape_options: None,
+            country: "us&unsafe=true".into(),
             language: "en".into(),
         };
         assert!(validate(&request).is_err());

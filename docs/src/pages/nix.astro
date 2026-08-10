@@ -24,18 +24,15 @@ const headings = [
     deployments. Nix downloads the matching GitHub Actions release archive and
     patches it for the Nix store; it does not compile Scorch locally.
   </p>
-  <pre><code>nix run github:Fractal-Tess/scorch/v0.1.3#scorch -- --help
-nix run github:Fractal-Tess/scorch/v0.1.3#scorchd -- --help</code></pre>
+  <pre><code>nix run github:Fractal-Tess/scorch/v0.3.0#scorch -- --help
+nix run github:Fractal-Tess/scorch/v0.3.0#scorchd -- --help</code></pre>
   <p>Install either package into a profile:</p>
-  <pre><code>nix profile install github:Fractal-Tess/scorch/v0.1.3#scorch
-nix profile install github:Fractal-Tess/scorch/v0.1.3#scorchd</code></pre>
-  <p>For a standalone daemon with Chromium already in its closure:</p>
-  <pre><code>nix run github:Fractal-Tess/scorch/v0.1.3#scorchd-with-chromium</code></pre>
+  <pre><code>nix profile install github:Fractal-Tess/scorch/v0.3.0#scorch
+nix profile install github:Fractal-Tess/scorch/v0.3.0#scorchd</code></pre>
   <div class="callout">
-    <strong>Linux support.</strong> The embedded V8 renderer is packaged for
-    <code>x86_64-linux</code> and <code>aarch64-linux</code>. Use the optional
-    <code>scorchd-with-chromium</code> package or configure an explicit browser path
-    when Chromium compatibility is required.
+    <strong>Linux support.</strong> The embedded Obscura V8 renderer is packaged for
+    <code>x86_64-linux</code> and <code>aarch64-linux</code>. No external
+    browser package or executable is required.
   </div>
 
   <h2 id="nixos">Enable both on NixOS</h2>
@@ -53,7 +50,7 @@ nix profile install github:Fractal-Tess/scorch/v0.1.3#scorchd</code></pre>
   <pre><code>&#123;
   inputs = &#123;
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    scorch.url = "github:Fractal-Tess/scorch/v0.1.3";
+    scorch.url = "github:Fractal-Tess/scorch/v0.3.0";
   &#125;;
 
   outputs = &#123; nixpkgs, scorch, ... &#125;: &#123;
@@ -62,10 +59,7 @@ nix profile install github:Fractal-Tess/scorch/v0.1.3#scorchd</code></pre>
       modules = [
         scorch.nixosModules.default
         (&#123; ... &#125;: &#123;
-          programs.scorch = &#123;
-            enable = true;
-            apiUrl = "http://127.0.0.1:33000";
-          &#125;;
+          programs.scorch.enable = true;
 
           services.scorchd = &#123;
             enable = true;
@@ -86,9 +80,6 @@ scorch search "rust web extraction" --limit 3</code></pre>
   <h2 id="service-policy">Configure service policy</h2>
   <pre><code>services.scorchd = &#123;
   enable = true;
-  browser = "obscura";
-  allowedBrowsers = [ "obscura" "chromium" ];
-  browserPath = pkgs.chromium + "/bin/chromium";
   obscuraStealth = true;
   maxConcurrency = 4;
   maxResponseBytes = 5 * 1024 * 1024;
@@ -131,21 +122,6 @@ scorch search "rust web extraction" --limit 3</code></pre>
           ></tr
         >
         <tr
-          ><td><code>browser</code></td><td><code>obscura</code></td><td
-            >Select the default renderer.</td
-          ></tr
-        >
-        <tr
-          ><td><code>allowedBrowsers</code></td><td
-            ><code>[ "obscura" ]</code></td
-          ><td>Set the request-level backend allowlist.</td></tr
-        >
-        <tr
-          ><td><code>browserPath</code></td><td><code>null</code></td><td
-            >Provide an executable path when Chromium is allowed.</td
-          ></tr
-        >
-        <tr
           ><td><code>environmentFile</code></td><td><code>null</code></td><td
             >Load credentials without putting them in the Nix store.</td
           ></tr
@@ -154,11 +130,10 @@ scorch search "rust web extraction" --limit 3</code></pre>
     </table>
   </div>
   <p>
-    The module asserts that the default browser belongs to the allowlist and
-    that browser and search-engine lists are non-empty. When Chromium is
-    allowed, <code>browserPath</code> must be set and NixOS user namespaces must remain
-    enabled for Chromium's sandbox; do not add <code>--no-sandbox</code>.
-    Authentication and TLS remain the responsibility of an external gateway.
+    The module asserts that the search-engine list is non-empty. Obscura is
+    embedded, so the service does not need a browser package, executable path,
+    or browser-selection policy. Authentication and TLS remain the
+    responsibility of an external gateway.
   </p>
 
   <h2 id="secrets">Load search credentials safely</h2>
@@ -198,10 +173,7 @@ SCORCH_BRAVE_SEARCH_API_KEY=replace-at-deploy-time</code></pre>
       home.username = "user";
       home.homeDirectory = "/home/user";
       home.stateVersion = "26.05";
-      programs.scorch = &#123;
-        enable = true;
-        apiUrl = "http://127.0.0.1:33000";
-      &#125;;
+      programs.scorch.enable = true;
     &#125;
   ];
 &#125;;</code></pre>
@@ -220,10 +192,6 @@ SCORCH_BRAVE_SEARCH_API_KEY=replace-at-deploy-time</code></pre>
           ><td><code>packages.&lt;system&gt;.scorchd</code></td><td
             >API service with the embedded Obscura renderer.</td
           ></tr
-        >
-        <tr
-          ><td><code>packages.&lt;system&gt;.scorchd-with-chromium</code></td
-          ><td>API service with a Nixpkgs Chromium path configured.</td></tr
         >
         <tr
           ><td><code>packages.&lt;system&gt;.skill</code></td><td
@@ -257,11 +225,11 @@ SCORCH_BRAVE_SEARCH_API_KEY=replace-at-deploy-time</code></pre>
         >
         <tr
           ><td><code>devShells.&lt;system&gt;.default</code></td><td
-            >Rust, Bun, Chromium, and development tools.</td
+            >Rust, Bun, and development tools.</td
           ></tr
         >
       </tbody>
     </table>
   </div>
-  <pre><code>nix flake show github:Fractal-Tess/scorch/v0.1.3</code></pre>
+  <pre><code>nix flake show github:Fractal-Tess/scorch/v0.3.0</code></pre>
 </DocLayout>

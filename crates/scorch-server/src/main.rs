@@ -1,10 +1,9 @@
-use std::{env, net::SocketAddr, path::PathBuf, time::Duration};
+use std::{env, net::SocketAddr, time::Duration};
 
 use clap::{Parser, ValueEnum};
 use metasearch::{EngineCredentials, EngineKind};
 use scorch_engine::{EngineConfig, ScorchEngine};
-use scorch_types::BrowserBackend;
-use tracing::info;
+use tracing::{info, warn};
 use tracing_subscriber::EnvFilter;
 
 #[derive(Parser)]
@@ -12,18 +11,6 @@ use tracing_subscriber::EnvFilter;
 struct ServerArgs {
     #[arg(long, env = "SCORCH_BIND", default_value = "127.0.0.1:33000")]
     bind: SocketAddr,
-    #[arg(long, value_enum, env = "SCORCH_BROWSER", default_value = "obscura")]
-    browser: BrowserArg,
-    #[arg(
-        long,
-        value_enum,
-        value_delimiter = ',',
-        env = "SCORCH_ALLOWED_BROWSERS",
-        default_value = "obscura"
-    )]
-    allowed_browsers: Vec<BrowserArg>,
-    #[arg(long, env = "SCORCH_BROWSER_PATH", default_value = "chromium")]
-    browser_path: PathBuf,
     #[arg(
         long,
         env = "SCORCH_OBSCURA_STEALTH",
@@ -61,16 +48,7 @@ impl ServerArgs {
                 search_engines.push(engine);
             }
         }
-        let mut allowed_browsers = Vec::new();
-        for browser in self.allowed_browsers.iter().copied().map(Into::into) {
-            if !allowed_browsers.contains(&browser) {
-                allowed_browsers.push(browser);
-            }
-        }
         EngineConfig {
-            browser: self.browser.into(),
-            allowed_browsers,
-            browser_path: self.browser_path.clone(),
             obscura_stealth: self.obscura_stealth,
             max_concurrency: self.max_concurrency.max(1),
             max_response_bytes: self.max_response_bytes.max(1024),
@@ -82,21 +60,6 @@ impl ServerArgs {
                 google_search_engine_id: self.google_search_engine_id.clone(),
             },
             ..Default::default()
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, ValueEnum)]
-enum BrowserArg {
-    Obscura,
-    Chromium,
-}
-
-impl From<BrowserArg> for BrowserBackend {
-    fn from(value: BrowserArg) -> Self {
-        match value {
-            BrowserArg::Obscura => Self::Obscura,
-            BrowserArg::Chromium => Self::Chromium,
         }
     }
 }
@@ -155,19 +118,45 @@ fn init_tracing() {
 
 async fn shutdown_signal() {
     let ctrl_c = async {
-        tokio::signal::ctrl_c()
-            .await
-            .expect("failed to install Ctrl+C handler")
+        if let Err(error) = tokio::signal::ctrl_c().await {
+            warn!(%error, "failed to receive Ctrl+C signal");
+        }
     };
     #[cfg(unix)]
     let terminate = async {
-        tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
-            .expect("failed to install SIGTERM handler")
-            .recv()
-            .await;
+        match tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()) {
+            Ok(mut signal) => {
+                signal.recv().await;
+            }
+            Err(error) => warn!(%error, "failed to install SIGTERM handler"),
+        }
     };
     #[cfg(not(unix))]
     let terminate = std::future::pending::<()>();
     tokio::select! { () = ctrl_c => {}, () = terminate => {} }
     info!("shutdown signal received");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn obscura_stealth_is_enabled_by_default() {
+        let args = ServerArgs::try_parse_from(["scorchd"]).unwrap();
+        assert!(args.engine_config().obscura_stealth);
+    }
+
+    #[test]
+    fn obscura_standard_transport_requires_an_explicit_override() {
+        let args = ServerArgs::try_parse_from(["scorchd", "--obscura-stealth", "false"]).unwrap();
+        assert!(!args.engine_config().obscura_stealth);
+    }
+
+    #[test]
+    fn removed_browser_flags_are_rejected() {
+        for flag in ["--browser", "--allowed-browsers", "--browser-path"] {
+            assert!(ServerArgs::try_parse_from(["scorchd", flag, "obscura"]).is_err());
+        }
+    }
 }

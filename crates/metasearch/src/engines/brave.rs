@@ -28,7 +28,7 @@ impl Brave {
         let client = Client::builder()
             .connect_timeout(Duration::from_secs(3))
             .timeout(Duration::from_secs(5))
-            .user_agent("Scorch/0.1")
+            .user_agent(concat!("Scorch/", env!("CARGO_PKG_VERSION")))
             .build()
             .map_err(|error| Error::Request {
                 engine: NAME,

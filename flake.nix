@@ -6,6 +6,7 @@
   outputs =
     { self, nixpkgs }:
     let
+      # Release CI publishes native GNU/Linux archives for these platforms.
       supportedSystems = [
         "x86_64-linux"
         "aarch64-linux"
@@ -15,6 +16,9 @@
         pkgs:
         let
           lib = pkgs.lib;
+
+          # Keep the release tag and fixed archive hashes together. Promotion CI
+          # updates these only after both immutable artifacts have been prepared.
           version = "0.1.3";
           releaseArtifacts = {
             x86_64-linux = {
@@ -31,6 +35,8 @@
             url = "https://github.com/Fractal-Tess/scorch/releases/download/v${version}/scorch-v${version}-${artifact.target}.tar.xz";
             inherit (artifact) hash;
           };
+          # Package release binaries directly: normal Nix installation must not
+          # compile Rust or the embedded Obscura runtime.
           mkBinaryPackage =
             {
               pname,
@@ -42,6 +48,8 @@
               src = releaseArchive;
               sourceRoot = "scorch-v${version}-${artifact.target}";
 
+              # CI targets generic glibc; autoPatchelf binds the downloaded
+              # executables to the host system's runtime libraries.
               nativeBuildInputs = [ pkgs.autoPatchelfHook ];
               buildInputs = [ pkgs.stdenv.cc.cc.lib ];
               strictDeps = true;
@@ -79,19 +87,7 @@
             binary = "scorchd";
             description = "Scorch HTTP API, metasearch, browser, and crawl service";
           };
-          scorchdWithChromium =
-            pkgs.runCommand "scorchd-with-chromium-${version}"
-              {
-                nativeBuildInputs = [ pkgs.makeWrapper ];
-                meta = scorchd.meta // {
-                  description = "Scorch service with Chromium compatibility available";
-                };
-              }
-              ''
-                mkdir -p "$out/bin"
-                makeWrapper ${scorchd}/bin/scorchd "$out/bin/scorchd" \
-                  --set-default SCORCH_BROWSER_PATH ${pkgs.chromium}/bin/chromium
-              '';
+          # Expose the repository skill as a small standalone Nix package.
           skill =
             pkgs.runCommand "scorch-agent-skill-${version}"
               {
@@ -106,7 +102,6 @@
           inherit scorch scorchd skill;
           scorch-unwrapped = scorch;
           scorchd-unwrapped = scorchd;
-          scorchd-with-chromium = scorchdWithChromium;
           default = scorch;
         };
     in
@@ -127,6 +122,7 @@
         };
       });
 
+      # Validate packages and module policy on every supported architecture.
       checks = forAllSystems (
         system:
         let
@@ -146,9 +142,13 @@
         in
         {
           inherit (packages) scorch scorchd skill;
+          # Evaluate the generated systemd command to catch module regressions
+          # without starting a daemon during flake evaluation.
           module =
-            assert nixpkgs.lib.hasInfix "--browser obscura"
+            assert nixpkgs.lib.hasInfix "--obscura-stealth true"
               moduleSystem.config.systemd.services.scorchd.serviceConfig.ExecStart;
+            assert
+              !(nixpkgs.lib.hasInfix "--browser" moduleSystem.config.systemd.services.scorchd.serviceConfig.ExecStart);
             assert nixpkgs.lib.hasInfix "--bind 127.0.0.1:33000"
               moduleSystem.config.systemd.services.scorchd.serviceConfig.ExecStart;
             pkgs.runCommand "scorch-module-check" { } ''
@@ -162,6 +162,8 @@
         }
       );
 
+      # `.envrc` enters this shell; it contains build tooling, not runtime
+      # dependencies or a source-built Scorch package.
       devShells = forAllSystems (
         system:
         let
@@ -173,7 +175,6 @@
             packages = with pkgs; [
               bun
               cargo
-              chromium
               clang
               clippy
               cmake
@@ -186,13 +187,14 @@
               rustfmt
             ];
             LIBCLANG_PATH = "${pkgs.llvmPackages.libclang.lib}/lib";
-            SCORCH_BROWSER_PATH = "${pkgs.chromium}/bin/chromium";
           };
         }
       );
 
       formatter = forAllSystems (system: nixpkgs.legacyPackages.${system}.nixfmt);
 
+      # Consumers can choose the overlay or the explicit NixOS/Home Manager
+      # modules without importing implementation files directly.
       overlays.default =
         final: _prev:
         let
@@ -201,7 +203,6 @@
         {
           scorch = packages.scorch;
           scorchd = packages.scorchd;
-          scorchd-with-chromium = packages.scorchd-with-chromium;
           scorch-agent-skill = packages.skill;
         };
       nixosModules.default = import ./nix/module.nix { inherit self; };

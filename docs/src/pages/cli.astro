@@ -6,7 +6,6 @@ const headings = [
   { label: "search", href: "#search" },
   { label: "map", href: "#map" },
   { label: "crawl", href: "#crawl" },
-  { label: "benchmark", href: "#benchmark" },
   { label: "mcp", href: "#mcp" },
   { label: "Output and errors", href: "#output-and-errors" },
 ];
@@ -14,7 +13,7 @@ const headings = [
 
 <DocLayout
   title="CLI reference"
-  description="Use the lightweight scorch executable to call a running API for search, extraction, discovery, crawling, benchmarking, and MCP."
+  description="Use the lightweight scorch executable to call a running API for search, extraction, discovery, crawling, and MCP."
   headings={headings}
   previous={{ label: "Configuration", href: "/configuration/" }}
   next={{ label: "HTTP API", href: "/api/" }}
@@ -78,12 +77,6 @@ const headings = [
           ></tr
         >
         <tr
-          ><td><code>--browser</code></td><td>service default</td><td
-            ><code>obscura</code> or <code>chromium</code>; must be allowed by
-            server policy.</td
-          ></tr
-        >
-        <tr
           ><td><code>--timeout-ms</code></td><td><code>30000</code></td><td
             >Total scrape deadline from 100 to 120,000 ms.</td
           ></tr
@@ -109,10 +102,9 @@ const headings = [
   <pre><code># Direct-first Markdown and links
 scorch scrape https://example.com --format markdown,links
 
-# Force JavaScript rendering with an allowed backend
+# Force JavaScript rendering with embedded Obscura
 scorch scrape https://example.com/app \
   --render always \
-  --browser obscura \
   --wait-for-ms 500
 
 # Return a full-page PNG data URI
@@ -226,23 +218,8 @@ scorch crawl https://example.com --limit 20 --wait</code></pre>
     found.
   </p>
 
-  <h2 id="benchmark">scorch benchmark</h2>
-  <pre><code>scorch benchmark [--runs N] &lt;URLS&gt;...</code></pre>
-  <p>
-    The benchmark command calls the configured API, not the engine directly. It
-    runs scrape requests using fetch, auto, and browser modes and prints
-    comparative JSON.
-  </p>
-  <pre><code>scorch benchmark --runs 5 \
-  https://example.com \
-  https://example.org</code></pre>
-  <p>
-    The default is three runs per input. Use optimized <code>scorchd</code> builds
-    when measurements need to represent production behavior.
-  </p>
-
   <h2 id="mcp">scorch mcp</h2>
-  <pre><code>SCORCH_API_URL=http://127.0.0.1:33000 scorch mcp</code></pre>
+  <pre><code>scorch mcp</code></pre>
   <p>
     Starts a Model Context Protocol server over stdio. It is designed to be
     launched by an MCP host rather than used interactively. Every tool call is

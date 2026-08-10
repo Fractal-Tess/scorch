@@ -1,4 +1,7 @@
+use std::time::Duration;
+
 use anyhow::{Context, bail};
+use futures_util::StreamExt;
 use reqwest::Method;
 use scorch_types::{
     CrawlJobSummary, CrawlPage, CrawlRequest, DeleteResponse, ErrorResponse, MapRequest,
@@ -6,6 +9,8 @@ use scorch_types::{
 };
 use serde::{Serialize, de::DeserializeOwned};
 use uuid::Uuid;
+
+const MAX_API_RESPONSE_BYTES: usize = 64 * 1024 * 1024;
 
 #[derive(Clone)]
 pub struct ApiClient {
@@ -16,10 +21,22 @@ pub struct ApiClient {
 impl ApiClient {
     pub fn new(base_url: &str) -> anyhow::Result<Self> {
         let base_url = base_url.trim_end_matches('/');
-        reqwest::Url::parse(base_url).context("invalid API URL")?;
+        let parsed = reqwest::Url::parse(base_url).context("invalid API URL")?;
+        if !matches!(parsed.scheme(), "http" | "https") || parsed.host_str().is_none() {
+            bail!("API URL must use HTTP or HTTPS and include a host");
+        }
+        if !parsed.username().is_empty() || parsed.password().is_some() {
+            bail!("credentials in the API URL are not supported");
+        }
+        if parsed.query().is_some() || parsed.fragment().is_some() {
+            bail!("API URL cannot contain a query or fragment");
+        }
         Ok(Self {
             base_url: base_url.into(),
-            client: reqwest::Client::builder().build()?,
+            client: reqwest::Client::builder()
+                .connect_timeout(Duration::from_secs(10))
+                .timeout(Duration::from_secs(135))
+                .build()?,
         })
     }
 
@@ -72,10 +89,7 @@ impl ApiClient {
         }
         let response = request.send().await.context("API request failed")?;
         let status = response.status();
-        let bytes = response
-            .bytes()
-            .await
-            .context("failed to read API response")?;
+        let bytes = read_limited(response).await?;
         if !status.is_success() {
             if let Ok(error) = serde_json::from_slice::<ErrorResponse>(&bytes) {
                 bail!("{}: {}", error.code, error.message);
@@ -86,5 +100,37 @@ impl ApiClient {
             );
         }
         serde_json::from_slice(&bytes).context("API returned invalid JSON")
+    }
+}
+
+async fn read_limited(response: reqwest::Response) -> anyhow::Result<Vec<u8>> {
+    if response
+        .content_length()
+        .is_some_and(|length| length > MAX_API_RESPONSE_BYTES as u64)
+    {
+        bail!("API response exceeds the {MAX_API_RESPONSE_BYTES} byte limit");
+    }
+    let mut stream = response.bytes_stream();
+    let mut bytes = Vec::new();
+    while let Some(chunk) = stream.next().await {
+        let chunk = chunk.context("failed to read API response")?;
+        if bytes.len().saturating_add(chunk.len()) > MAX_API_RESPONSE_BYTES {
+            bail!("API response exceeds the {MAX_API_RESPONSE_BYTES} byte limit");
+        }
+        bytes.extend_from_slice(&chunk);
+    }
+    Ok(bytes)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn validates_api_origin() {
+        assert!(ApiClient::new("http://127.0.0.1:33000").is_ok());
+        assert!(ApiClient::new("file:///tmp/scorch.sock").is_err());
+        assert!(ApiClient::new("https://user:secret@example.com").is_err());
+        assert!(ApiClient::new("https://example.com?token=secret").is_err());
     }
 }

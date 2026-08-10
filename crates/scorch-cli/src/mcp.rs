@@ -26,15 +26,25 @@ pub struct ScorchMcp {
 #[tool_router(router = tool_router)]
 impl ScorchMcp {
     pub fn new(client: ApiClient) -> Self {
+        let mut tool_router = Self::tool_router();
+        for route in tool_router.map.values_mut() {
+            strip_nonstandard_integer_formats(std::sync::Arc::make_mut(
+                &mut route.attr.input_schema,
+            ));
+            if let Some(schema) = &mut route.attr.output_schema {
+                strip_nonstandard_integer_formats(std::sync::Arc::make_mut(schema));
+            }
+        }
+
         Self {
             client,
-            tool_router: Self::tool_router(),
+            tool_router,
         }
     }
 
     #[tool(
         name = "scorch_search",
-        description = "Search the public web and optionally scrape each result"
+        description = "Search the public web; omit scrapeOptions for compact result metadata, or set it only when page content is required"
     )]
     async fn search(
         &self,
@@ -138,6 +148,47 @@ pub async fn run(client: ApiClient) -> anyhow::Result<()> {
     Ok(())
 }
 
+fn strip_nonstandard_integer_formats(schema: &mut serde_json::Map<String, serde_json::Value>) {
+    if schema
+        .get("format")
+        .and_then(serde_json::Value::as_str)
+        .is_some_and(|format| {
+            matches!(
+                format,
+                "int8"
+                    | "int16"
+                    | "int32"
+                    | "int64"
+                    | "int128"
+                    | "isize"
+                    | "uint"
+                    | "uint8"
+                    | "uint16"
+                    | "uint32"
+                    | "uint64"
+                    | "uint128"
+                    | "usize"
+            )
+        })
+    {
+        schema.remove("format");
+    }
+
+    for value in schema.values_mut() {
+        match value {
+            serde_json::Value::Object(object) => strip_nonstandard_integer_formats(object),
+            serde_json::Value::Array(values) => {
+                for value in values {
+                    if let serde_json::Value::Object(object) = value {
+                        strip_nonstandard_integer_formats(object);
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
 fn client_error(error: anyhow::Error) -> CallToolResult {
     tool_error(error.to_string())
 }
@@ -154,12 +205,8 @@ mod tests {
     fn exposes_expected_tools() {
         let client = ApiClient::new("http://127.0.0.1:33000").unwrap();
         let server = ScorchMcp::new(client);
-        let names: Vec<_> = server
-            .tool_router
-            .list_all()
-            .into_iter()
-            .map(|tool| tool.name.into_owned())
-            .collect();
+        let tools = server.tool_router.list_all();
+        let names: Vec<_> = tools.iter().map(|tool| tool.name.as_ref()).collect();
         assert_eq!(
             names,
             [
@@ -171,5 +218,19 @@ mod tests {
                 "scorch_search",
             ]
         );
+
+        for tool in tools {
+            let schema = serde_json::to_string(&tool).unwrap();
+            for format in [
+                "int8", "int16", "int32", "int64", "int128", "isize", "uint", "uint8", "uint16",
+                "uint32", "uint64", "uint128", "usize",
+            ] {
+                assert!(
+                    !schema.contains(&format!("\"format\":\"{format}\"")),
+                    "{} contains unsupported integer format {format}",
+                    tool.name
+                );
+            }
+        }
     }
 }

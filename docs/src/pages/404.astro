@@ -3,7 +3,11 @@ import CutButton from "../components/CutButton.astro";
 import BaseLayout from "../layouts/BaseLayout.astro";
 ---
 
-<BaseLayout title="Page not found">
+<BaseLayout
+  title="Page not found"
+  description="The requested Scorch documentation page does not exist."
+  noindex={true}
+>
   <section
     class="relative grid min-h-[70vh] place-items-center overflow-hidden px-5 py-20 text-center"
   >

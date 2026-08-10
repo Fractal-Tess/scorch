@@ -141,10 +141,7 @@ async fn readiness(State(state): State<AppState>) -> (StatusCode, Json<Readiness
             }
             .into(),
             browser_available,
-            browser: state.engine.config().browser,
-            allowed_browsers: state.engine.config().allowed_browsers.clone(),
-            browser_path: (state.engine.config().browser == scorch_types::BrowserBackend::Chromium)
-                .then(|| state.engine.config().browser_path.display().to_string()),
+            browser: "obscura".into(),
             obscura_stealth: state.engine.config().obscura_stealth,
             max_concurrency: state.engine.config().max_concurrency,
             search_provider: "metasearch".into(),
@@ -294,6 +291,29 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn readiness_reports_obscura_stealth_without_backend_policy() {
+        let engine = ScorchEngine::new(EngineConfig::default()).await.unwrap();
+        let response = router(engine)
+            .oneshot(
+                Request::builder()
+                    .uri("/ready")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let body: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(body["browser"], "obscura");
+        assert_eq!(body["obscuraStealth"], true);
+        assert!(body.get("allowedBrowsers").is_none());
+        assert!(body.get("browserPath").is_none());
+    }
+
+    #[tokio::test]
     async fn request_ids_are_propagated() {
         let engine = ScorchEngine::new(EngineConfig::default()).await.unwrap();
         let response = router(engine)
@@ -349,7 +369,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn forbidden_browser_selection_is_rejected() {
+    async fn removed_browser_selection_is_rejected() {
         let engine = ScorchEngine::new(EngineConfig::default()).await.unwrap();
         let response = router(engine)
             .oneshot(
@@ -358,7 +378,7 @@ mod tests {
                     .uri("/v1/scrape")
                     .header("content-type", "application/json")
                     .body(Body::from(
-                        r#"{"url":"https://example.com","options":{"render":"always","browser":"chromium"}}"#,
+                        r#"{"url":"https://example.com","options":{"render":"always","browser":"obscura"}}"#,
                     ))
                     .unwrap(),
             )

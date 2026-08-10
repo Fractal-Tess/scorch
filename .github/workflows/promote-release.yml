@@ -30,9 +30,17 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           RUN_ID: ${{ inputs.run_id }}
         run: |
-          conclusion="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${RUN_ID}" --jq .conclusion)"
-          if [[ "${conclusion}" != "success" ]]; then
-            echo "preparation run ${RUN_ID} did not succeed: ${conclusion}" >&2
+          run="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${RUN_ID}")"
+          conclusion="$(jq -r .conclusion <<<"${run}")"
+          event="$(jq -r .event <<<"${run}")"
+          workflow_id="$(jq -r .workflow_id <<<"${run}")"
+          workflow_path="$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/${workflow_id}" --jq .path)"
+          if [[ "${conclusion}" != "success" || "${event}" != "workflow_dispatch" ]]; then
+            echo "preparation run ${RUN_ID} is not a successful dispatch: ${conclusion}/${event}" >&2
+            exit 1
+          fi
+          if [[ "${workflow_path}" != ".github/workflows/release.yml" ]]; then
+            echo "run ${RUN_ID} used unexpected workflow ${workflow_path}" >&2
             exit 1
           fi
 
@@ -45,12 +53,35 @@ jobs:
           github-token: ${{ github.token }}
           run-id: ${{ inputs.run_id }}
 
-      - name: Verify archive checksums
+      - name: Download source manifest
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: scorch-v${{ inputs.version }}-manifest
+          path: manifest
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.run_id }}
+
+      - name: Verify source and archive checksums
+        env:
+          TARGET: ${{ inputs.target }}
+          VERSION: ${{ inputs.version }}
         run: |
+          sh -n manifest/install.sh
+          jq --exit-status \
+            --arg version "${VERSION}" \
+            --arg sourceSha "${TARGET}" \
+            '.version == $version and .sourceSha == $sourceSha and .rustVersion == "1.97.1"' \
+            manifest/release-manifest.json >/dev/null
+          expected=(
+            "scorch-v${VERSION}-aarch64-unknown-linux-gnu.tar.xz"
+            "scorch-v${VERSION}-x86_64-unknown-linux-gnu.tar.xz"
+          )
           test "$(find dist -maxdepth 1 -name '*.tar.xz' -type f | wc -l)" -eq 2
           test "$(find dist -maxdepth 1 -name '*.sha256' -type f | wc -l)" -eq 2
-          for checksum in dist/*.sha256; do
-            (cd dist && sha256sum --check --strict "$(basename "${checksum}")")
+          for archive in "${expected[@]}"; do
+            test -f "dist/${archive}"
+            test -f "dist/${archive}.sha256"
+            (cd dist && sha256sum --check --strict "${archive}.sha256")
           done
 
       - name: Create release and upload immutable assets
@@ -69,5 +100,10 @@ jobs:
             --target "${TARGET}" \
             --title "Scorch ${tag}" \
             --generate-notes \
+            --draft \
             dist/*.tar.xz \
-            dist/*.sha256
+            dist/*.sha256 \
+            manifest/install.sh
+          gh release edit "${tag}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --draft=false
