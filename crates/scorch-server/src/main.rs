@@ -24,6 +24,13 @@ struct ServerArgs {
     allowed_browsers: Vec<BrowserArg>,
     #[arg(long, env = "SCORCH_BROWSER_PATH", default_value = "chromium")]
     browser_path: PathBuf,
+    #[arg(
+        long,
+        env = "SCORCH_OBSCURA_STEALTH",
+        default_value_t = true,
+        action = clap::ArgAction::Set
+    )]
+    obscura_stealth: bool,
     #[arg(long, env = "SCORCH_MAX_CONCURRENCY", default_value_t = 4)]
     max_concurrency: usize,
     #[arg(long, env = "SCORCH_MAX_RESPONSE_BYTES", default_value_t = 5 * 1024 * 1024)]
@@ -64,6 +71,7 @@ impl ServerArgs {
             browser: self.browser.into(),
             allowed_browsers,
             browser_path: self.browser_path.clone(),
+            obscura_stealth: self.obscura_stealth,
             max_concurrency: self.max_concurrency.max(1),
             max_response_bytes: self.max_response_bytes.max(1024),
             job_ttl: Duration::from_secs(self.job_ttl_secs.max(1)),

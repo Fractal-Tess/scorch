@@ -293,6 +293,8 @@ def benchmark_backend(args, backend, port):
     env = os.environ.copy()
     env["RUST_LOG"] = args.rust_log
     env["RUST_BACKTRACE"] = "0"
+    if args.obscura_stealth is not None:
+        env["SCORCH_OBSCURA_STEALTH"] = args.obscura_stealth
     with tempfile.TemporaryFile(mode="w+") as logs:
         process = subprocess.Popen(command, stdout=logs, stderr=logs, env=env)
         monitor = ProcessTreeMonitor(process.pid)
@@ -375,6 +377,7 @@ def print_report(report):
     print("\nScorch browser backend benchmark")
     print(f"Host: {report['host']['cpu_count']} logical CPUs")
     print(f"URLs: {len(report['config']['urls'])}")
+    print(f"Obscura stealth: {report['config']['obscura_stealth']}")
     print(
         f"Parallel workload: {report['config']['parallel_rounds']} round(s), "
         f"concurrency {report['config']['concurrency']}"
@@ -438,6 +441,11 @@ def parse_args():
     parser.add_argument("--startup-timeout", type=float, default=10)
     parser.add_argument("--cooldown", type=float, default=0.5)
     parser.add_argument("--rust-log", default="warn")
+    parser.add_argument(
+        "--obscura-stealth",
+        choices=("true", "false"),
+        help="override SCORCH_OBSCURA_STEALTH for the benchmark server",
+    )
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
     if args.concurrency < 1:
@@ -465,6 +473,8 @@ def main():
             "sequential_rounds": args.sequential_rounds,
             "parallel_rounds": args.parallel_rounds,
             "timeout_seconds": args.timeout,
+            "obscura_stealth": args.obscura_stealth
+            or os.environ.get("SCORCH_OBSCURA_STEALTH", "true"),
             "memory_method": "summed Linux /proc PSS and RSS for the scorchd process tree",
         },
         "backends": [],

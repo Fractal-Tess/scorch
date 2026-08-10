@@ -368,6 +368,7 @@ pub struct ReadinessResponse {
     pub allowed_browsers: Vec<BrowserBackend>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub browser_path: Option<String>,
+    pub obscura_stealth: bool,
     pub max_concurrency: usize,
     pub search_provider: String,
     pub search_engines: Vec<String>,

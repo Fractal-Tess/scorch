@@ -1,7 +1,10 @@
 mod chromium;
 mod obscura;
 
-use std::{sync::Arc, time::Duration};
+use std::{
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
 use scorch_types::BrowserBackend;
 use tokio::{sync::Semaphore, time::timeout};
@@ -20,6 +23,7 @@ pub struct BrowserManager {
     semaphore: Arc<Semaphore>,
     chromium: ChromiumBackend,
     obscura: ObscuraBackend,
+    security: SecurityPolicy,
     _proxy: Arc<SafeProxy>,
 }
 
@@ -33,7 +37,7 @@ pub struct RenderedPage {
 impl BrowserManager {
     pub async fn new(config: EngineConfig, security: SecurityPolicy) -> Result<Self> {
         validate_policy(&config)?;
-        let proxy = Arc::new(SafeProxy::start(security).await.map_err(|error| {
+        let proxy = Arc::new(SafeProxy::start(security.clone()).await.map_err(|error| {
             EngineError::Browser(format!("failed to start safe proxy: {error}"))
         })?);
         let proxy_url = proxy.url().to_string();
@@ -42,6 +46,7 @@ impl BrowserManager {
             chromium: ChromiumBackend::new(config.clone(), proxy_url.clone()),
             obscura: ObscuraBackend::new(config.clone(), proxy_url),
             config,
+            security,
             _proxy: proxy,
         })
     }
@@ -85,17 +90,29 @@ impl BrowserManager {
         screenshot: bool,
         full_page: bool,
     ) -> Result<RenderedPage> {
-        let permit = timeout(request_timeout, Arc::clone(&self.semaphore).acquire_owned())
+        let started = Instant::now();
+        timeout(request_timeout, self.security.validate(url))
+            .await
+            .map_err(|_| EngineError::Timeout)??;
+        let remaining = request_timeout.saturating_sub(started.elapsed());
+        if remaining.is_zero() {
+            return Err(EngineError::Timeout);
+        }
+        let permit = timeout(remaining, Arc::clone(&self.semaphore).acquire_owned())
             .await
             .map_err(|_| EngineError::Timeout)?
             .map_err(|_| EngineError::Browser("browser semaphore closed".into()))?;
+        let remaining = request_timeout.saturating_sub(started.elapsed());
+        if remaining.is_zero() {
+            return Err(EngineError::Timeout);
+        }
         match browser {
             BrowserBackend::Obscura => {
                 self.obscura
                     .render(
                         permit,
                         url,
-                        request_timeout,
+                        remaining,
                         wait_for,
                         block_media,
                         screenshot,
@@ -106,14 +123,7 @@ impl BrowserManager {
             BrowserBackend::Chromium => {
                 let result = self
                     .chromium
-                    .render(
-                        url,
-                        request_timeout,
-                        wait_for,
-                        block_media,
-                        screenshot,
-                        full_page,
-                    )
+                    .render(url, remaining, wait_for, block_media, screenshot, full_page)
                     .await;
                 drop(permit);
                 result
@@ -159,6 +169,7 @@ mod tests {
         let config = EngineConfig::default();
         assert_eq!(config.browser, BrowserBackend::Obscura);
         assert_eq!(config.allowed_browsers, vec![BrowserBackend::Obscura]);
+        assert!(config.obscura_stealth);
         assert!(validate_policy(&config).is_ok());
     }
 }

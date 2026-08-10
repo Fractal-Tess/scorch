@@ -145,6 +145,7 @@ async fn readiness(State(state): State<AppState>) -> (StatusCode, Json<Readiness
             allowed_browsers: state.engine.config().allowed_browsers.clone(),
             browser_path: (state.engine.config().browser == scorch_types::BrowserBackend::Chromium)
                 .then(|| state.engine.config().browser_path.display().to_string()),
+            obscura_stealth: state.engine.config().obscura_stealth,
             max_concurrency: state.engine.config().max_concurrency,
             search_provider: "metasearch".into(),
             search_engines: state
@@ -358,6 +359,25 @@ mod tests {
                     .header("content-type", "application/json")
                     .body(Body::from(
                         r#"{"url":"https://example.com","options":{"render":"always","browser":"chromium"}}"#,
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn forced_browser_render_rejects_non_http_urls() {
+        let engine = ScorchEngine::new(EngineConfig::default()).await.unwrap();
+        let response = router(engine)
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/v1/scrape")
+                    .header("content-type", "application/json")
+                    .body(Body::from(
+                        r#"{"url":"file:///etc/passwd","options":{"render":"always"}}"#,
                     ))
                     .unwrap(),
             )

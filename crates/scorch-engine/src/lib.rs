@@ -57,6 +57,7 @@ impl ScorchEngine {
             browser = config.browser.as_str(),
             allowed_browsers,
             chromium_path = %config.browser_path.display(),
+            obscura_stealth = config.obscura_stealth,
             max_concurrency = config.max_concurrency,
             max_response_bytes = config.max_response_bytes,
             search_provider = "metasearch",
@@ -139,35 +140,39 @@ impl ScorchEngine {
         validate_scrape_request(request)?;
         let timeout = Duration::from_millis(request.options.timeout_ms.min(120_000));
         let wants_screenshot = request.options.formats.contains(&ScrapeFormat::Screenshot);
-        let selected_browser = (request.options.render == RenderMode::Always || wants_screenshot)
+        let forced_browser = (request.options.render == RenderMode::Always || wants_screenshot)
             .then(|| self.browser.resolve(request.options.browser))
             .transpose()?;
-
-        let fetched = self.fetcher.get(&request.url, timeout).await;
-        let should_render = match (&fetched, request.options.render) {
-            (_, RenderMode::Always) => true,
-            (_, _) if wants_screenshot => true,
-            (Ok(response), RenderMode::Auto) => needs_browser(response),
-            _ => false,
+        let render = |browser| {
+            self.browser.render(
+                browser,
+                &request.url,
+                timeout,
+                Duration::from_millis(request.options.wait_for_ms.min(60_000)),
+                request.options.block_media && !wants_screenshot,
+                wants_screenshot,
+                request.options.full_page_screenshot,
+            )
         };
 
+        let (fetched, forced_rendered) = if let Some(browser) = forced_browser {
+            let (fetched, rendered) =
+                tokio::join!(self.fetcher.get(&request.url, timeout), render(browser));
+            (fetched, Some((browser, rendered?)))
+        } else {
+            (self.fetcher.get(&request.url, timeout).await, None)
+        };
+        let should_render = forced_rendered.is_some()
+            || matches!((&fetched, request.options.render), (Ok(response), RenderMode::Auto) if needs_browser(response));
+
         if should_render {
-            let browser = match selected_browser {
-                Some(browser) => browser,
-                None => self.browser.resolve(request.options.browser)?,
+            let (browser, rendered) = match forced_rendered {
+                Some(rendered) => rendered,
+                None => {
+                    let browser = self.browser.resolve(request.options.browser)?;
+                    (browser, render(browser).await?)
+                }
             };
-            let rendered = self
-                .browser
-                .render(
-                    browser,
-                    &request.url,
-                    timeout,
-                    Duration::from_millis(request.options.wait_for_ms.min(60_000)),
-                    request.options.block_media && !wants_screenshot,
-                    wants_screenshot,
-                    request.options.full_page_screenshot,
-                )
-                .await?;
             let response = match fetched {
                 Ok(mut response) => {
                     response.final_url = rendered.final_url.clone();

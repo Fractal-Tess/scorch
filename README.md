@@ -54,6 +54,8 @@ SCORCH_BROWSER=chromium SCORCH_ALLOWED_BROWSERS=chromium scorchd
 
 A scrape request may select an allowed backend with `options.browser`; omitted selection uses `SCORCH_BROWSER`. The service rejects a request that selects a backend not listed in `SCORCH_ALLOWED_BROWSERS`.
 
+Obscura uses its stealth transport by default. For higher throughput where transport-level browser fingerprinting is not required, select the standard transport with `SCORCH_OBSCURA_STEALTH=false` or `scorchd --obscura-stealth false`.
+
 ### Metasearch engines
 
 Metasearch is Scorch's only search provider. It owns engine routing, concurrent searching, result merging, and reranking. Configure the engines it is allowed to use independently when starting the API:
