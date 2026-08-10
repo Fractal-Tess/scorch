@@ -19,6 +19,10 @@ bun run build
 
 The static output is written to `dist/`.
 
+## Documented API endpoint
+
+Examples use Scorch's default API endpoint, <http://127.0.0.1:33000>. The Astro development server and documentation container ports are separate from the Scorch API port.
+
 ## Docker
 
 The production image follows Astro's static NGINX deployment pattern, using Bun for the build stage and NGINX on port 8080 for serving.
