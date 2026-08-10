@@ -15,7 +15,7 @@
         pkgs:
         let
           lib = pkgs.lib;
-          version = "0.1.0";
+          version = "0.1.1";
           source = lib.fileset.toSource {
             root = ./.;
             fileset = lib.fileset.unions [
@@ -197,8 +197,8 @@
               touch "$out"
             '';
           version = pkgs.runCommand "scorch-version-check" { } ''
-            test "$(${packages.scorch}/bin/scorch --version)" = 'scorch 0.1.0'
-            test "$(${packages.scorchd}/bin/scorchd --version)" = 'scorchd 0.1.0'
+            test "$(${packages.scorch}/bin/scorch --version)" = 'scorch 0.1.1'
+            test "$(${packages.scorchd}/bin/scorchd --version)" = 'scorchd 0.1.1'
             touch "$out"
           '';
         }

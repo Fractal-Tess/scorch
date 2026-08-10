@@ -9,8 +9,8 @@ Scorch does not require a database, broker, cache server, browser service, or ex
 Run either executable directly from the flake:
 
 ```sh
-nix run github:Fractal-Tess/scorch/v0.1.0#scorch -- --help
-nix run github:Fractal-Tess/scorch/v0.1.0#scorchd -- --help
+nix run github:Fractal-Tess/scorch/v0.1.1#scorch -- --help
+nix run github:Fractal-Tess/scorch/v0.1.1#scorchd -- --help
 ```
 
 Or enable the client and service declaratively on NixOS:
@@ -18,7 +18,7 @@ Or enable the client and service declaratively on NixOS:
 ```nix
 {
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-  inputs.scorch.url = "github:Fractal-Tess/scorch/v0.1.0";
+  inputs.scorch.url = "github:Fractal-Tess/scorch/v0.1.1";
 
   outputs = { nixpkgs, scorch, ... }: {
     nixosConfigurations.host = nixpkgs.lib.nixosSystem {
@@ -45,7 +45,7 @@ The flake also exports an optional `scorchd-with-chromium` package, an overlay, 
 The repository includes a standard Agent Skill at `.agents/skills/scorch/SKILL.md`. It is discovered automatically while working in this repository. The flake packages it for installation into another agent environment:
 
 ```sh
-nix build github:Fractal-Tess/scorch/v0.1.0#skill
+nix build github:Fractal-Tess/scorch/v0.1.1#skill
 mkdir -p ~/.agents/skills
 rm -rf ~/.agents/skills/scorch
 cp -R result/share/agent-skills/scorch ~/.agents/skills/scorch

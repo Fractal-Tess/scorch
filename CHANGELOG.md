@@ -4,6 +4,13 @@ All notable changes to Scorch are documented in this file. The project follows [
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-08-10
+
+### Changed
+
+- Nix packages now install versioned, CI-built GitHub release binaries instead of compiling the Rust workspace locally.
+- Added reproducible Linux release archives for the `scorch` client and `scorchd` service on x86_64 and AArch64.
+
 ## [0.1.0] - 2026-08-10
 
 ### Added
@@ -27,5 +34,6 @@ All notable changes to Scorch are documented in this file. The project follows [
 - Embedded Obscura requests use fresh context, page, cookie, cache, and JavaScript state to prevent caller data leakage.
 - Render requests enforce one caller-visible deadline across validation, queueing, navigation, execution, serialization, and screenshots.
 
-[Unreleased]: https://github.com/Fractal-Tess/scorch/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/Fractal-Tess/scorch/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/Fractal-Tess/scorch/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/Fractal-Tess/scorch/releases/tag/v0.1.0
