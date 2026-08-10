@@ -30,4 +30,4 @@ docker build -t scorch-docs ./docs
 docker run --rm -p 8080:8080 scorch-docs
 ```
 
-Open <http://127.0.0.1:8080>. The container health check uses <http://127.0.0.1:8080/healthz>.
+Open <http://127.0.0.1:8080>. The container health check uses <http://127.0.0.1:8080/health>.

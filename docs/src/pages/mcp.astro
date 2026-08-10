@@ -52,7 +52,7 @@ const headings = [
   <h2 id="start-the-service">Start the service</h2>
   <pre><code>scorchd</code></pre>
   <p>Confirm that the API is ready before starting an MCP host:</p>
-  <pre><code>curl -fsS http://127.0.0.1:33000/readyz | jq</code></pre>
+  <pre><code>curl -fsS http://127.0.0.1:33000/ready | jq</code></pre>
   <p>
     The MCP adapter is not a service supervisor. Your process manager, shell, or
     container runtime should keep <code>scorchd</code> running separately.
@@ -211,7 +211,7 @@ const headings = [
   <h3>Tools fail with connection errors</h3>
   <p>Check the API separately:</p>
   <pre><code>SCORCH_API_URL=http://127.0.0.1:33000 scorch search "health check"
-curl -v http://127.0.0.1:33000/readyz</code></pre>
+curl -v http://127.0.0.1:33000/ready</code></pre>
   <p>
     If the MCP host is sandboxed or containerized, <code>127.0.0.1</code> refers to
     that sandbox or container, not necessarily the machine running <code
@@ -226,7 +226,7 @@ curl -v http://127.0.0.1:33000/readyz</code></pre>
   <h3>A browser choice is rejected</h3>
   <p>
     The MCP schema may allow both backend names, but the service allowlist is
-    authoritative. Inspect <code>/readyz</code> and update <code
+    authoritative. Inspect <code>/ready</code> and update <code
       >SCORCH_ALLOWED_BROWSERS</code
     > only if the deployment intends to permit that backend.
   </p>

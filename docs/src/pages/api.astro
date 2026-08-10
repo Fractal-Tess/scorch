@@ -26,7 +26,7 @@ const headings = [
       >content-type: application/json</code
     >.
   </p>
-  <pre><code>curl -sS http://127.0.0.1:33000/healthz</code></pre>
+  <pre><code>curl -sS http://127.0.0.1:33000/health</code></pre>
   <p>
     Request objects reject unknown fields. Every response includes an <code
       >x-request-id</code
@@ -39,10 +39,10 @@ const headings = [
   </div>
 
   <h2 id="health">Health and readiness</h2>
-  <h3><span class="text-accent font-mono">GET</span> /healthz</h3>
+  <h3><span class="text-accent font-mono">GET</span> /health</h3>
   <p>Process liveness. A healthy process returns HTTP 200:</p>
   <pre><code>&#123; "status": "ok" &#125;</code></pre>
-  <h3><span class="text-accent font-mono">GET</span> /readyz</h3>
+  <h3><span class="text-accent font-mono">GET</span> /ready</h3>
   <p>
     Reports runtime policy and browser availability. It returns HTTP 200 when
     the configured browser is available, or 503 when unavailable.

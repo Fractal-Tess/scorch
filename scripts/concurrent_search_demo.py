@@ -105,7 +105,7 @@ def truncate(text, width):
 
 
 def check_health(api_url, timeout):
-    request = urllib.request.Request(f"{api_url.rstrip('/')}/healthz")
+    request = urllib.request.Request(f"{api_url.rstrip('/')}/health")
     with urllib.request.urlopen(request, timeout=timeout) as response:
         payload = json.load(response)
     if payload.get("status") != "ok":

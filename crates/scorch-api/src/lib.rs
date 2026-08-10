@@ -35,8 +35,8 @@ struct AppState {
 
 pub fn router(engine: Arc<ScorchEngine>) -> Router {
     Router::new()
-        .route("/healthz", get(health))
-        .route("/readyz", get(readiness))
+        .route("/health", get(health))
+        .route("/ready", get(readiness))
         .route("/v1/scrape", post(scrape))
         .route("/v1/search", post(search))
         .route("/v1/map", post(map))
@@ -284,7 +284,7 @@ mod tests {
         let response = router(engine)
             .oneshot(
                 Request::builder()
-                    .uri("/healthz")
+                    .uri("/health")
                     .body(Body::empty())
                     .unwrap(),
             )
@@ -299,7 +299,7 @@ mod tests {
         let response = router(engine)
             .oneshot(
                 Request::builder()
-                    .uri("/healthz")
+                    .uri("/health")
                     .header(&REQUEST_ID_HEADER, "known-request-id")
                     .body(Body::empty())
                     .unwrap(),

@@ -51,8 +51,8 @@ const headings = [
   <h2 id="install">Install</h2>
   <h3 id="nix-flake">Option A: Nix flake</h3>
   <p>Run either released executable without cloning the repository:</p>
-  <pre><code>nix run github:Fractal-Tess/scorch/v0.1.2#scorch -- --help
-nix run github:Fractal-Tess/scorch/v0.1.2#scorchd -- --help</code></pre>
+  <pre><code>nix run github:Fractal-Tess/scorch/v0.1.3#scorch -- --help
+nix run github:Fractal-Tess/scorch/v0.1.3#scorchd -- --help</code></pre>
   <p>
     For a declarative NixOS service and client installation, continue to the <a
       href="/nix/">Nix installation guide</a
@@ -102,10 +102,10 @@ install -Dm755 target/release/scorch ~/.local/bin/scorch</code></pre>
     At startup the service prints operational logs to stderr. Verify liveness
     and readiness from another terminal:
   </p>
-  <pre><code>curl -sS http://127.0.0.1:33000/healthz
-curl -sS http://127.0.0.1:33000/readyz | jq</code></pre>
+  <pre><code>curl -sS http://127.0.0.1:33000/health
+curl -sS http://127.0.0.1:33000/ready | jq</code></pre>
   <p>
-    <code>/readyz</code> reports the default and allowed browser backends, Obscura
+    <code>/ready</code> reports the default and allowed browser backends, Obscura
     stealth setting, global concurrency, search provider, and enabled search engines.
   </p>
   <div class="callout">

@@ -4,6 +4,12 @@ All notable changes to Scorch are documented in this file. The project follows [
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-08-10
+
+### Changed
+
+- Renamed the operational probe endpoints from `/healthz` and `/readyz` to `/health` and `/ready`.
+
 ## [0.1.2] - 2026-08-10
 
 ### Changed
@@ -40,7 +46,8 @@ All notable changes to Scorch are documented in this file. The project follows [
 - Embedded Obscura requests use fresh context, page, cookie, cache, and JavaScript state to prevent caller data leakage.
 - Render requests enforce one caller-visible deadline across validation, queueing, navigation, execution, serialization, and screenshots.
 
-[Unreleased]: https://github.com/Fractal-Tess/scorch/compare/v0.1.2...HEAD
+[Unreleased]: https://github.com/Fractal-Tess/scorch/compare/v0.1.3...HEAD
+[0.1.3]: https://github.com/Fractal-Tess/scorch/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/Fractal-Tess/scorch/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/Fractal-Tess/scorch/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/Fractal-Tess/scorch/releases/tag/v0.1.0

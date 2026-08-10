@@ -9,8 +9,8 @@ Scorch does not require a database, broker, cache server, browser service, or ex
 Run either executable directly from the flake. Versioned Linux binaries are built by GitHub Actions and fetched by Nix, so installation does not compile the Rust workspace locally:
 
 ```sh
-nix run github:Fractal-Tess/scorch/v0.1.2#scorch -- --help
-nix run github:Fractal-Tess/scorch/v0.1.2#scorchd -- --help
+nix run github:Fractal-Tess/scorch/v0.1.3#scorch -- --help
+nix run github:Fractal-Tess/scorch/v0.1.3#scorchd -- --help
 ```
 
 Or enable the client and service declaratively on NixOS:
@@ -18,7 +18,7 @@ Or enable the client and service declaratively on NixOS:
 ```nix
 {
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-  inputs.scorch.url = "github:Fractal-Tess/scorch/v0.1.2";
+  inputs.scorch.url = "github:Fractal-Tess/scorch/v0.1.3";
 
   outputs = { nixpkgs, scorch, ... }: {
     nixosConfigurations.host = nixpkgs.lib.nixosSystem {
@@ -45,7 +45,7 @@ The flake also exports an optional `scorchd-with-chromium` package, an overlay, 
 The repository includes a standard Agent Skill at `.agents/skills/scorch/SKILL.md`. It is discovered automatically while working in this repository. The flake packages it for installation into another agent environment:
 
 ```sh
-nix build github:Fractal-Tess/scorch/v0.1.2#skill
+nix build github:Fractal-Tess/scorch/v0.1.3#skill
 mkdir -p ~/.agents/skills
 rm -rf ~/.agents/skills/scorch
 cp -R result/share/agent-skills/scorch ~/.agents/skills/scorch
@@ -147,8 +147,8 @@ curl -sS http://127.0.0.1:33000/v1/scrape \
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| `GET` | `/healthz` | Process liveness |
-| `GET` | `/readyz` | Browser readiness and concurrency |
+| `GET` | `/health` | Process liveness |
+| `GET` | `/ready` | Browser readiness and concurrency |
 | `POST` | `/v1/scrape` | Fetch or render one page |
 | `POST` | `/v1/search` | Search, optionally scraping results |
 | `POST` | `/v1/map` | Discover normalized same-site URLs |

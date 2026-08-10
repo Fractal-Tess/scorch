@@ -175,7 +175,7 @@ def wait_until_ready(api_url, process, timeout):
         if process.poll() is not None:
             raise RuntimeError(f"scorchd exited with status {process.returncode}")
         try:
-            response = request_json(f"{api_url}/readyz", timeout=1)
+            response = request_json(f"{api_url}/ready", timeout=1)
             if response.get("status") == "ready":
                 return
         except Exception as error:  # Startup connection failures vary by platform.

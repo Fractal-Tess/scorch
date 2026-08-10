@@ -24,13 +24,13 @@ const headings = [
     deployments. Nix downloads the matching GitHub Actions release archive and
     patches it for the Nix store; it does not compile Scorch locally.
   </p>
-  <pre><code>nix run github:Fractal-Tess/scorch/v0.1.2#scorch -- --help
-nix run github:Fractal-Tess/scorch/v0.1.2#scorchd -- --help</code></pre>
+  <pre><code>nix run github:Fractal-Tess/scorch/v0.1.3#scorch -- --help
+nix run github:Fractal-Tess/scorch/v0.1.3#scorchd -- --help</code></pre>
   <p>Install either package into a profile:</p>
-  <pre><code>nix profile install github:Fractal-Tess/scorch/v0.1.2#scorch
-nix profile install github:Fractal-Tess/scorch/v0.1.2#scorchd</code></pre>
+  <pre><code>nix profile install github:Fractal-Tess/scorch/v0.1.3#scorch
+nix profile install github:Fractal-Tess/scorch/v0.1.3#scorchd</code></pre>
   <p>For a standalone daemon with Chromium already in its closure:</p>
-  <pre><code>nix run github:Fractal-Tess/scorch/v0.1.2#scorchd-with-chromium</code></pre>
+  <pre><code>nix run github:Fractal-Tess/scorch/v0.1.3#scorchd-with-chromium</code></pre>
   <div class="callout">
     <strong>Linux support.</strong> The embedded V8 renderer is packaged for
     <code>x86_64-linux</code> and <code>aarch64-linux</code>. Use the optional
@@ -47,7 +47,7 @@ nix profile install github:Fractal-Tess/scorch/v0.1.2#scorchd</code></pre>
   <pre><code>&#123;
   inputs = &#123;
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    scorch.url = "github:Fractal-Tess/scorch/v0.1.2";
+    scorch.url = "github:Fractal-Tess/scorch/v0.1.3";
   &#125;;
 
   outputs = &#123; nixpkgs, scorch, ... &#125;: &#123;
@@ -74,7 +74,7 @@ nix profile install github:Fractal-Tess/scorch/v0.1.2#scorchd</code></pre>
   <p>Apply the host configuration and inspect the service:</p>
   <pre><code>sudo nixos-rebuild switch --flake .#host
 systemctl status scorchd
-curl -fsS http://127.0.0.1:33000/readyz | jq
+curl -fsS http://127.0.0.1:33000/ready | jq
 scorch search "rust web extraction" --limit 3</code></pre>
 
   <h2 id="service-policy">Configure service policy</h2>
@@ -257,5 +257,5 @@ SCORCH_BRAVE_SEARCH_API_KEY=replace-at-deploy-time</code></pre>
       </tbody>
     </table>
   </div>
-  <pre><code>nix flake show github:Fractal-Tess/scorch/v0.1.2</code></pre>
+  <pre><code>nix flake show github:Fractal-Tess/scorch/v0.1.3</code></pre>
 </DocLayout>
