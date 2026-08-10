@@ -15,7 +15,7 @@ scorch-server  <- `scorchd`: service configuration and lifecycle
 scorch-cli     <- `scorch`: lightweight HTTP client, API benchmark, API-backed MCP adapter
 ```
 
-`scorch` does not link `scorch-engine`, `scorch-api`, Chromium, or metasearch. Every operation it exposes crosses the HTTP API boundary. Only `scorchd` owns runtime and engine configuration.
+`scorch` does not link `scorch-engine`, `scorch-api`, Obscura, Chromium, or metasearch. Every operation it exposes crosses the HTTP API boundary. Only `scorchd` owns runtime and engine configuration.
 
 ## Runtime
 
@@ -23,8 +23,9 @@ scorch-cli     <- `scorch`: lightweight HTTP client, API benchmark, API-backed M
 
 - one Axum server;
 - one globally bounded direct-fetch runtime;
-- one lazy Chromium process and bounded page semaphore;
-- one embedded HTTP/CONNECT safety proxy;
+- an in-process Obscura renderer with bounded isolated work;
+- an optional lazy Chromium compatibility backend;
+- one embedded HTTP/CONNECT safety proxy shared by both backends;
 - up to four active crawl tasks;
 - an in-memory crawl registry with TTL and retained-byte limits.
 
@@ -35,8 +36,8 @@ There is no durable state. Restarting the process removes every crawl job.
 1. Parse and validate strict request options.
 2. Validate URL, DNS answers, port, and redirect policy.
 3. Fetch with manual redirects and DNS-pinned sockets.
-4. Select fetch output or Chromium based on requested capabilities and content heuristics.
-5. Route browser traffic through the embedded validating proxy.
+4. Select fetch output or an allowed browser backend based on requested capabilities and content heuristics.
+5. Route Obscura or Chromium traffic through the embedded validating proxy.
 6. Extract readable content, metadata, links, text, and Markdown.
 7. Return only requested large formats.
 
@@ -58,4 +59,4 @@ The metasearch runtime has per-engine concurrency limits, a bounded 60-second in
 
 ## Trust boundary
 
-Fetched pages, search results, browser output, sitemaps, and robots files are untrusted data. They never control process configuration or command execution. Direct and browser network paths share one URL/address policy. The browser cannot connect directly: QUIC and non-proxied WebRTC are disabled and Chromium receives an explicit proxy with loopback bypass removed.
+Fetched pages, search results, browser output, sitemaps, and robots files are untrusted data. They never control process configuration or command execution. Direct and browser network paths share one URL/address policy. Obscura receives only the embedded proxy endpoint and keeps its own private-address guard enabled. Optional Chromium receives an explicit proxy with loopback bypass removed while QUIC and non-proxied WebRTC are disabled.

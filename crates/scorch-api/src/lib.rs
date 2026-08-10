@@ -141,7 +141,10 @@ async fn readiness(State(state): State<AppState>) -> (StatusCode, Json<Readiness
             }
             .into(),
             browser_available,
-            browser_path: state.engine.config().browser_path.display().to_string(),
+            browser: state.engine.config().browser,
+            allowed_browsers: state.engine.config().allowed_browsers.clone(),
+            browser_path: (state.engine.config().browser == scorch_types::BrowserBackend::Chromium)
+                .then(|| state.engine.config().browser_path.display().to_string()),
             max_concurrency: state.engine.config().max_concurrency,
             search_provider: "metasearch".into(),
             search_engines: state
@@ -336,6 +339,25 @@ mod tests {
                     .header("content-type", "application/json")
                     .body(Body::from(
                         r#"{"url":"https://example.com","unexpected":true}"#,
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn forbidden_browser_selection_is_rejected() {
+        let engine = ScorchEngine::new(EngineConfig::default()).await.unwrap();
+        let response = router(engine)
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/v1/scrape")
+                    .header("content-type", "application/json")
+                    .body(Body::from(
+                        r#"{"url":"https://example.com","options":{"render":"always","browser":"chromium"}}"#,
                     ))
                     .unwrap(),
             )

@@ -18,6 +18,7 @@ Every response includes an `x-request-id` header.
   "options": {
     "formats": ["markdown", "html", "text", "links", "metadata", "screenshot"],
     "render": "auto",
+    "browser": "obscura",
     "timeoutMs": 30000,
     "waitForMs": 0,
     "onlyMainContent": true,
@@ -28,9 +29,11 @@ Every response includes an `x-request-id` header.
 ```
 
 - `render`: `auto`, `always`, or `never`.
+- `browser`: optional `obscura` or `chromium`; omission uses the service default. The selected backend must be allowed by `SCORCH_ALLOWED_BROWSERS`.
 - Default format: `markdown`.
 - `auto` uses direct fetch unless the page appears JavaScript-dependent or a screenshot is requested.
 - Screenshots are PNG data URIs.
+- Response `engine` is `fetch`, `obscura`, or `chromium`.
 - Timeout range: 100–120,000 ms. Explicit post-load wait is capped at 60,000 ms.
 - One remote response is capped at 5 MiB by default.
 

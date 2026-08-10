@@ -1,9 +1,12 @@
 use std::{path::PathBuf, time::Duration};
 
 use metasearch::{EngineCredentials, EngineKind};
+use scorch_types::BrowserBackend;
 
 #[derive(Debug, Clone)]
 pub struct EngineConfig {
+    pub browser: BrowserBackend,
+    pub allowed_browsers: Vec<BrowserBackend>,
     pub browser_path: PathBuf,
     pub max_concurrency: usize,
     pub max_response_bytes: usize,
@@ -23,6 +26,8 @@ pub struct EngineConfig {
 impl Default for EngineConfig {
     fn default() -> Self {
         Self {
+            browser: BrowserBackend::Obscura,
+            allowed_browsers: vec![BrowserBackend::Obscura],
             browser_path: "chromium".into(),
             max_concurrency: 4,
             max_response_bytes: 5 * 1024 * 1024,

@@ -3,8 +3,11 @@
 {
   packages = with pkgs; [
     chromium
+    clang
+    cmake
     git
     jujutsu
+    llvmPackages.libclang
     pkg-config
   ];
 
@@ -22,6 +25,7 @@
   };
 
   env = {
+    LIBCLANG_PATH = "${pkgs.llvmPackages.libclang.lib}/lib";
     RUST_BACKTRACE = "1";
     SCORCH_BROWSER_PATH = "${pkgs.chromium}/bin/chromium";
   };

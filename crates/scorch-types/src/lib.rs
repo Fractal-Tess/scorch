@@ -33,11 +33,32 @@ pub enum RenderMode {
     Never,
 }
 
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub enum BrowserBackend {
+    #[default]
+    Obscura,
+    Chromium,
+}
+
+impl BrowserBackend {
+    pub const ALL: [Self; 2] = [Self::Obscura, Self::Chromium];
+
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Obscura => "obscura",
+            Self::Chromium => "chromium",
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase", default, deny_unknown_fields)]
 pub struct ScrapeOptions {
     pub formats: Vec<ScrapeFormat>,
     pub render: RenderMode,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub browser: Option<BrowserBackend>,
     pub timeout_ms: u64,
     pub wait_for_ms: u64,
     pub only_main_content: bool,
@@ -50,6 +71,7 @@ impl Default for ScrapeOptions {
         Self {
             formats: vec![ScrapeFormat::Markdown],
             render: RenderMode::Auto,
+            browser: None,
             timeout_ms: 30_000,
             wait_for_ms: 0,
             only_main_content: true,
@@ -71,7 +93,17 @@ pub struct ScrapeRequest {
 #[serde(rename_all = "camelCase")]
 pub enum ScrapeEngine {
     Fetch,
-    Browser,
+    Obscura,
+    Chromium,
+}
+
+impl From<BrowserBackend> for ScrapeEngine {
+    fn from(value: BrowserBackend) -> Self {
+        match value {
+            BrowserBackend::Obscura => Self::Obscura,
+            BrowserBackend::Chromium => Self::Chromium,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
@@ -332,7 +364,10 @@ pub struct DeleteResponse {
 pub struct ReadinessResponse {
     pub status: String,
     pub browser_available: bool,
-    pub browser_path: String,
+    pub browser: BrowserBackend,
+    pub allowed_browsers: Vec<BrowserBackend>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub browser_path: Option<String>,
     pub max_concurrency: usize,
     pub search_provider: String,
     pub search_engines: Vec<String>,

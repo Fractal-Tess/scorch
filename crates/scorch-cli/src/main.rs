@@ -6,8 +6,8 @@ use std::time::{Duration, Instant};
 use clap::{Args, Parser, Subcommand, ValueEnum};
 use client::ApiClient;
 use scorch_types::{
-    CrawlRequest, CrawlStatus, MapRequest, RenderMode, ScrapeFormat, ScrapeOptions, ScrapeRequest,
-    SearchRequest,
+    BrowserBackend, CrawlRequest, CrawlStatus, MapRequest, RenderMode, ScrapeFormat, ScrapeOptions,
+    ScrapeRequest, SearchRequest,
 };
 use uuid::Uuid;
 
@@ -78,6 +78,21 @@ impl From<RenderArg> for RenderMode {
     }
 }
 
+#[derive(Debug, Clone, Copy, ValueEnum)]
+enum BrowserArg {
+    Obscura,
+    Chromium,
+}
+
+impl From<BrowserArg> for BrowserBackend {
+    fn from(value: BrowserArg) -> Self {
+        match value {
+            BrowserArg::Obscura => Self::Obscura,
+            BrowserArg::Chromium => Self::Chromium,
+        }
+    }
+}
+
 #[derive(Args)]
 struct ScrapeArgs {
     url: String,
@@ -85,6 +100,8 @@ struct ScrapeArgs {
     format: Vec<FormatArg>,
     #[arg(long, value_enum, default_value = "auto")]
     render: RenderArg,
+    #[arg(long, value_enum)]
+    browser: Option<BrowserArg>,
     #[arg(long, default_value_t = 30_000)]
     timeout_ms: u64,
     #[arg(long, default_value_t = 0)]
@@ -102,6 +119,7 @@ impl ScrapeArgs {
             options: ScrapeOptions {
                 formats: self.format.iter().copied().map(Into::into).collect(),
                 render: self.render.into(),
+                browser: self.browser.map(Into::into),
                 timeout_ms: self.timeout_ms,
                 wait_for_ms: self.wait_for_ms,
                 only_main_content: !self.full_content,

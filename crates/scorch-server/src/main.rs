@@ -3,6 +3,7 @@ use std::{env, net::SocketAddr, path::PathBuf, time::Duration};
 use clap::{Parser, ValueEnum};
 use metasearch::{EngineCredentials, EngineKind};
 use scorch_engine::{EngineConfig, ScorchEngine};
+use scorch_types::BrowserBackend;
 use tracing::info;
 use tracing_subscriber::EnvFilter;
 
@@ -11,6 +12,16 @@ use tracing_subscriber::EnvFilter;
 struct ServerArgs {
     #[arg(long, env = "SCORCH_BIND", default_value = "127.0.0.1:3000")]
     bind: SocketAddr,
+    #[arg(long, value_enum, env = "SCORCH_BROWSER", default_value = "obscura")]
+    browser: BrowserArg,
+    #[arg(
+        long,
+        value_enum,
+        value_delimiter = ',',
+        env = "SCORCH_ALLOWED_BROWSERS",
+        default_value = "obscura"
+    )]
+    allowed_browsers: Vec<BrowserArg>,
     #[arg(long, env = "SCORCH_BROWSER_PATH", default_value = "chromium")]
     browser_path: PathBuf,
     #[arg(long, env = "SCORCH_MAX_CONCURRENCY", default_value_t = 4)]
@@ -43,7 +54,15 @@ impl ServerArgs {
                 search_engines.push(engine);
             }
         }
+        let mut allowed_browsers = Vec::new();
+        for browser in self.allowed_browsers.iter().copied().map(Into::into) {
+            if !allowed_browsers.contains(&browser) {
+                allowed_browsers.push(browser);
+            }
+        }
         EngineConfig {
+            browser: self.browser.into(),
+            allowed_browsers,
             browser_path: self.browser_path.clone(),
             max_concurrency: self.max_concurrency.max(1),
             max_response_bytes: self.max_response_bytes.max(1024),
@@ -55,6 +74,21 @@ impl ServerArgs {
                 google_search_engine_id: self.google_search_engine_id.clone(),
             },
             ..Default::default()
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, ValueEnum)]
+enum BrowserArg {
+    Obscura,
+    Chromium,
+}
+
+impl From<BrowserArg> for BrowserBackend {
+    fn from(value: BrowserArg) -> Self {
+        match value {
+            BrowserArg::Obscura => Self::Obscura,
+            BrowserArg::Chromium => Self::Chromium,
         }
     }
 }

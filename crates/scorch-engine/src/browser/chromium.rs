@@ -1,4 +1,4 @@
-use std::{env, ops::Deref, path::Path, sync::Arc, time::Duration};
+use std::{env, ops::Deref, path::Path, time::Duration};
 
 use base64::{Engine as _, engine::general_purpose::STANDARD};
 use chromiumoxide::{
@@ -8,17 +8,16 @@ use chromiumoxide::{
 };
 use futures_util::StreamExt;
 use tokio::{
-    sync::{Mutex, Semaphore},
+    sync::Mutex,
     task::JoinHandle,
     time::{sleep, timeout},
 };
 use tracing::{error, info, warn};
 
 use crate::{
+    browser::RenderedPage,
     config::EngineConfig,
     error::{EngineError, Result},
-    proxy::SafeProxy,
-    security::SecurityPolicy,
 };
 
 struct BrowserRuntime {
@@ -27,31 +26,19 @@ struct BrowserRuntime {
     _profile: tempfile::TempDir,
 }
 
-pub struct BrowserManager {
+pub(super) struct ChromiumBackend {
     config: EngineConfig,
     runtime: Mutex<Option<BrowserRuntime>>,
-    semaphore: Arc<Semaphore>,
-    proxy: Arc<SafeProxy>,
+    proxy_url: String,
 }
 
-#[derive(Debug)]
-pub struct RenderedPage {
-    pub html: String,
-    pub final_url: String,
-    pub screenshot: Option<String>,
-}
-
-impl BrowserManager {
-    pub async fn new(config: EngineConfig, security: SecurityPolicy) -> Result<Self> {
-        let proxy = SafeProxy::start(security).await.map_err(|error| {
-            EngineError::Browser(format!("failed to start safe proxy: {error}"))
-        })?;
-        Ok(Self {
-            semaphore: Arc::new(Semaphore::new(config.max_concurrency)),
+impl ChromiumBackend {
+    pub fn new(config: EngineConfig, proxy_url: String) -> Self {
+        Self {
             config,
             runtime: Mutex::new(None),
-            proxy: Arc::new(proxy),
-        })
+            proxy_url,
+        }
     }
 
     pub fn available(&self) -> bool {
@@ -67,10 +54,6 @@ impl BrowserManager {
         screenshot: bool,
         full_page: bool,
     ) -> Result<RenderedPage> {
-        let _permit = timeout(request_timeout, self.semaphore.acquire())
-            .await
-            .map_err(|_| EngineError::Timeout)?
-            .map_err(|_| EngineError::Browser("browser semaphore closed".into()))?;
         let page = PageGuard::new(self.new_page().await?);
 
         if block_media {
@@ -163,7 +146,7 @@ impl BrowserManager {
             })?;
         info!(
             browser_path = %browser_path.display(),
-            proxy = %self.proxy.url(),
+            proxy = %self.proxy_url,
             "launching Chromium"
         );
         let config = BrowserConfig::builder()
@@ -189,7 +172,7 @@ impl BrowserManager {
                 "--no-default-browser-check".to_owned(),
                 "--no-first-run".to_owned(),
                 "--proxy-bypass-list=<-loopback>".to_owned(),
-                format!("--proxy-server={}", self.proxy.url()),
+                format!("--proxy-server={}", self.proxy_url),
             ])
             .build()
             .map_err(EngineError::Browser)?;

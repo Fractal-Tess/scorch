@@ -1,6 +1,6 @@
 # Scorch
 
-Scorch is a self-contained web search, scraping, mapping, and crawling service written in Rust. `scorchd` runs the HTTP API, browser, metasearch, and bounded in-memory crawl runtime. The separate `scorch` executable is a lightweight HTTP client for convenient API, benchmark, and MCP access. It uses direct HTTP for inexpensive static pages and a locally managed headless Chromium process when JavaScript rendering or screenshots are required.
+Scorch is a self-contained web search, scraping, mapping, and crawling service written in Rust. `scorchd` runs the HTTP API, browser, metasearch, and bounded in-memory crawl runtime. The separate `scorch` executable is a lightweight HTTP client for convenient API, benchmark, and MCP access. It uses direct HTTP for inexpensive static pages and embeds Obscura for JavaScript rendering and screenshots. Chromium remains an optional operator-enabled compatibility backend.
 
 Scorch does not require a database, broker, cache server, browser service, or external worker deployment. Crawl state is intentionally ephemeral and is lost when the process restarts.
 
@@ -45,6 +45,15 @@ Set `SCORCH_API_URL` or pass `--api-url` to use another server.
 cargo run -p scorch-server -- --help
 ```
 
+Obscura is the default and only allowed browser. Operators can enable Chromium, or make it the default, without letting requests escape that policy:
+
+```sh
+SCORCH_ALLOWED_BROWSERS=obscura,chromium scorchd
+SCORCH_BROWSER=chromium SCORCH_ALLOWED_BROWSERS=chromium scorchd
+```
+
+A scrape request may select an allowed backend with `options.browser`; omitted selection uses `SCORCH_BROWSER`. The service rejects a request that selects a backend not listed in `SCORCH_ALLOWED_BROWSERS`.
+
 ### Metasearch engines
 
 Metasearch is Scorch's only search provider. It owns engine routing, concurrent searching, result merging, and reranking. Configure the engines it is allowed to use independently when starting the API:
@@ -79,7 +88,8 @@ curl -sS http://127.0.0.1:3000/v1/scrape \
     "url": "https://example.com",
     "options": {
       "formats": ["markdown", "links"],
-      "render": "auto"
+      "render": "auto",
+      "browser": "obscura"
     }
   }' | jq
 ```
@@ -127,7 +137,7 @@ The tools are `scorch_search`, `scorch_scrape`, `scorch_map`, `scorch_crawl_star
 
 ## Browser and security
 
-Chromium traffic is forced through an embedded validating HTTP/CONNECT proxy. Direct fetches and browser connections reject local, private, link-local, reserved, and unsafe targets, repin DNS addresses, and revalidate redirects. Response sizes, redirects, browser pages, crawl depth, crawl count, retained bytes, request bodies, and job lifetimes are bounded.
+Obscura runs as an in-process Rust library rather than a sidecar or executable. Obscura and optional Chromium traffic are forced through an embedded validating HTTP/CONNECT proxy. Direct fetches and browser connections reject local, private, link-local, reserved, and unsafe targets, repin DNS addresses, and revalidate redirects. Response sizes, redirects, browser work, crawl depth, crawl count, retained bytes, request bodies, and job lifetimes are bounded.
 
 The browser choice and measured tradeoffs are documented in `docs/browser-evaluation.md`.
 

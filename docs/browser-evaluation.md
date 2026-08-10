@@ -4,9 +4,9 @@ Assessment date: 2026-08-09.
 
 ## Decision
 
-Scorch uses Nix-pinned system Chromium through the native Rust `chromiumoxide` CDP client. Direct HTTP remains the first engine for static content, so Chromium is only paid for when rendering is necessary.
+Scorch uses Obscura as its default browser backend. It links Obscura's Apache-2.0 Rust crates directly into `scorchd`; no Obscura process, CDP server, or sidecar is started. Each render receives an isolated V8 page on bounded blocking work, and all traffic still crosses Scorch's embedded validating proxy.
 
-This is currently the lowest-risk option because it provides complete Blink/V8 behavior, real screenshots, typed Tokio-native CDP integration, and no Node or Python sidecar. One browser process is reused behind a bounded page semaphore and an embedded validating proxy.
+Chromium remains an optional compatibility backend. The service default and allowlist are controlled by `SCORCH_BROWSER` and `SCORCH_ALLOWED_BROWSERS`; requests may select only an allowed backend. Direct HTTP remains the first engine for static content, so browser work is paid for only when rendering or screenshots are necessary.
 
 ## Local measurements
 
@@ -20,6 +20,8 @@ These are directional smoke measurements, not a general browser benchmark. They 
 | JavaScript quote fixture | Chromium | 1,265 ms | 1,013–4,394 ms | 8,985 bytes |
 
 The static result supports fetch-first routing. The JavaScript page demonstrates why a browser fallback remains necessary: it returned substantially more rendered HTML at additional latency.
+
+Before integration, the Obscura 0.2.0 Linux stealth binary rendered `example.com` in 66–104 ms after warm filesystem caches and rendered the JavaScript quote fixture in 1,584–1,727 ms. A rough one-page sample observed about 54 MiB peak RSS for Obscura versus about 507 MiB summed process-tree RSS for Chromium. These figures motivated the trial but are not treated as equivalent production benchmarks.
 
 With `scorchd` running, reproduce the API-backed harness with:
 

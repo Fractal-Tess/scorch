@@ -47,8 +47,16 @@ impl ScorchEngine {
             .map(|engine| engine.as_str())
             .collect::<Vec<_>>()
             .join(",");
+        let allowed_browsers = config
+            .allowed_browsers
+            .iter()
+            .map(|browser| browser.as_str())
+            .collect::<Vec<_>>()
+            .join(",");
         info!(
-            browser_path = %config.browser_path.display(),
+            browser = config.browser.as_str(),
+            allowed_browsers,
+            chromium_path = %config.browser_path.display(),
             max_concurrency = config.max_concurrency,
             max_response_bytes = config.max_response_bytes,
             search_provider = "metasearch",
@@ -131,6 +139,9 @@ impl ScorchEngine {
         validate_scrape_request(request)?;
         let timeout = Duration::from_millis(request.options.timeout_ms.min(120_000));
         let wants_screenshot = request.options.formats.contains(&ScrapeFormat::Screenshot);
+        let selected_browser = (request.options.render == RenderMode::Always || wants_screenshot)
+            .then(|| self.browser.resolve(request.options.browser))
+            .transpose()?;
 
         let fetched = self.fetcher.get(&request.url, timeout).await;
         let should_render = match (&fetched, request.options.render) {
@@ -141,9 +152,14 @@ impl ScorchEngine {
         };
 
         if should_render {
+            let browser = match selected_browser {
+                Some(browser) => browser,
+                None => self.browser.resolve(request.options.browser)?,
+            };
             let rendered = self
                 .browser
                 .render(
+                    browser,
                     &request.url,
                     timeout,
                     Duration::from_millis(request.options.wait_for_ms.min(60_000)),
@@ -170,7 +186,7 @@ impl ScorchEngine {
                     requested_url: &request.url,
                     html: rendered.html,
                     response: &response,
-                    engine: ScrapeEngine::Browser,
+                    engine: browser.into(),
                     elapsed_ms: started.elapsed().as_millis() as u64,
                     screenshot: rendered.screenshot,
                 },
