@@ -1,0 +1,73 @@
+name: Publish prepared release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Release version without the v prefix
+        required: true
+        type: string
+      run_id:
+        description: Successful Prepare release binaries workflow run ID
+        required: true
+        type: string
+      target:
+        description: Exact commit SHA for the release tag
+        required: true
+        type: string
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  publish:
+    name: Publish exact prepared artifacts
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Validate preparation run
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ inputs.run_id }}
+        run: |
+          conclusion="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${RUN_ID}" --jq .conclusion)"
+          if [[ "${conclusion}" != "success" ]]; then
+            echo "preparation run ${RUN_ID} did not succeed: ${conclusion}" >&2
+            exit 1
+          fi
+
+      - name: Download exact prepared archives
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: scorch-v${{ inputs.version }}-*
+          path: dist
+          merge-multiple: true
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.run_id }}
+
+      - name: Verify archive checksums
+        run: |
+          test "$(find dist -maxdepth 1 -name '*.tar.xz' -type f | wc -l)" -eq 2
+          test "$(find dist -maxdepth 1 -name '*.sha256' -type f | wc -l)" -eq 2
+          for checksum in dist/*.sha256; do
+            (cd dist && sha256sum --check --strict "$(basename "${checksum}")")
+          done
+
+      - name: Create release and upload immutable assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET: ${{ inputs.target }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          tag="v${VERSION}"
+          if gh release view "${tag}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
+            echo "release ${tag} already exists; refusing to replace assets" >&2
+            exit 1
+          fi
+          gh release create "${tag}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --target "${TARGET}" \
+            --title "Scorch ${tag}" \
+            --generate-notes \
+            dist/*.tar.xz \
+            dist/*.sha256

@@ -16,111 +16,69 @@
         let
           lib = pkgs.lib;
           version = "0.1.1";
-          source = lib.fileset.toSource {
-            root = ./.;
-            fileset = lib.fileset.unions [
-              ./Cargo.lock
-              ./Cargo.toml
-              ./LICENSE
-              ./README.md
-              ./crates
-              ./vendor
-            ];
-          };
-          rustyV8Hashes = {
-            x86_64-linux = "sha256-omgf3lMBir0zZgGPEyYX3VmAAt948VbHvG0v9gi1ZWc=";
-            aarch64-linux = "sha256-42jQy0HBecQ6mQ5OxKVeRN2XYvHTS+FWlqzEQz+KbJI=";
-          };
-          librustyV8 = pkgs.stdenv.mkDerivation {
-            pname = "librusty-v8";
-            version = "137.3.0";
-            src = pkgs.fetchurl {
-              url = "https://github.com/denoland/rusty_v8/releases/download/v137.3.0/librusty_v8_release_${pkgs.stdenv.hostPlatform.rust.rustcTarget}.a.gz";
-              hash = rustyV8Hashes.${pkgs.stdenv.hostPlatform.system};
+          releaseArtifacts = {
+            x86_64-linux = {
+              target = "x86_64-unknown-linux-gnu";
+              hash = "sha256-x+VPnJRVMnbf/VF5fMVQjXGwRnSKItpfX5XjBdbKFOY=";
             };
-            dontUnpack = true;
-            installPhase = ''
-              gzip -cd "$src" > "$out"
-            '';
-            meta = {
-              sourceProvenance = with lib.sourceTypes; [ binaryNativeCode ];
-              platforms = builtins.attrNames rustyV8Hashes;
+            aarch64-linux = {
+              target = "aarch64-unknown-linux-gnu";
+              hash = "sha256-GqjMISYhWQHbVCDyrhoKdVyQ/jOz72FpLE3Eq77LiU0=";
             };
           };
-          unwrapped = pkgs.rustPlatform.buildRustPackage {
-            pname = "scorch-unwrapped";
-            inherit version;
-            src = source;
+          artifact = releaseArtifacts.${pkgs.stdenv.hostPlatform.system};
+          releaseArchive = pkgs.fetchurl {
+            url = "https://github.com/Fractal-Tess/scorch/releases/download/v${version}/scorch-v${version}-${artifact.target}.tar.xz";
+            inherit (artifact) hash;
+          };
+          mkBinaryPackage =
+            {
+              pname,
+              binary,
+              description,
+            }:
+            pkgs.stdenvNoCC.mkDerivation {
+              inherit pname version;
+              src = releaseArchive;
+              sourceRoot = "scorch-v${version}-${artifact.target}";
 
-            outputs = [
-              "out"
-              "server"
-            ];
-            cargoHash = "sha256-zZq0D9Myv9UWmtV6l1OQoI4UgZg9/iYh0xJt5uEn2Bg=";
-            cargoBuildFlags = [
-              "--workspace"
-              "--bins"
-            ];
-            nativeBuildInputs = [
-              pkgs.clang
-              pkgs.cmake
-              pkgs.git
-              pkgs.perl
-              pkgs.pkg-config
-              pkgs.rustPlatform.bindgenHook
-            ];
-            buildInputs = [ pkgs.openssl ];
-            env = {
-              OPENSSL_NO_VENDOR = "1";
-              RUSTY_V8_ARCHIVE = librustyV8;
-            };
-
-            # V8 isolate initialization is incompatible with the build sandbox's
-            # resource restrictions. The workspace tests run outside this derivation.
-            doCheck = false;
-            installPhase = ''
-              runHook preInstall
-              releaseDir="target/${pkgs.stdenv.hostPlatform.rust.rustcTarget}/release"
-              install -Dm755 "$releaseDir/scorch" "$out/bin/scorch"
-              install -Dm755 "$releaseDir/scorchd" "$server/bin/scorchd"
-              runHook postInstall
-            '';
-
-            meta = {
-              description = "Self-contained web search and extraction service";
-              homepage = "https://github.com/Fractal-Tess/scorch";
-              license = lib.licenses.mit;
-              platforms = supportedSystems;
-              sourceProvenance = with lib.sourceTypes; [
-                fromSource
-                binaryNativeCode
-              ];
-            };
-          };
-          scorch =
-            pkgs.runCommand "scorch-${version}"
-              {
-                meta = unwrapped.meta // {
-                  description = "HTTP-only Scorch command-line and MCP client";
-                  mainProgram = "scorch";
-                };
-              }
-              ''
-                mkdir -p "$out/bin"
-                ln -s ${unwrapped}/bin/scorch "$out/bin/scorch"
+              nativeBuildInputs = [ pkgs.autoPatchelfHook ];
+              buildInputs = [ pkgs.stdenv.cc.cc.lib ];
+              strictDeps = true;
+              dontBuild = true;
+              dontStrip = true;
+              doInstallCheck = true;
+              installPhase = ''
+                runHook preInstall
+                install -Dm755 "bin/${binary}" "$out/bin/${binary}"
+                install -Dm644 "share/licenses/scorch/LICENSE" "$out/share/licenses/scorch/LICENSE"
+                runHook postInstall
               '';
-          scorchd =
-            pkgs.runCommand "scorchd-${version}"
-              {
-                meta = unwrapped.meta // {
-                  description = "Scorch HTTP API, metasearch, browser, and crawl service";
-                  mainProgram = "scorchd";
-                };
-              }
-              ''
-                mkdir -p "$out/bin"
-                ln -s ${unwrapped.server}/bin/scorchd "$out/bin/scorchd"
+              installCheckPhase = ''
+                runHook preInstallCheck
+                test "$($out/bin/${binary} --version)" = '${binary} ${version}'
+                runHook postInstallCheck
               '';
+
+              meta = {
+                inherit description;
+                homepage = "https://github.com/Fractal-Tess/scorch";
+                license = lib.licenses.mit;
+                mainProgram = binary;
+                platforms = builtins.attrNames releaseArtifacts;
+                sourceProvenance = with lib.sourceTypes; [ binaryNativeCode ];
+              };
+            };
+          scorch = mkBinaryPackage {
+            pname = "scorch";
+            binary = "scorch";
+            description = "HTTP-only Scorch command-line and MCP client";
+          };
+          scorchd = mkBinaryPackage {
+            pname = "scorchd";
+            binary = "scorchd";
+            description = "Scorch HTTP API, metasearch, browser, and crawl service";
+          };
           scorchdWithChromium =
             pkgs.runCommand "scorchd-with-chromium-${version}"
               {
@@ -131,7 +89,7 @@
               }
               ''
                 mkdir -p "$out/bin"
-                makeWrapper ${unwrapped.server}/bin/scorchd "$out/bin/scorchd" \
+                makeWrapper ${scorchd}/bin/scorchd "$out/bin/scorchd" \
                   --set-default SCORCH_BROWSER_PATH ${pkgs.chromium}/bin/chromium
               '';
           skill =
@@ -146,8 +104,8 @@
         in
         {
           inherit scorch scorchd skill;
-          scorch-unwrapped = unwrapped;
-          scorchd-unwrapped = unwrapped.server;
+          scorch-unwrapped = scorch;
+          scorchd-unwrapped = scorchd;
           scorchd-with-chromium = scorchdWithChromium;
           default = scorch;
         };
@@ -211,13 +169,18 @@
         in
         {
           default = pkgs.mkShell {
-            inputsFrom = [ self.packages.${system}.scorch-unwrapped ];
+            nativeBuildInputs = [ pkgs.rustPlatform.bindgenHook ];
             packages = with pkgs; [
               bun
               cargo
               chromium
+              clang
               clippy
+              cmake
+              git
               jujutsu
+              perl
+              pkg-config
               rust-analyzer
               rustc
               rustfmt

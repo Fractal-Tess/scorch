@@ -1,4 +1,4 @@
-name: Release binaries
+name: Prepare release binaries
 
 on:
   workflow_dispatch:
@@ -12,49 +12,57 @@ on:
         required: true
         default: main
         type: string
-      publish:
-        description: Upload the archives to an existing versioned GitHub release
-        required: true
-        default: false
-        type: boolean
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
+  resolve:
+    name: Resolve source revision
+    runs-on: ubuntu-24.04
+    outputs:
+      sha: ${{ steps.revision.outputs.sha }}
+    steps:
+      - name: Check out requested revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Record immutable revision
+        id: revision
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
   build:
     name: Build ${{ matrix.target }}
+    needs: resolve
     strategy:
       fail-fast: false
       matrix:
         include:
           - runner: ubuntu-24.04
             target: x86_64-unknown-linux-gnu
+            v8_sha256: a2681fde53018abd3366018f132617dd598002df78f156c7bc6d2ff608b56567
           - runner: ubuntu-24.04-arm
             target: aarch64-unknown-linux-gnu
+            v8_sha256: e368d0cb41c179c43a990e4ec4a55e44dd9762f1d34be15696acc4433f8a6c92
     runs-on: ${{ matrix.runner }}
     steps:
-      - name: Check out source
-        uses: actions/checkout@v4
+      - name: Check out resolved source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.ref }}
+          ref: ${{ needs.resolve.outputs.sha }}
 
-      - name: Resolve version
+      - name: Verify version
         id: version
         env:
-          DISPATCH_VERSION: ${{ inputs.version }}
+          VERSION: ${{ inputs.version }}
         run: |
-          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
-            version="${DISPATCH_VERSION}"
-          else
-            version="${GITHUB_REF_NAME#v}"
-          fi
           package_version="$(sed -n '/^\[workspace.package\]/,/^$/s/^version = "\([^"]*\)"/\1/p' Cargo.toml)"
-          if [[ "${version}" != "${package_version}" ]]; then
-            echo "requested version ${version} does not match workspace version ${package_version}" >&2
+          if [[ "${VERSION}" != "${package_version}" ]]; then
+            echo "requested version ${VERSION} does not match workspace version ${package_version}" >&2
             exit 1
           fi
-          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
 
       - name: Install native dependencies
         run: |
@@ -62,19 +70,32 @@ jobs:
           sudo apt-get install --yes clang cmake git libclang-dev perl pkg-config xz-utils
 
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@4360b52568e2003a75bf9bc1d59f33a8e3fc893c # stable
         with:
           toolchain: "1.88.0"
           targets: ${{ matrix.target }}
 
       - name: Cache Rust build
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@49a0bdc70d2e1b713ca9e2869b211fcce03d3c1c # v2
         with:
           key: release-${{ matrix.target }}
+
+      - name: Fetch verified Rusty V8 archive
+        env:
+          TARGET: ${{ matrix.target }}
+          V8_SHA256: ${{ matrix.v8_sha256 }}
+        run: |
+          archive="$RUNNER_TEMP/librusty_v8.a.gz"
+          curl --fail --location --retry 5 \
+            --output "${archive}" \
+            "https://github.com/denoland/rusty_v8/releases/download/v137.3.0/librusty_v8_release_${TARGET}.a.gz"
+          echo "${V8_SHA256}  ${archive}" | sha256sum --check --strict
+          gzip -cd "${archive}" > "$RUNNER_TEMP/librusty_v8.a"
 
       - name: Build release binaries
         env:
           CARGO_BUILD_JOBS: "2"
+          RUSTY_V8_ARCHIVE: ${{ runner.temp }}/librusty_v8.a
         run: |
           cargo build \
             --locked \
@@ -105,8 +126,8 @@ jobs:
           (cd dist && sha256sum "${archive}" > "${archive}.sha256")
           rm -rf "${root}"
 
-      - name: Upload workflow artifact
-        uses: actions/upload-artifact@v4
+      - name: Upload prepared archive
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: scorch-v${{ steps.version.outputs.version }}-${{ matrix.target }}
           path: |
@@ -114,33 +135,3 @@ jobs:
             dist/*.sha256
           if-no-files-found: error
           retention-days: 30
-
-  publish:
-    name: Publish release assets
-    if: inputs.publish
-    needs: build
-    runs-on: ubuntu-24.04
-    steps:
-      - name: Download release archives
-        uses: actions/download-artifact@v4
-        with:
-          pattern: scorch-*
-          path: dist
-          merge-multiple: true
-
-      - name: Upload versioned assets
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          tag="v${{ inputs.version }}"
-          gh release view "${tag}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1 || \
-            gh release create "${tag}" \
-              --repo "${GITHUB_REPOSITORY}" \
-              --target "${{ inputs.ref }}" \
-              --title "Scorch ${tag}" \
-              --generate-notes
-          gh release upload "${tag}" \
-            --repo "${GITHUB_REPOSITORY}" \
-            --clobber \
-            dist/*.tar.xz \
-            dist/*.sha256
