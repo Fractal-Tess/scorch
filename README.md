@@ -6,7 +6,7 @@ Scorch does not require a database, broker, cache server, browser service, or ex
 
 ## Install with Nix
 
-Run either executable directly from the flake:
+Run either executable directly from the flake. Versioned Linux binaries are built by GitHub Actions and fetched by Nix, so installation does not compile the Rust workspace locally:
 
 ```sh
 nix run github:Fractal-Tess/scorch/v0.1.1#scorch -- --help

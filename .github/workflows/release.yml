@@ -12,9 +12,11 @@ on:
         required: true
         default: main
         type: string
-  push:
-    tags:
-      - "v*"
+      publish:
+        description: Upload the archives to an existing versioned GitHub release
+        required: true
+        default: false
+        type: boolean
 
 permissions:
   contents: write
@@ -91,7 +93,6 @@ jobs:
           install -Dm755 "target/${TARGET}/release/scorch" "${root}/bin/scorch"
           install -Dm755 "target/${TARGET}/release/scorchd" "${root}/bin/scorchd"
           install -Dm644 LICENSE "${root}/share/licenses/scorch/LICENSE"
-          install -Dm644 README.md "${root}/share/doc/scorch/README.md"
           tar \
             --sort=name \
             --mtime='UTC 1970-01-01' \
@@ -101,7 +102,7 @@ jobs:
             -C dist \
             -cJf "dist/${archive}" \
             "scorch-v${VERSION}-${TARGET}"
-          sha256sum "dist/${archive}" > "dist/${archive}.sha256"
+          (cd dist && sha256sum "${archive}" > "${archive}.sha256")
           rm -rf "${root}"
 
       - name: Upload workflow artifact
@@ -116,7 +117,7 @@ jobs:
 
   publish:
     name: Publish release assets
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: inputs.publish
     needs: build
     runs-on: ubuntu-24.04
     steps:
@@ -131,12 +132,14 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release view "${GITHUB_REF_NAME}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1 || \
-            gh release create "${GITHUB_REF_NAME}" \
+          tag="v${{ inputs.version }}"
+          gh release view "${tag}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1 || \
+            gh release create "${tag}" \
               --repo "${GITHUB_REPOSITORY}" \
-              --title "Scorch ${GITHUB_REF_NAME}" \
+              --target "${{ inputs.ref }}" \
+              --title "Scorch ${tag}" \
               --generate-notes
-          gh release upload "${GITHUB_REF_NAME}" \
+          gh release upload "${tag}" \
             --repo "${GITHUB_REPOSITORY}" \
             --clobber \
             dist/*.tar.xz \

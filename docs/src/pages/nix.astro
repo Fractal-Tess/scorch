@@ -21,7 +21,8 @@ const headings = [
   <p>
     The release flake exposes separate packages and apps for the HTTP-only
     client and the runtime-owning service. Pin a release tag for reproducible
-    deployments.
+    deployments. Nix downloads the matching GitHub Actions release archive and
+    patches it for the Nix store; it does not compile Scorch locally.
   </p>
   <pre><code>nix run github:Fractal-Tess/scorch/v0.1.1#scorch -- --help
 nix run github:Fractal-Tess/scorch/v0.1.1#scorchd -- --help</code></pre>
