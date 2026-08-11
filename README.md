@@ -12,6 +12,7 @@
   <a href="https://github.com/Fractal-Tess/scorch/actions/workflows/release.yml"><img src="https://img.shields.io/github/actions/workflow/status/Fractal-Tess/scorch/release.yml?label=build" alt="Release build status"></a>
   <a href="https://github.com/Fractal-Tess/scorch/actions/workflows/promote-release.yml"><img src="https://img.shields.io/github/actions/workflow/status/Fractal-Tess/scorch/promote-release.yml?label=publish" alt="Release publication status"></a>
   <a href="https://github.com/Fractal-Tess/scorch/releases/latest"><img src="https://img.shields.io/github/v/release/Fractal-Tess/scorch?sort=semver" alt="Latest release"></a>
+  <a href="https://skills.sh/Fractal-Tess/scorch"><img src="https://skills.sh/b/Fractal-Tess/scorch" alt="Scorch skill installs"></a>
   <a href="LICENSE"><img src="https://img.shields.io/github/license/Fractal-Tess/scorch" alt="MIT license"></a>
 </p>
 
@@ -171,7 +172,13 @@ Scorch exposes six tools: `scorch_search`, `scorch_scrape`, `scorch_map`, `scorc
 
 ## Agent Skill
 
-The standard skill lives at [`.agents/skills/scorch/SKILL.md`](.agents/skills/scorch/SKILL.md). Build its installable Nix package with:
+The standard skill lives at [`.agents/skills/scorch/SKILL.md`](.agents/skills/scorch/SKILL.md). Install it with the open Agent Skills CLI:
+
+```sh
+npx skills add Fractal-Tess/scorch --skill scorch
+```
+
+Alternatively, build its installable Nix package:
 
 ```sh
 nix build github:Fractal-Tess/scorch/v0.3.0#skill

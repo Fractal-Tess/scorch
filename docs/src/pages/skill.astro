@@ -56,6 +56,13 @@ const headings = [
     Agents that discover project-level <code>.agents/skills</code> directories can
     load the checked-in skill automatically after the repository is trusted.
   </p>
+  <h3>Install with the Agent Skills CLI</h3>
+  <pre><code>npx skills add Fractal-Tess/scorch --skill scorch</code></pre>
+  <p>
+    Successful public-repository installs are reported anonymously to <a
+      href="https://skills.sh/">skills.sh</a
+    >, where installation counts power skill discovery and ranking.
+  </p>
   <h3>Install with Nix</h3>
   <pre><code>nix build github:Fractal-Tess/scorch/v0.3.0#skill
 mkdir -p ~/.agents/skills
@@ -66,9 +73,11 @@ cp -R result/share/agent-skills/scorch ~/.agents/skills/scorch</code></pre>
 rm -rf ~/.agents/skills/scorch
 cp -R .agents/skills/scorch ~/.agents/skills/scorch</code></pre>
   <p>
-    Pi discovers <code>~/.agents/skills/scorch/SKILL.md</code> automatically. Other
-    Agent Skills-compatible harnesses may use a different configured root; copy the
-    same <code>scorch</code> directory there.
+    Pi discovers both <code>~/.pi/agent/skills</code> and <code
+      >~/.agents/skills</code
+    >. Keep Scorch in only one of those roots to avoid a duplicate-name warning.
+    Other Agent Skills-compatible harnesses may use a different configured root;
+    copy the same <code>scorch</code> directory there.
   </p>
   <div class="callout">
     <strong>Review skills before installation.</strong> Skills influence agent tool
