@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "scorch-client"
+version = "0.4.0"
+description = "Typed Python client for the Scorch HTTP API"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+authors = [{ name = "Fractal-Tess" }]
+keywords = ["scorch", "search", "scraping", "crawling"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Typing :: Typed",
+]
+
+[project.urls]
+Homepage = "https://github.com/Fractal-Tess/scorch"
+Documentation = "https://github.com/Fractal-Tess/scorch/tree/main/clients/python"
+Issues = "https://github.com/Fractal-Tess/scorch/issues"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+scorch_client = ["py.typed"]

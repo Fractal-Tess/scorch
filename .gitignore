@@ -3,5 +3,10 @@
 /.omo/
 /.env
 /references/
+/clients/javascript/node_modules/
+/clients/python/**/__pycache__/
+/clients/python/build/
+/clients/python/dist/
+/clients/python/src/*.egg-info/
 /result
 /result-*

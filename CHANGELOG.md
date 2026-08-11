@@ -4,6 +4,10 @@ All notable changes to Scorch are documented in this file. The project follows [
 
 ## [Unreleased]
 
+### Added
+
+- Added typed, zero-runtime-dependency Python and JavaScript clients for the complete Scorch HTTP API.
+
 ## [0.4.0] - 2026-08-11
 
 ### Added

@@ -177,6 +177,7 @@
           default = pkgs.mkShell {
             nativeBuildInputs = [ pkgs.rustPlatform.bindgenHook ];
             packages = with pkgs; [
+              basedpyright
               bun
               cargo
               clang
@@ -184,8 +185,11 @@
               cmake
               git
               jujutsu
+              nodejs_24
               perl
               pkg-config
+              python3
+              ruff
               rust-analyzer
               rustc
               rustfmt

@@ -1,0 +1,81 @@
+name: Client libraries
+
+on:
+  push:
+    paths:
+      - "clients/**"
+      - "crates/scorch-api/src/lib.rs"
+      - "crates/scorch-cli/src/client.rs"
+      - "crates/scorch-types/src/lib.rs"
+      - "docs/src/pages/clients.astro"
+      - "README.md"
+      - ".github/workflows/clients.yml"
+  pull_request:
+    paths:
+      - "clients/**"
+      - "crates/scorch-api/src/lib.rs"
+      - "crates/scorch-cli/src/client.rs"
+      - "crates/scorch-types/src/lib.rs"
+      - "docs/src/pages/clients.astro"
+      - "README.md"
+      - ".github/workflows/clients.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: clients-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python:
+    name: Python 3.11
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+      - name: Install Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: clients/python/requirements-dev.txt
+      - name: Install client and development tools
+        run: python -m pip install ./clients/python -r clients/python/requirements-dev.txt
+      - name: Check formatting
+        run: ruff format --check clients/python
+      - name: Lint
+        run: ruff check clients/python
+      - name: Check types
+        run: basedpyright clients/python/src
+      - name: Test
+        working-directory: clients/python
+        run: python -m unittest discover -s tests -v
+      - name: Compile package
+        run: python -m compileall -q clients/python/src clients/python/tests
+
+  javascript:
+    name: Node.js 22
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+      - name: Install Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: clients/javascript/package-lock.json
+      - name: Install development dependencies
+        working-directory: clients/javascript
+        run: npm ci --ignore-scripts
+      - name: Check types
+        working-directory: clients/javascript
+        run: npm run check
+      - name: Test
+        working-directory: clients/javascript
+        run: npm test
+      - name: Verify package contents
+        working-directory: clients/javascript
+        run: npm pack --dry-run

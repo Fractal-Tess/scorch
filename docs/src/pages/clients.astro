@@ -1,0 +1,148 @@
+---
+import DocLayout from "../layouts/DocLayout.astro";
+const headings = [
+  { label: "Python", href: "#python" },
+  { label: "JavaScript", href: "#javascript" },
+  { label: "Operations", href: "#operations" },
+  { label: "Gateways and errors", href: "#gateways-errors" },
+];
+---
+
+<DocLayout
+  title="Python and JavaScript clients"
+  description="Typed, zero-runtime-dependency clients for applications that call the Scorch HTTP API directly."
+  headings={headings}
+  previous={{ label: "HTTP API", href: "/api/" }}
+  next={{ label: "MCP server", href: "/mcp/" }}
+>
+  <div class="callout">
+    The source packages currently install from the repository and are not yet
+    published to PyPI or npm. Their versions follow Scorch's API version.
+  </div>
+
+  <h2 id="python">Python</h2>
+  <p>
+    The Python package supports Python 3.11 and newer. It is synchronous, fully
+    typed, and uses only the standard library.
+  </p>
+  <pre><code>python -m pip install ./clients/python</code></pre>
+  <pre><code>from scorch_client import ScorchClient
+
+client = ScorchClient()
+response = client.search(
+    "времето в София",
+    country="bg",
+    language="bg",
+    engines=["bing", "duckduckgo"],
+    limit=5,
+)
+
+for result in response["results"]:
+    print(result["title"], result["url"])
+
+page = client.scrape(
+    "https://example.com",
+    options=&#123;"formats": ["markdown", "links"], "render": "auto"&#125;,
+)
+print(page.get("markdown", ""))</code></pre>
+  <p>
+    Request parameters use Python-style names while returned dictionaries
+    preserve the HTTP API's camel-case field names.
+  </p>
+
+  <h2 id="javascript">JavaScript and TypeScript</h2>
+  <p>
+    The ESM package supports Node.js 22 and modern Fetch API runtimes. It ships
+    TypeScript declarations and has no runtime dependencies.
+  </p>
+  <pre><code>npm install ./clients/javascript</code></pre>
+  <pre><code>import &#123; ScorchClient &#125; from "@fractal-tess/scorch";
+
+const client = new ScorchClient();
+const response = await client.search("времето в София", &#123;
+  country: "bg",
+  language: "bg",
+  engines: ["bing", "duckduckgo"],
+  limit: 5,
+&#125;);
+
+for (const result of response.results) &#123;
+  console.log(result.title, result.url);
+&#125;
+
+const page = await client.scrape("https://example.com", &#123;
+  formats: ["markdown", "links"],
+  render: "auto",
+&#125;);</code></pre>
+  <p>
+    Every JavaScript operation accepts a final <code>&#123; signal &#125;</code> argument
+    for cancellation with <code>AbortController</code>.
+  </p>
+
+  <h2 id="operations">Operations</h2>
+  <div class="table-wrap">
+    <table>
+      <thead
+        ><tr><th>HTTP operation</th><th>Python</th><th>JavaScript</th></tr
+        ></thead
+      ><tbody>
+        <tr
+          ><td>Health</td><td><code>health</code></td><td
+            ><code>health</code></td
+          ></tr
+        ><tr
+          ><td>Readiness</td><td><code>readiness</code></td><td
+            ><code>readiness</code></td
+          ></tr
+        ><tr
+          ><td>Search</td><td><code>search</code></td><td
+            ><code>search</code></td
+          ></tr
+        ><tr
+          ><td>Scrape</td><td><code>scrape</code></td><td
+            ><code>scrape</code></td
+          ></tr
+        ><tr><td>Map</td><td><code>map</code></td><td><code>map</code></td></tr
+        ><tr
+          ><td>Start crawl</td><td><code>start_crawl</code></td><td
+            ><code>startCrawl</code></td
+          ></tr
+        ><tr
+          ><td>Crawl status</td><td><code>crawl_status</code></td><td
+            ><code>crawlStatus</code></td
+          ></tr
+        ><tr
+          ><td>Cancel crawl</td><td><code>cancel_crawl</code></td><td
+            ><code>cancelCrawl</code></td
+          ></tr
+        >
+      </tbody>
+    </table>
+  </div>
+
+  <h2 id="gateways-errors">Gateways, errors, and limits</h2>
+  <p>
+    Both clients default to <code>http://127.0.0.1:33000</code>, honor <code
+      >SCORCH_API_URL</code
+    > in their server runtimes, and accept static headers for an authenticated gateway.
+    Credentials embedded in the base URL are rejected. API redirects are not followed,
+    so gateway headers are never forwarded to another origin.
+  </p>
+  <pre><code># Python
+client = ScorchClient(
+    "https://scorch.example.com",
+    headers=&#123;"Authorization": "Bearer ..."&#125;,
+)
+
+// JavaScript
+const client = new ScorchClient(&#123;
+  baseUrl: "https://scorch.example.com",
+  headers: &#123; Authorization: "Bearer ..." &#125;,
+&#125;);</code></pre>
+  <p>
+    Structured API errors expose the HTTP status, Scorch error code, message,
+    and request ID. Connection failures and invalid responses use separate
+    exception classes. Response bodies are streamed into a bounded 64 MiB buffer
+    by default.
+  </p>
+</DocLayout>

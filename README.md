@@ -116,6 +116,31 @@ nix run github:Fractal-Tess/scorch/v0.4.0#scorchd -- --help
 
 Use `github:Fractal-Tess/scorch/v0.4.0` as a flake input. The flake exports packages, an overlay, NixOS and Home Manager modules, checks, and the Agent Skill. See the [Nix guide](docs/src/pages/nix.astro) for a complete declarative configuration.
 
+## Python and JavaScript clients
+
+Typed, zero-runtime-dependency HTTP clients live under [`clients/`](clients/). They currently install from a repository checkout and are not yet published to PyPI or npm.
+
+```sh
+python -m pip install ./clients/python
+npm install ./clients/javascript
+```
+
+```python
+from scorch_client import ScorchClient
+
+results = ScorchClient().search("Rust", engines=["bing", "duckduckgo"])
+```
+
+```js
+import { ScorchClient } from "@fractal-tess/scorch";
+
+const results = await new ScorchClient().search("Rust", {
+  engines: ["bing", "duckduckgo"],
+});
+```
+
+Both clients cover health, readiness, search, scrape, map, crawl lifecycle, structured errors, authenticated gateway headers, timeouts, cancellation where supported, and bounded response reads. See the [client guide](docs/src/pages/clients.astro) for details.
+
 ## MCP and agent setup
 
 Start `scorchd` first. Each agent spawns `scorch mcp` as a local stdio child process, discovers its six tools, and forwards tool calls to the daemon at `http://127.0.0.1:33000` by default. The `scorch` executable must be available on the agent's `PATH`.
@@ -214,6 +239,21 @@ bun install --frozen-lockfile
 bun run build
 ```
 
+Validate the application clients with:
+
+```sh
+cd clients/python
+python -m pip install --editable . -r requirements-dev.txt
+ruff format --check . && ruff check .
+basedpyright src
+python -m unittest discover -s tests -v
+
+cd ../javascript
+npm ci
+npm run check
+npm test
+```
+
 ## Security
 
 Direct fetches and Obscura traffic share SSRF, DNS, redirect, unsafe-port, response-size, concurrency, and deadline controls. Crawl state is bounded, ephemeral, and lost when `scorchd` restarts. Authentication and TLS belong at the deployment gateway; do not expose Scorch to an untrusted network without them.
@@ -222,6 +262,7 @@ Direct fetches and Obscura traffic share SSRF, DNS, redirect, unsafe-port, respo
 
 - [Getting started](docs/src/pages/getting-started.astro)
 - [HTTP API](docs/src/pages/api.astro)
+- [Python and JavaScript clients](docs/src/pages/clients.astro)
 - [Architecture](docs/src/pages/architecture.astro)
 - [Configuration](docs/src/pages/configuration.astro)
 - [Nix](docs/src/pages/nix.astro)

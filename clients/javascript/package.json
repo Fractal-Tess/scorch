@@ -1,0 +1,51 @@
+{
+  "name": "@fractal-tess/scorch",
+  "version": "0.4.0",
+  "description": "Typed JavaScript client for the Scorch HTTP API",
+  "type": "module",
+  "sideEffects": false,
+  "main": "./src/index.js",
+  "types": "./src/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.d.ts",
+      "import": "./src/index.js",
+      "default": "./src/index.js"
+    }
+  },
+  "files": [
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "check": "tsc --noEmit",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "keywords": [
+    "scorch",
+    "search",
+    "scraping",
+    "crawling"
+  ],
+  "author": "Fractal-Tess",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Fractal-Tess/scorch.git",
+    "directory": "clients/javascript"
+  },
+  "bugs": {
+    "url": "https://github.com/Fractal-Tess/scorch/issues"
+  },
+  "homepage": "https://github.com/Fractal-Tess/scorch/tree/main/clients/javascript",
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
