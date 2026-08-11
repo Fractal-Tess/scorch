@@ -2186,7 +2186,7 @@ dependencies = [
 
 [[package]]
 name = "metasearch"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "base64 0.23.1",
  "futures-util",
@@ -3355,7 +3355,7 @@ checksum = "94143f37725109f92c262ed2cf5e59bce7498c01bcc1502d7b9afe439a4e9f49"
 
 [[package]]
 name = "scorch-api"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "anyhow",
  "axum",
@@ -3372,7 +3372,7 @@ dependencies = [
 
 [[package]]
 name = "scorch-cli"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -3390,7 +3390,7 @@ dependencies = [
 
 [[package]]
 name = "scorch-engine"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "base64 0.23.1",
  "dashmap",
@@ -3415,7 +3415,7 @@ dependencies = [
 
 [[package]]
 name = "scorch-server"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -3429,7 +3429,7 @@ dependencies = [
 
 [[package]]
 name = "scorch-types"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "schemars",
  "serde",

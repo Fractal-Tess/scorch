@@ -4,6 +4,8 @@ All notable changes to Scorch are documented in this file. The project follows [
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-08-11
+
 ### Added
 
 - Added request-level metasearch engine subsets bounded by the server allowlist.
@@ -88,7 +90,8 @@ All notable changes to Scorch are documented in this file. The project follows [
 - Embedded Obscura requests use fresh context, page, cookie, cache, and JavaScript state to prevent caller data leakage.
 - Render requests enforce one caller-visible deadline across validation, queueing, navigation, execution, serialization, and screenshots.
 
-[Unreleased]: https://github.com/Fractal-Tess/scorch/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/Fractal-Tess/scorch/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/Fractal-Tess/scorch/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/Fractal-Tess/scorch/compare/v0.1.3...v0.3.0
 [0.1.3]: https://github.com/Fractal-Tess/scorch/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/Fractal-Tess/scorch/compare/v0.1.1...v0.1.2

@@ -79,8 +79,8 @@ wget -qO- https://github.com/Fractal-Tess/scorch/releases/latest/download/instal
 The installer detects the Linux architecture and verifies the release checksum. Pin a version or choose another directory with:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/Fractal-Tess/scorch/v0.3.0/install.sh \
-  | sh -s -- --version 0.3.0 --install-dir ~/.local/bin
+curl -fsSL https://raw.githubusercontent.com/Fractal-Tess/scorch/v0.4.0/install.sh \
+  | sh -s -- --version 0.4.0 --install-dir ~/.local/bin
 ```
 
 ### Release archive
@@ -88,7 +88,7 @@ curl -fsSL https://raw.githubusercontent.com/Fractal-Tess/scorch/v0.3.0/install.
 Download the archive from [GitHub Releases](https://github.com/Fractal-Tess/scorch/releases) for the current Linux architecture and verify its published checksum:
 
 ```sh
-VERSION=0.3.0
+VERSION=0.4.0
 TARGET="$(uname -m)-unknown-linux-gnu"
 ARCHIVE="scorch-v${VERSION}-${TARGET}.tar.xz"
 BASE="https://github.com/Fractal-Tess/scorch/releases/download/v${VERSION}"
@@ -110,11 +110,11 @@ Release archives support `x86_64-linux` and `aarch64-linux`.
 Nix downloads the same fixed-hash CI binaries rather than compiling the Rust workspace:
 
 ```sh
-nix run github:Fractal-Tess/scorch/v0.3.0#scorch -- --help
-nix run github:Fractal-Tess/scorch/v0.3.0#scorchd -- --help
+nix run github:Fractal-Tess/scorch/v0.4.0#scorch -- --help
+nix run github:Fractal-Tess/scorch/v0.4.0#scorchd -- --help
 ```
 
-Use `github:Fractal-Tess/scorch/v0.3.0` as a flake input. The flake exports packages, an overlay, NixOS and Home Manager modules, checks, and the Agent Skill. See the [Nix guide](docs/src/pages/nix.astro) for a complete declarative configuration.
+Use `github:Fractal-Tess/scorch/v0.4.0` as a flake input. The flake exports packages, an overlay, NixOS and Home Manager modules, checks, and the Agent Skill. See the [Nix guide](docs/src/pages/nix.astro) for a complete declarative configuration.
 
 ## MCP and agent setup
 
@@ -182,7 +182,7 @@ npx skills add Fractal-Tess/scorch --skill scorch
 Alternatively, build its installable Nix package:
 
 ```sh
-nix build github:Fractal-Tess/scorch/v0.3.0#skill
+nix build github:Fractal-Tess/scorch/v0.4.0#skill
 ```
 
 ## Development
