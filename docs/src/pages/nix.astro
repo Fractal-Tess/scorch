@@ -122,6 +122,11 @@ scorch search "rust web extraction" --limit 3</code></pre>
           ></tr
         >
         <tr
+          ><td><code>searchEngines</code></td><td
+            ><code>bing, duckduckgo, naver, wikipedia</code></td
+          ><td>Set the server allowlist available to search requests.</td></tr
+        >
+        <tr
           ><td><code>environmentFile</code></td><td><code>null</code></td><td
             >Load credentials without putting them in the Nix store.</td
           ></tr
@@ -130,9 +135,10 @@ scorch search "rust web extraction" --limit 3</code></pre>
     </table>
   </div>
   <p>
-    The module asserts that the search-engine list is non-empty. Obscura is
-    embedded, so the service does not need a browser package, executable path,
-    or browser-selection policy. Authentication and TLS remain the
+    The module asserts that the search-engine allowlist is non-empty. Requests
+    that omit an engine subset use allowed Bing and DuckDuckGo adapters. Obscura
+    is embedded, so the service does not need a browser package, executable
+    path, or browser-selection policy. Authentication and TLS remain the
     responsibility of an external gateway.
   </p>
 

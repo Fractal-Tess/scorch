@@ -4,6 +4,16 @@ All notable changes to Scorch are documented in this file. The project follows [
 
 ## [Unreleased]
 
+### Added
+
+- Added request-level metasearch engine subsets bounded by the server allowlist.
+- Added completed-engine diagnostics to search responses.
+
+### Changed
+
+- Made Bing and DuckDuckGo the default search engines while keeping Naver and Wikipedia available on explicit requests.
+- Improved Agent Skill guidance for locale-sensitive search, compact results, and structured JSON APIs.
+
 ## [0.3.0] - 2026-08-11
 
 ### Added

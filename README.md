@@ -35,6 +35,7 @@ Start `scorchd`, then search, extract, render, map, or crawl with the lightweigh
 scorchd
 
 scorch search "rust async runtime" --limit 5
+scorch search "времето в София" --country bg --language bg --engine bing,duckduckgo
 scorch scrape https://example.com --format markdown,links
 scorch scrape https://example.com --render always --format markdown
 scorch scrape https://example.com --format screenshot --full-page-screenshot
@@ -42,7 +43,7 @@ scorch map https://example.com --limit 100
 scorch crawl https://example.com --limit 20 --max-depth 2 --wait
 ```
 
-The default endpoint is `http://127.0.0.1:33000`. Override it with `SCORCH_API_URL` or `--api-url`. Metasearch combines Bing, DuckDuckGo, Naver, and Wikipedia by default; Brave and Google are optional credential-backed engines.
+The default endpoint is `http://127.0.0.1:33000`. Override it with `SCORCH_API_URL` or `--api-url`. The server allows Bing, DuckDuckGo, Naver, and Wikipedia by default, while ordinary requests use Bing and DuckDuckGo unless they select another allowed subset. Brave and Google remain credential-backed; [Google's Custom Search JSON API](https://developers.google.com/custom-search/v1/overview) is closed to new customers and scheduled for retirement on January 1, 2027.
 
 ## Smaller than self-hosted Firecrawl
 

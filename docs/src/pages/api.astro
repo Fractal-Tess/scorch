@@ -147,16 +147,19 @@ const headings = [
   "limit": 5,
   "country": "us",
   "language": "en",
+  "engines": ["bing", "duckduckgo"],
   "scrapeOptions": null
 &#125;</code></pre>
   <p>
     Limits range from 1 to 20 and queries are capped at 512 bytes. Metasearch is
-    the only public provider; requests cannot name source engines. Results
-    identify their contributing <code>sources</code>.
+    the only public provider. Omit <code>engines</code> to use server defaults, or
+    select a subset of the server allowlist. Results identify their contributing
+    <code>sources</code>.
   </p>
   <pre><code>&#123;
   "query": "rust async runtime",
   "provider": "metasearch",
+  "engines": ["bing", "duckduckgo"],
   "results": [
     &#123;
       "position": 1,

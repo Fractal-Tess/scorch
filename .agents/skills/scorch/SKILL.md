@@ -32,13 +32,16 @@ Pass `--api-url <URL>` before the subcommand when the configured endpoint differ
 
 ```bash
 scorch search "query" --limit 10
-scorch search "query" --limit 5 --scrape
 scorch search "query" --country us --language en
+scorch search "reference query" --engine wikipedia
+scorch search "query" --limit 5 --scrape
 ```
 
-Search is metasearch: `scorchd` concurrently queries the engines allowed by server policy, merges duplicate URLs, and reranks results. Callers cannot select source engines. `--scrape` already enriches returned results; do not scrape the same pages again without a reason.
+Search is metasearch: `scorchd` concurrently queries the selected engines, merges duplicate URLs, and reranks results. Omit `--engine` to use server defaults, or repeat/comma-separate it to narrow the server allowlist. A request cannot activate an engine excluded by server policy.
 
-An empty result list is not proof that no relevant page exists. Refine the query or inspect service readiness before concluding that discovery failed.
+For location-sensitive searches, set `--country` and `--language` deliberately and include an unambiguous place name. A native-language query often improves regional results. Start with compact search metadata; use `--scrape` only when result-page content is actually required. `--scrape` already enriches returned results, so do not scrape the same pages again without a reason.
+
+An empty result list is not proof that no relevant page exists. Refine the query, adjust locale hints or the allowed engine subset, or inspect service readiness before concluding that discovery failed.
 
 ## Page extraction
 
@@ -57,7 +60,7 @@ Render policy:
 - `--render never` stays on the direct HTTP path.
 - Browser rendering always uses embedded Obscura. Stealth transport is enabled by default by the service.
 
-Use `--wait-for-ms <milliseconds>` only when a rendered page needs a short settling period. Keep `--timeout-ms` bounded. Screenshot data is returned inside the JSON response and can be large.
+Use `--wait-for-ms <milliseconds>` only when a rendered page needs a short settling period. Keep `--timeout-ms` bounded. Screenshot data is returned inside the JSON response and can be large. Page extraction expects supported web-document content types; use an appropriate API client such as `curl` for a known JSON API rather than forcing it through `scorch scrape`.
 
 ## Map and crawl
 

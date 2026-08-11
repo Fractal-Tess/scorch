@@ -44,7 +44,7 @@ impl ScorchMcp {
 
     #[tool(
         name = "scorch_search",
-        description = "Search the public web; omit scrapeOptions for compact result metadata, or set it only when page content is required"
+        description = "Search the public web with server defaults or an allowed engines subset; set country and language for local queries, and omit scrapeOptions unless page content is required"
     )]
     async fn search(
         &self,
@@ -218,6 +218,15 @@ mod tests {
                 "scorch_search",
             ]
         );
+        let search_schema = serde_json::to_string(
+            tools
+                .iter()
+                .find(|tool| tool.name.as_ref() == "scorch_search")
+                .unwrap(),
+        )
+        .unwrap();
+        assert!(search_schema.contains("engines"));
+        assert!(search_schema.contains("duckduckgo"));
 
         for tool in tools {
             let schema = serde_json::to_string(&tool).unwrap();

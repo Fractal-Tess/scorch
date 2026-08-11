@@ -407,7 +407,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn search_engine_selection_is_not_a_request_option() {
+    async fn alternate_search_provider_is_not_a_request_option() {
         let engine = ScorchEngine::new(EngineConfig::default()).await.unwrap();
         let response = router(engine)
             .oneshot(

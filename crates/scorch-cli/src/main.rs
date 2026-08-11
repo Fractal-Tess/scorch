@@ -7,7 +7,7 @@ use clap::{Args, Parser, Subcommand, ValueEnum};
 use client::ApiClient;
 use scorch_types::{
     CrawlRequest, CrawlStatus, MapRequest, RenderMode, ScrapeFormat, ScrapeOptions, ScrapeRequest,
-    SearchRequest,
+    SearchEngine, SearchRequest,
 };
 use uuid::Uuid;
 
@@ -126,6 +126,31 @@ struct SearchArgs {
     country: String,
     #[arg(long, default_value = "en")]
     language: String,
+    #[arg(long = "engine", value_enum, value_delimiter = ',')]
+    engines: Vec<SearchEngineArg>,
+}
+
+#[derive(Debug, Clone, Copy, ValueEnum)]
+enum SearchEngineArg {
+    Bing,
+    Brave,
+    Duckduckgo,
+    Google,
+    Naver,
+    Wikipedia,
+}
+
+impl From<SearchEngineArg> for SearchEngine {
+    fn from(value: SearchEngineArg) -> Self {
+        match value {
+            SearchEngineArg::Bing => Self::Bing,
+            SearchEngineArg::Brave => Self::Brave,
+            SearchEngineArg::Duckduckgo => Self::DuckDuckGo,
+            SearchEngineArg::Google => Self::Google,
+            SearchEngineArg::Naver => Self::Naver,
+            SearchEngineArg::Wikipedia => Self::Wikipedia,
+        }
+    }
 }
 
 #[derive(Args)]
@@ -181,6 +206,7 @@ async fn run_client(client: &ApiClient, command: Command) -> anyhow::Result<()> 
                     scrape_options: args.scrape.then(ScrapeOptions::default),
                     country: args.country,
                     language: args.language,
+                    engines: args.engines.into_iter().map(Into::into).collect(),
                 })
                 .await?,
         )?,
@@ -250,5 +276,23 @@ mod tests {
             ])
             .is_err()
         );
+    }
+
+    #[test]
+    fn search_accepts_an_explicit_engine_subset() {
+        let cli = Cli::try_parse_from([
+            "scorch",
+            "search",
+            "Rust",
+            "--engine",
+            "bing,duckduckgo",
+            "--engine",
+            "wikipedia",
+        ])
+        .unwrap();
+        let Command::Search(args) = cli.command else {
+            panic!("expected search command");
+        };
+        assert_eq!(args.engines.len(), 3);
     }
 }

@@ -131,7 +131,7 @@ in
           "naver"
           "wikipedia"
         ];
-        description = "Metasearch engines enabled by server policy.";
+        description = "Metasearch engines allowed by server policy.";
       };
       logLevel = mkOption {
         type = types.str;

@@ -122,6 +122,30 @@ pub struct ScrapeDocument {
     pub warnings: Vec<String>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum SearchEngine {
+    Bing,
+    Brave,
+    DuckDuckGo,
+    Google,
+    Naver,
+    Wikipedia,
+}
+
+impl SearchEngine {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Bing => "bing",
+            Self::Brave => "brave",
+            Self::DuckDuckGo => "duckduckgo",
+            Self::Google => "google",
+            Self::Naver => "naver",
+            Self::Wikipedia => "wikipedia",
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct SearchRequest {
@@ -134,6 +158,8 @@ pub struct SearchRequest {
     pub country: String,
     #[serde(default = "default_language")]
     pub language: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub engines: Vec<SearchEngine>,
 }
 
 fn default_search_limit() -> usize {
@@ -169,6 +195,8 @@ pub struct SearchResult {
 pub struct SearchResponse {
     pub query: String,
     pub provider: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub engines: Vec<String>,
     pub results: Vec<SearchResult>,
     pub elapsed_ms: u64,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -337,4 +365,34 @@ pub struct ReadinessResponse {
     pub max_concurrency: usize,
     pub search_provider: String,
     pub search_engines: Vec<String>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn search_engines_use_stable_wire_names() {
+        assert_eq!(
+            serde_json::to_string(&SearchEngine::DuckDuckGo).unwrap(),
+            "\"duckduckgo\""
+        );
+    }
+
+    #[test]
+    fn omitted_search_engines_preserve_default_behavior() {
+        let request: SearchRequest = serde_json::from_str(r#"{"query":"Rust"}"#).unwrap();
+        assert!(request.engines.is_empty());
+        assert_eq!(request.country, "us");
+        assert_eq!(request.language, "en");
+    }
+
+    #[test]
+    fn search_response_accepts_older_servers_without_engine_diagnostics() {
+        let response: SearchResponse = serde_json::from_str(
+            r#"{"query":"Rust","provider":"metasearch","results":[],"elapsedMs":1}"#,
+        )
+        .unwrap();
+        assert!(response.engines.is_empty());
+    }
 }

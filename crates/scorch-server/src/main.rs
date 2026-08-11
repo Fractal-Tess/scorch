@@ -42,12 +42,7 @@ struct ServerArgs {
 
 impl ServerArgs {
     fn engine_config(&self) -> EngineConfig {
-        let mut search_engines = Vec::new();
-        for engine in self.search_engines.iter().copied().map(EngineKind::from) {
-            if !search_engines.contains(&engine) {
-                search_engines.push(engine);
-            }
-        }
+        let search_engines = unique_engines(&self.search_engines);
         EngineConfig {
             obscura_stealth: self.obscura_stealth,
             max_concurrency: self.max_concurrency.max(1),
@@ -62,6 +57,16 @@ impl ServerArgs {
             ..Default::default()
         }
     }
+}
+
+fn unique_engines(engines: &[SearchEngineArg]) -> Vec<EngineKind> {
+    let mut unique = Vec::new();
+    for engine in engines.iter().copied().map(EngineKind::from) {
+        if !unique.contains(&engine) {
+            unique.push(engine);
+        }
+    }
+    unique
 }
 
 #[derive(Debug, Clone, Copy, ValueEnum)]

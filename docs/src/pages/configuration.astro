@@ -156,23 +156,35 @@ const headings = [
   <p>
     The allowed values are <code>bing</code>, <code>brave</code>, <code
       >duckduckgo</code
-    >, <code>google</code>, <code>naver</code>, and <code>wikipedia</code>.
-    Search requests never carry this list.
+    >, <code>google</code>, <code>naver</code>, and <code>wikipedia</code>. The
+    server allowlist is an upper bound: requests may select a subset but cannot
+    activate an engine excluded by server policy.
   </p>
-  <h3>Credential-free default</h3>
+  <h3>Credential-free policy</h3>
   <pre><code>SCORCH_SEARCH_ENGINES=bing,duckduckgo,naver,wikipedia scorchd</code></pre>
+  <p>
+    Requests that omit <code>engines</code> use whichever of Bing and DuckDuckGo the
+    server allows. Select Naver or Wikipedia explicitly when regional or reference
+    results are useful. If neither default is allowed, requests must select an allowed
+    engine explicitly.
+  </p>
   <h3>Add Brave</h3>
   <pre><code>SCORCH_SEARCH_ENGINES=bing,brave,duckduckgo,naver,wikipedia \
 SCORCH_BRAVE_SEARCH_API_KEY='...' \
 scorchd</code></pre>
   <h3>Add Google Custom Search</h3>
-  <pre><code>SCORCH_SEARCH_ENGINES=google,wikipedia \
+  <pre><code>SCORCH_SEARCH_ENGINES=bing,duckduckgo,google,wikipedia \
 SCORCH_GOOGLE_SEARCH_API_KEY='...' \
 SCORCH_GOOGLE_SEARCH_ENGINE_ID='...' \
 scorchd</code></pre>
   <p>
     Missing credentials for an enabled credentialed engine are startup
-    configuration errors. Secrets are redacted from Scorch's diagnostics.
+    configuration errors. Secrets are redacted from Scorch's diagnostics. <a
+      href="https://developers.google.com/custom-search/v1/overview"
+      >Google documents</a
+    > that Custom Search JSON API is unavailable to new customers and will be discontinued
+    on January 1, 2027, so the adapter is useful only for existing customers during
+    migration.
   </p>
 
   <h2 id="logging">Logging</h2>

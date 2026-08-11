@@ -138,15 +138,22 @@ scorch scrape https://example.com \
             >Language hint sent to applicable engines.</td
           ></tr
         >
+        <tr
+          ><td><code>--engine</code></td><td>server defaults</td><td
+            >Repeat or comma-separate to select an allowed engine subset.</td
+          ></tr
+        >
       </tbody>
     </table>
   </div>
   <pre><code>scorch search "rust async runtime" --limit 8
-scorch search "web extraction" --country gb --language en --scrape</code></pre>
+scorch search "времето в София" --country bg --language bg
+scorch search "Rust history" --engine bing,duckduckgo --engine wikipedia</code></pre>
   <p>
-    There is no engine option. Metasearch routing is controlled exclusively by <code
-      >scorchd</code
-    >.
+    Engine selection can only narrow the server allowlist. An excluded or
+    unconfigured engine is rejected rather than activated by a request. Search
+    compact metadata first; use <code>--scrape</code> only when every result needs
+    page content.
   </p>
 
   <h2 id="map">scorch map</h2>

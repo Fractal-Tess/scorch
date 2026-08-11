@@ -63,36 +63,37 @@ impl MetaSearch {
         credentials: &EngineCredentials,
     ) -> Result<Self> {
         let mut enabled = Vec::new();
-        let mut engines: Vec<Arc<dyn SearchEngine>> = Vec::new();
+        let mut engines: Vec<(EngineKind, Arc<dyn SearchEngine>)> = Vec::new();
         for kind in kinds {
             if enabled.contains(kind) {
                 continue;
             }
             enabled.push(*kind);
-            match kind {
-                EngineKind::Bing => engines.push(Arc::new(Bing::new()?)),
-                EngineKind::Brave => engines.push(Arc::new(Brave::new(required_credential(
+            let engine: Arc<dyn SearchEngine> = match kind {
+                EngineKind::Bing => Arc::new(Bing::new()?),
+                EngineKind::Brave => Arc::new(Brave::new(required_credential(
                     &credentials.brave_api_key,
                     "Brave API key",
-                )?)?)),
-                EngineKind::DuckDuckGo => engines.push(Arc::new(DuckDuckGo::new()?)),
-                EngineKind::Google => engines.push(Arc::new(Google::new(
+                )?)?),
+                EngineKind::DuckDuckGo => Arc::new(DuckDuckGo::new()?),
+                EngineKind::Google => Arc::new(Google::new(
                     required_credential(&credentials.google_api_key, "Google API key")?,
                     required_credential(
                         &credentials.google_search_engine_id,
                         "Google Programmable Search Engine ID",
                     )?,
-                )?)),
-                EngineKind::Naver => engines.push(Arc::new(Naver::new()?)),
-                EngineKind::Wikipedia => engines.push(Arc::new(Wikipedia::new()?)),
-            }
+                )?),
+                EngineKind::Naver => Arc::new(Naver::new()?),
+                EngineKind::Wikipedia => Arc::new(Wikipedia::new()?),
+            };
+            engines.push((*kind, engine));
         }
         if engines.is_empty() {
             return Err(Error::InvalidConfiguration(
                 "at least one engine must be enabled".into(),
             ));
         }
-        Ok(Self::with_engines(config, engines))
+        Ok(Self::with_engine_kinds(config, engines))
     }
 
     pub fn with_engines(config: MetaSearchConfig, engines: Vec<Arc<dyn SearchEngine>>) -> Self {
@@ -100,7 +101,22 @@ impl MetaSearch {
         Self {
             engines: engines
                 .into_iter()
-                .map(|engine| Arc::new(EngineSlot::new(engine, concurrency)))
+                .map(|engine| Arc::new(EngineSlot::new(None, engine, concurrency)))
+                .collect(),
+            config,
+            cache: RwLock::new(HashMap::new()),
+        }
+    }
+
+    fn with_engine_kinds(
+        config: MetaSearchConfig,
+        engines: Vec<(EngineKind, Arc<dyn SearchEngine>)>,
+    ) -> Self {
+        let concurrency = config.per_engine_concurrency.max(1);
+        Self {
+            engines: engines
+                .into_iter()
+                .map(|(kind, engine)| Arc::new(EngineSlot::new(Some(kind), engine, concurrency)))
                 .collect(),
             config,
             cache: RwLock::new(HashMap::new()),
@@ -108,9 +124,35 @@ impl MetaSearch {
     }
 
     pub async fn search(&self, query: &SearchQuery) -> Result<MetaSearchOutput> {
+        self.search_selected(query, None).await
+    }
+
+    pub async fn search_with_engine_kinds(
+        &self,
+        query: &SearchQuery,
+        engines: &[EngineKind],
+    ) -> Result<MetaSearchOutput> {
+        if engines.is_empty() {
+            return Err(Error::InvalidQuery(
+                "at least one search engine must be selected".into(),
+            ));
+        }
+        self.search_selected(query, Some(engines)).await
+    }
+
+    async fn search_selected(
+        &self,
+        query: &SearchQuery,
+        selected: Option<&[EngineKind]>,
+    ) -> Result<MetaSearchOutput> {
         validate(query)?;
         let started = Instant::now();
-        let cache_key = CacheKey::new(query);
+        let mut selected_names: Vec<&str> = selected
+            .map(|engines| engines.iter().map(|engine| engine.as_str()).collect())
+            .unwrap_or_else(|| self.engines.iter().map(|slot| slot.engine.name()).collect());
+        selected_names.sort_unstable();
+        selected_names.dedup();
+        let cache_key = CacheKey::new(query, &selected_names);
         if let Some(mut output) = self.cached(&cache_key).await {
             output.cached = true;
             output.elapsed = started.elapsed();
@@ -120,12 +162,15 @@ impl MetaSearch {
         let available = self
             .engines
             .iter()
+            .filter(|slot| {
+                selected.is_none_or(|engines| slot.kind.is_some_and(|kind| engines.contains(&kind)))
+            })
             .filter(|slot| slot.available())
             .cloned()
             .collect::<Vec<_>>();
         if available.is_empty() {
             return Err(Error::AllEnginesFailed(
-                "all engines are cooling down".into(),
+                "selected engines are unavailable or cooling down".into(),
             ));
         }
 
@@ -253,14 +298,16 @@ impl Default for MetaSearch {
 }
 
 struct EngineSlot {
+    kind: Option<EngineKind>,
     engine: Arc<dyn SearchEngine>,
     limit: Semaphore,
     state: Mutex<EngineState>,
 }
 
 impl EngineSlot {
-    fn new(engine: Arc<dyn SearchEngine>, concurrency: usize) -> Self {
+    fn new(kind: Option<EngineKind>, engine: Arc<dyn SearchEngine>, concurrency: usize) -> Self {
         Self {
+            kind,
             engine,
             limit: Semaphore::new(concurrency),
             state: Mutex::new(EngineState::default()),
@@ -314,10 +361,11 @@ struct CacheKey {
     limit: usize,
     country: String,
     language: String,
+    engines: Vec<String>,
 }
 
 impl CacheKey {
-    fn new(query: &SearchQuery) -> Self {
+    fn new(query: &SearchQuery, engines: &[&str]) -> Self {
         Self {
             query: query
                 .query
@@ -328,6 +376,7 @@ impl CacheKey {
             limit: query.limit,
             country: query.country.to_lowercase(),
             language: query.language.to_lowercase(),
+            engines: engines.iter().map(|engine| (*engine).into()).collect(),
         }
     }
 }
@@ -563,6 +612,59 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn selects_requested_engines_and_separates_cache_entries() {
+        let engines: Vec<(EngineKind, Arc<dyn SearchEngine>)> = vec![
+            (
+                EngineKind::Bing,
+                Arc::new(FakeEngine {
+                    name: "bing",
+                    delay: Duration::from_millis(1),
+                    hits: vec![hit("https://bing.example/", "Bing")],
+                }),
+            ),
+            (
+                EngineKind::Wikipedia,
+                Arc::new(FakeEngine {
+                    name: "wikipedia",
+                    delay: Duration::from_millis(1),
+                    hits: vec![hit("https://wikipedia.example/", "Wikipedia")],
+                }),
+            ),
+        ];
+        let search = MetaSearch::with_engine_kinds(MetaSearchConfig::default(), engines);
+        let query = SearchQuery::new("example", 5);
+
+        let bing = search
+            .search_with_engine_kinds(&query, &[EngineKind::Bing])
+            .await
+            .unwrap();
+        assert_eq!(bing.engines_used, ["bing"]);
+        assert_eq!(bing.hits[0].title, "Bing");
+
+        let wikipedia = search
+            .search_with_engine_kinds(&query, &[EngineKind::Wikipedia])
+            .await
+            .unwrap();
+        assert!(!wikipedia.cached);
+        assert_eq!(wikipedia.engines_used, ["wikipedia"]);
+        assert_eq!(wikipedia.hits[0].title, "Wikipedia");
+
+        let combined = search
+            .search_with_engine_kinds(&query, &[EngineKind::Bing, EngineKind::Wikipedia])
+            .await
+            .unwrap();
+        assert!(!combined.cached);
+        let reordered = search
+            .search_with_engine_kinds(
+                &query,
+                &[EngineKind::Wikipedia, EngineKind::Bing, EngineKind::Bing],
+            )
+            .await
+            .unwrap();
+        assert!(reordered.cached);
+    }
+
+    #[tokio::test]
     async fn empty_results_are_a_successful_search() {
         let engines: Vec<Arc<dyn SearchEngine>> = vec![Arc::new(FakeEngine {
             name: "empty",
@@ -582,6 +684,7 @@ mod tests {
     #[test]
     fn expired_cooldown_resets_failure_count() {
         let slot = EngineSlot::new(
+            None,
             Arc::new(FakeEngine {
                 name: "test",
                 delay: Duration::ZERO,

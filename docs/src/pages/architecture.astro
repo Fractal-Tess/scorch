@@ -202,15 +202,16 @@ const headings = [
 
   <h2 id="metasearch">Metasearch</h2>
   <p>
-    Metasearch is Scorch's only search provider. Source engines are internal
-    adapters and cannot be selected by API, CLI, or MCP requests. The server may
-    allow Bing, Brave, DuckDuckGo, Google, Naver, and Wikipedia; Brave and
-    Google require operator credentials.
+    Metasearch is Scorch's only search provider. The server allowlist remains
+    the policy boundary; API, CLI, and MCP requests may narrow it to an explicit
+    subset or omit selection to use server defaults. The server may allow Bing,
+    Brave, DuckDuckGo, Google, Naver, and Wikipedia; Brave and Google require
+    operator credentials.
   </p>
   <ol>
     <li>
-      Start every enabled and healthy engine concurrently under per-engine
-      limits.
+      Start every selected, allowed, and healthy engine concurrently under
+      per-engine limits.
     </li>
     <li>
       Accept the first useful result, then hold a short collection window for
