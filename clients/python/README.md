@@ -18,10 +18,9 @@ from scorch_client import ScorchClient
 client = ScorchClient()  # http://127.0.0.1:33000
 
 response = client.search(
-    "времето в София",
-    country="bg",
-    language="bg",
-    engines=["bing", "duckduckgo"],
+    "Rust HTTP clients",
+    categories=["github"],
+    engines=["brave-web", "crates-io", "npm", "yahoo"],
     limit=5,
 )
 

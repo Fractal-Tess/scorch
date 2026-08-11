@@ -13,6 +13,8 @@ pub enum Error {
     },
     #[error("{engine} returned HTTP {status}")]
     HttpStatus { engine: &'static str, status: u16 },
+    #[error("{engine} rate limit exceeded")]
+    RateLimited { engine: &'static str },
     #[error("{engine} response exceeded {limit} bytes")]
     ResponseTooLarge { engine: &'static str, limit: usize },
     #[error("{engine} response could not be parsed: {message}")]

@@ -17,10 +17,9 @@ import { ScorchClient } from "@fractal-tess/scorch";
 
 const client = new ScorchClient(); // http://127.0.0.1:33000
 
-const response = await client.search("времето в София", {
-  country: "bg",
-  language: "bg",
-  engines: ["bing", "duckduckgo"],
+const response = await client.search("Rust HTTP clients", {
+  categories: ["github"],
+  engines: ["brave-web", "crates-io", "npm", "yahoo"],
   limit: 5,
 });
 

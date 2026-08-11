@@ -121,8 +121,19 @@ class Handler(BaseHTTPRequestHandler):
                 {
                     "query": body["query"],
                     "provider": "metasearch",
-                    "engines": body.get("engines", ["bing", "duckduckgo"]),
-                    "results": [],
+                    "engines": body.get("engines", ["duckduckgo"]),
+                    "results": (
+                        [
+                            {
+                                "position": 1,
+                                "title": "Repository",
+                                "url": "https://github.com/example/repository",
+                                "category": "github",
+                            }
+                        ]
+                        if body.get("categories") == ["github"]
+                        else []
+                    ),
                     "elapsedMs": 1,
                 },
             )
@@ -186,9 +197,24 @@ class ClientTests(unittest.TestCase):
         self.assertEqual(client.health()["status"], "ok")
         self.assertEqual(client.readiness()["browser"], "obscura")
         response = client.search(
-            "Rust", country="bg", language="en", engines=["wikipedia"]
+            "Rust",
+            country="bg",
+            language="en",
+            engines=[
+                "brave-web",
+                "crates-io",
+                "docker-hub",
+                "google-cse",
+                "npm",
+                "yahoo",
+            ],
+            categories=["github"],
         )
-        self.assertEqual(response["engines"], ["wikipedia"])
+        self.assertEqual(
+            response["engines"],
+            ["brave-web", "crates-io", "docker-hub", "google-cse", "npm", "yahoo"],
+        )
+        self.assertEqual(response["results"][0]["category"], "github")
 
     def test_scrape_map_and_crawl(self):
         client = ScorchClient(self.base_url)

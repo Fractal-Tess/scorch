@@ -4,9 +4,24 @@ All notable changes to Scorch are documented in this file. The project follows [
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-08-12
+
 ### Added
 
 - Added typed, zero-runtime-dependency Python and JavaScript clients for the complete Scorch HTTP API.
+- Added a GitHub search category across HTTP, CLI, MCP, Python, and JavaScript.
+- Added credential-free Brave Web, Google CSE, Yahoo, Mwmbl, GitHub, Hacker News, Hugging Face, crates.io, npm, Docker Hub, Crossref, OpenAlex, Open Library, PubMed, NVD, and Wikidata search adapters.
+- Added `search-engines.md`, a clean-room compatibility inventory for the evaluated SearXNG engine surface.
+
+### Changed
+
+- Made DuckDuckGo the sole implicit search engine.
+- Narrowed the selectable credential-free binary surface to 19 useful English-focused engines after every retained engine returned source-attributed results through built `scorchd` and `scorch search` binaries.
+- Updated the HTTP API, CLI, MCP schemas, Python and JavaScript clients, Nix modules, Agent Skill, and documentation for the final engine set.
+
+### Removed
+
+- Removed redundant, non-English, or overly specialized engines from the selectable binary surface, including Naver, Stack Overflow, Microsoft Learn, Steam, Jisho, PDBe, Arch Linux, GitLab, Hex, Packagist, and ManKier.
 
 ## [0.4.0] - 2026-08-11
 
@@ -17,7 +32,7 @@ All notable changes to Scorch are documented in this file. The project follows [
 
 ### Changed
 
-- Made Bing and DuckDuckGo the default search engines while keeping Naver and Wikipedia available on explicit requests.
+- Kept DuckDuckGo as the sole implicit search engine while allowing request-level engine subsets.
 - Improved Agent Skill guidance for locale-sensitive search, compact results, and structured JSON APIs.
 - Updated pinned core GitHub Actions to their current major releases.
 
@@ -95,7 +110,8 @@ All notable changes to Scorch are documented in this file. The project follows [
 - Embedded Obscura requests use fresh context, page, cookie, cache, and JavaScript state to prevent caller data leakage.
 - Render requests enforce one caller-visible deadline across validation, queueing, navigation, execution, serialization, and screenshots.
 
-[Unreleased]: https://github.com/Fractal-Tess/scorch/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/Fractal-Tess/scorch/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/Fractal-Tess/scorch/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/Fractal-Tess/scorch/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/Fractal-Tess/scorch/compare/v0.1.3...v0.3.0
 [0.1.3]: https://github.com/Fractal-Tess/scorch/compare/v0.1.2...v0.1.3

@@ -2,7 +2,8 @@ use std::{sync::Arc, time::Duration};
 
 use metasearch::{MetaSearch, MetaSearchConfig, MetaSearchOutput, SearchHit, SearchQuery};
 use scorch_types::{
-    SearchEngine as RequestedSearchEngine, SearchRequest, SearchResponse, SearchResult,
+    SearchCategory, SearchEngine as RequestedSearchEngine, SearchRequest, SearchResponse,
+    SearchResult,
 };
 use tokio::sync::Semaphore;
 
@@ -45,7 +46,7 @@ impl SearchService {
             .map_err(|_| EngineError::Timeout)?
             .map_err(|_| EngineError::Capacity("search runtime is shutting down".into()))?;
         let query = SearchQuery {
-            query: request.query.trim().into(),
+            query: categorized_query(request),
             limit: request.limit,
             country: request.country.clone(),
             language: request.language.clone(),
@@ -59,13 +60,10 @@ impl SearchService {
 
     fn selected_engines(&self, request: &SearchRequest) -> Result<Vec<metasearch::EngineKind>> {
         let requested = if request.engines.is_empty() {
-            [
-                metasearch::EngineKind::Bing,
-                metasearch::EngineKind::DuckDuckGo,
-            ]
-            .into_iter()
-            .filter(|engine| self.allowed_engines.contains(engine))
-            .collect::<Vec<_>>()
+            [metasearch::EngineKind::DuckDuckGo]
+                .into_iter()
+                .filter(|engine| self.allowed_engines.contains(engine))
+                .collect::<Vec<_>>()
         } else {
             request
                 .engines
@@ -99,10 +97,25 @@ fn engine_kind(engine: RequestedSearchEngine) -> metasearch::EngineKind {
     match engine {
         RequestedSearchEngine::Bing => metasearch::EngineKind::Bing,
         RequestedSearchEngine::Brave => metasearch::EngineKind::Brave,
+        RequestedSearchEngine::BraveWeb => metasearch::EngineKind::BraveWeb,
+        RequestedSearchEngine::CratesIo => metasearch::EngineKind::CratesIo,
+        RequestedSearchEngine::Crossref => metasearch::EngineKind::Crossref,
+        RequestedSearchEngine::DockerHub => metasearch::EngineKind::DockerHub,
         RequestedSearchEngine::DuckDuckGo => metasearch::EngineKind::DuckDuckGo,
+        RequestedSearchEngine::GitHub => metasearch::EngineKind::GitHub,
         RequestedSearchEngine::Google => metasearch::EngineKind::Google,
-        RequestedSearchEngine::Naver => metasearch::EngineKind::Naver,
+        RequestedSearchEngine::GoogleCse => metasearch::EngineKind::GoogleCse,
+        RequestedSearchEngine::HackerNews => metasearch::EngineKind::HackerNews,
+        RequestedSearchEngine::HuggingFace => metasearch::EngineKind::HuggingFace,
+        RequestedSearchEngine::Mwmbl => metasearch::EngineKind::Mwmbl,
+        RequestedSearchEngine::Npm => metasearch::EngineKind::Npm,
+        RequestedSearchEngine::Nvd => metasearch::EngineKind::Nvd,
+        RequestedSearchEngine::Openalex => metasearch::EngineKind::OpenAlex,
+        RequestedSearchEngine::OpenLibrary => metasearch::EngineKind::OpenLibrary,
+        RequestedSearchEngine::Pubmed => metasearch::EngineKind::PubMed,
+        RequestedSearchEngine::Wikidata => metasearch::EngineKind::Wikidata,
         RequestedSearchEngine::Wikipedia => metasearch::EngineKind::Wikipedia,
+        RequestedSearchEngine::Yahoo => metasearch::EngineKind::Yahoo,
     }
 }
 
@@ -112,9 +125,9 @@ fn validate(request: &SearchRequest) -> Result<()> {
             "search query cannot be empty".into(),
         ));
     }
-    if request.query.len() > 512 {
+    if categorized_query(request).len() > 512 {
         return Err(EngineError::InvalidRequest(
-            "search query cannot exceed 512 bytes".into(),
+            "search query cannot exceed 512 bytes after category filters".into(),
         ));
     }
     if !(1..=20).contains(&request.limit) {
@@ -139,6 +152,14 @@ fn validate(request: &SearchRequest) -> Result<()> {
     Ok(())
 }
 
+fn categorized_query(request: &SearchRequest) -> String {
+    let mut query = request.query.trim().to_owned();
+    if request.categories.contains(&SearchCategory::GitHub) {
+        query.push_str(" (site:github.com)");
+    }
+    query
+}
+
 fn response(request: &SearchRequest, output: MetaSearchOutput) -> SearchResponse {
     let MetaSearchOutput {
         hits,
@@ -155,6 +176,7 @@ fn response(request: &SearchRequest, output: MetaSearchOutput) -> SearchResponse
             .into_iter()
             .enumerate()
             .map(|(index, hit)| {
+                let category = category_for_url(&hit.url, &request.categories);
                 result(
                     index,
                     SearchHit {
@@ -163,6 +185,7 @@ fn response(request: &SearchRequest, output: MetaSearchOutput) -> SearchResponse
                         snippet: hit.snippet,
                     },
                     hit.sources,
+                    category,
                 )
             })
             .collect(),
@@ -171,16 +194,31 @@ fn response(request: &SearchRequest, output: MetaSearchOutput) -> SearchResponse
     }
 }
 
-fn result(index: usize, hit: SearchHit, sources: Vec<String>) -> SearchResult {
+fn result(
+    index: usize,
+    hit: SearchHit,
+    sources: Vec<String>,
+    category: Option<SearchCategory>,
+) -> SearchResult {
     SearchResult {
         position: index + 1,
         title: hit.title,
         url: hit.url,
         description: hit.snippet,
         sources,
+        category,
         document: None,
         error: None,
     }
+}
+
+fn category_for_url(url: &str, categories: &[SearchCategory]) -> Option<SearchCategory> {
+    if !categories.contains(&SearchCategory::GitHub) {
+        return None;
+    }
+    let parsed = url::Url::parse(url).ok()?;
+    let host = parsed.host_str()?.trim_end_matches('.');
+    (host == "github.com" || host.ends_with(".github.com")).then_some(SearchCategory::GitHub)
 }
 
 fn search_error(error: metasearch::Error) -> EngineError {
@@ -200,6 +238,7 @@ mod tests {
             country: "us".into(),
             language: "en".into(),
             engines: Vec::new(),
+            categories: Vec::new(),
         };
         assert!(validate(&request).is_err());
     }
@@ -213,6 +252,7 @@ mod tests {
             country: "us&unsafe=true".into(),
             language: "en".into(),
             engines: Vec::new(),
+            categories: Vec::new(),
         };
         assert!(validate(&request).is_err());
     }
@@ -227,12 +267,23 @@ mod tests {
             country: "us".into(),
             language: "en".into(),
             engines: Vec::new(),
+            categories: Vec::new(),
         };
         assert_eq!(
             service.selected_engines(&request).unwrap(),
+            [metasearch::EngineKind::DuckDuckGo]
+        );
+
+        request.engines = vec![
+            RequestedSearchEngine::BraveWeb,
+            RequestedSearchEngine::GoogleCse,
+            RequestedSearchEngine::GoogleCse,
+        ];
+        assert_eq!(
+            service.selected_engines(&request).unwrap(),
             [
-                metasearch::EngineKind::Bing,
-                metasearch::EngineKind::DuckDuckGo
+                metasearch::EngineKind::BraveWeb,
+                metasearch::EngineKind::GoogleCse
             ]
         );
 
@@ -247,6 +298,49 @@ mod tests {
     }
 
     #[test]
+    fn github_category_restricts_and_labels_matching_results() {
+        let request = SearchRequest {
+            query: "Rust HTTP client".into(),
+            limit: 5,
+            scrape_options: None,
+            country: "us".into(),
+            language: "en".into(),
+            engines: Vec::new(),
+            categories: vec![SearchCategory::GitHub],
+        };
+        assert_eq!(
+            categorized_query(&request),
+            "Rust HTTP client (site:github.com)"
+        );
+        assert_eq!(
+            category_for_url("https://github.com/user/repo", &request.categories),
+            Some(SearchCategory::GitHub)
+        );
+        assert_eq!(
+            category_for_url("https://docs.github.com/en/rest", &request.categories),
+            Some(SearchCategory::GitHub)
+        );
+        assert_eq!(
+            category_for_url("https://example.com", &request.categories),
+            None
+        );
+    }
+
+    #[test]
+    fn rejects_categorized_queries_over_limit() {
+        let request = SearchRequest {
+            query: "x".repeat(512),
+            limit: 5,
+            scrape_options: None,
+            country: "us".into(),
+            language: "en".into(),
+            engines: Vec::new(),
+            categories: vec![SearchCategory::GitHub],
+        };
+        assert!(validate(&request).is_err());
+    }
+
+    #[test]
     fn rejects_engines_outside_server_policy() {
         let service = SearchService::new(&EngineConfig::default()).unwrap();
         let request = SearchRequest {
@@ -256,6 +350,7 @@ mod tests {
             country: "us".into(),
             language: "en".into(),
             engines: vec![RequestedSearchEngine::Brave],
+            categories: Vec::new(),
         };
         let error = service.selected_engines(&request).unwrap_err();
         assert!(error.to_string().contains("not allowed by server policy"));
@@ -275,6 +370,7 @@ mod tests {
             country: "us".into(),
             language: "en".into(),
             engines: Vec::new(),
+            categories: Vec::new(),
         };
         assert!(service.selected_engines(&request).is_err());
 

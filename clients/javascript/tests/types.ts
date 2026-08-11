@@ -7,7 +7,19 @@ import {
 
 const client = new ScorchClient({ baseUrl: "http://127.0.0.1:33000" });
 const search: Promise<SearchResponse> = client.search("Rust", {
-  engines: ["bing", "duckduckgo"],
+  engines: [
+    "bing",
+    "brave-web",
+    "crates-io",
+    "docker-hub",
+    "duckduckgo",
+    "google-cse",
+    "hugging-face",
+    "npm",
+    "pubmed",
+    "yahoo",
+  ],
+  categories: ["github"],
   country: "us",
   language: "en",
 });

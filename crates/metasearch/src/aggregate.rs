@@ -12,7 +12,11 @@ use url::Url;
 use crate::{
     AggregatedHit, EngineCredentials, EngineKind, EngineOutput, Error, MetaSearchOutput, Result,
     SearchEngine, SearchHit, SearchQuery,
-    engines::{Bing, Brave, DuckDuckGo, Google, Naver, Wikipedia},
+    engines::{
+        Bing, Brave, BraveWeb, CratesIo, Crossref, DockerHub, DuckDuckGo, GitHub, Google,
+        GoogleCse, HackerNews, HuggingFace, Mwmbl, Npm, Nvd, OpenAlex, OpenLibrary, PubMed,
+        Wikidata, Wikipedia, Yahoo,
+    },
 };
 
 const RRF_K: f64 = 60.0;
@@ -75,7 +79,12 @@ impl MetaSearch {
                     &credentials.brave_api_key,
                     "Brave API key",
                 )?)?),
+                EngineKind::BraveWeb => Arc::new(BraveWeb::new()?),
+                EngineKind::CratesIo => Arc::new(CratesIo::new()?),
+                EngineKind::Crossref => Arc::new(Crossref::new()?),
+                EngineKind::DockerHub => Arc::new(DockerHub::new()?),
                 EngineKind::DuckDuckGo => Arc::new(DuckDuckGo::new()?),
+                EngineKind::GitHub => Arc::new(GitHub::new()?),
                 EngineKind::Google => Arc::new(Google::new(
                     required_credential(&credentials.google_api_key, "Google API key")?,
                     required_credential(
@@ -83,8 +92,18 @@ impl MetaSearch {
                         "Google Programmable Search Engine ID",
                     )?,
                 )?),
-                EngineKind::Naver => Arc::new(Naver::new()?),
+                EngineKind::GoogleCse => Arc::new(GoogleCse::new()?),
+                EngineKind::HackerNews => Arc::new(HackerNews::new()?),
+                EngineKind::HuggingFace => Arc::new(HuggingFace::new()?),
+                EngineKind::Mwmbl => Arc::new(Mwmbl::new()?),
+                EngineKind::Npm => Arc::new(Npm::new()?),
+                EngineKind::Nvd => Arc::new(Nvd::new()?),
+                EngineKind::OpenAlex => Arc::new(OpenAlex::new()?),
+                EngineKind::OpenLibrary => Arc::new(OpenLibrary::new()?),
+                EngineKind::PubMed => Arc::new(PubMed::new()?),
+                EngineKind::Wikidata => Arc::new(Wikidata::new()?),
                 EngineKind::Wikipedia => Arc::new(Wikipedia::new()?),
+                EngineKind::Yahoo => Arc::new(Yahoo::new()?),
             };
             engines.push((*kind, engine));
         }
@@ -506,6 +525,14 @@ mod tests {
         .unwrap();
         assert_eq!(search.engines.len(), 1);
         assert_eq!(search.engines[0].engine.name(), "wikipedia");
+    }
+
+    #[test]
+    fn credential_free_brave_web_requires_no_configuration() {
+        let search =
+            MetaSearch::from_engine_kinds(MetaSearchConfig::default(), &[EngineKind::BraveWeb])
+                .unwrap();
+        assert_eq!(search.engines[0].engine.name(), "brave-web");
     }
 
     #[test]

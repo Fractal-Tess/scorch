@@ -100,11 +100,14 @@ const headings = [
       ><tbody>
         <tr
           ><td><code>scorch_search</code></td><td
-            >Search the public web and optionally scrape each result.</td
+            >Search live-validated web, package, developer, security, and
+            research sources and optionally scrape each result.</td
           ><td
             ><code>query</code>, <code>limit</code>, <code>country</code>, <code
               >language</code
-            >, optional <code>engines</code> and <code>scrapeOptions</code>.</td
+            >, optional <code>engines</code>, <code>categories</code>, and <code
+              >scrapeOptions</code
+            >.</td
           ></tr
         >
         <tr
@@ -144,7 +147,12 @@ const headings = [
   </div>
   <p>
     Tool schemas use the same contracts as the <a href="/api/">HTTP API</a>.
-    Unknown fields and out-of-range values are rejected by the service.
+    Omitted engine selection uses only DuckDuckGo. Callers can explicitly choose
+    from the server's 19 credential-free engines, including <code>yahoo</code>, <code
+      >crates-io</code
+    >, <code>npm</code>, <code>docker-hub</code>, <code>pubmed</code>, and the
+    other documented sources. Unknown fields, removed engine names, and
+    out-of-range values are rejected by the service.
   </p>
 
   <h2 id="example-prompts">Example prompts</h2>

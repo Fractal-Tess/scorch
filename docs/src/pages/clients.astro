@@ -30,10 +30,9 @@ const headings = [
 
 client = ScorchClient()
 response = client.search(
-    "времето в София",
-    country="bg",
-    language="bg",
-    engines=["bing", "duckduckgo"],
+    "Rust HTTP clients",
+    categories=["github"],
+    engines=["brave-web", "crates-io", "npm", "yahoo"],
     limit=5,
 )
 
@@ -59,10 +58,9 @@ print(page.get("markdown", ""))</code></pre>
   <pre><code>import &#123; ScorchClient &#125; from "@fractal-tess/scorch";
 
 const client = new ScorchClient();
-const response = await client.search("времето в София", &#123;
-  country: "bg",
-  language: "bg",
-  engines: ["bing", "duckduckgo"],
+const response = await client.search("Rust HTTP clients", &#123;
+  categories: ["github"],
+  engines: ["brave-web", "crates-io", "npm", "yahoo"],
   limit: 5,
 &#125;);
 

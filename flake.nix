@@ -153,7 +153,7 @@
               !(nixpkgs.lib.hasInfix "--browser" moduleSystem.config.systemd.services.scorchd.serviceConfig.ExecStart);
             assert nixpkgs.lib.hasInfix "--bind 127.0.0.1:33000"
               moduleSystem.config.systemd.services.scorchd.serviceConfig.ExecStart;
-            assert nixpkgs.lib.hasInfix "--search-engines bing,duckduckgo,naver,wikipedia"
+            assert nixpkgs.lib.hasInfix "--search-engines bing,brave-web,crates-io,crossref,docker-hub,duckduckgo,github,google-cse,hacker-news,hugging-face,mwmbl,npm,nvd,openalex,open-library,pubmed,wikidata,wikipedia,yahoo"
               moduleSystem.config.systemd.services.scorchd.serviceConfig.ExecStart;
             pkgs.runCommand "scorch-module-check" { } ''
               touch "$out"

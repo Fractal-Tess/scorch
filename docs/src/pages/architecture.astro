@@ -204,9 +204,14 @@ const headings = [
   <p>
     Metasearch is Scorch's only search provider. The server allowlist remains
     the policy boundary; API, CLI, and MCP requests may narrow it to an explicit
-    subset or omit selection to use server defaults. The server may allow Bing,
-    Brave, DuckDuckGo, Google, Naver, and Wikipedia; Brave and Google require
-    operator credentials.
+    subset or omit selection to use DuckDuckGo. The server may allow the 19
+    live-validated credential-free engines, plus credential-backed official
+    Brave or Google adapters. Brave Web parses Brave Search's public HTML;
+    Google CSE uses Blackle's public Programmable Search Element. Both are
+    request-explicit, credential-free, and best-effort. Search categories are
+    typed query restrictions: the GitHub category adds <code
+      >site:github.com</code
+    > before dispatch and labels matching results.
   </p>
   <ol>
     <li>

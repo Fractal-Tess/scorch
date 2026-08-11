@@ -18,10 +18,25 @@ let
   engineType = types.enum [
     "bing"
     "brave"
+    "brave-web"
+    "crates-io"
+    "crossref"
+    "docker-hub"
     "duckduckgo"
+    "github"
     "google"
-    "naver"
+    "google-cse"
+    "hacker-news"
+    "hugging-face"
+    "mwmbl"
+    "npm"
+    "nvd"
+    "openalex"
+    "open-library"
+    "pubmed"
+    "wikidata"
     "wikipedia"
+    "yahoo"
   ];
   bindAddress =
     if lib.hasInfix ":" server.address then
@@ -127,9 +142,24 @@ in
         type = types.listOf engineType;
         default = [
           "bing"
+          "brave-web"
+          "crates-io"
+          "crossref"
+          "docker-hub"
           "duckduckgo"
-          "naver"
+          "github"
+          "google-cse"
+          "hacker-news"
+          "hugging-face"
+          "mwmbl"
+          "npm"
+          "nvd"
+          "openalex"
+          "open-library"
+          "pubmed"
+          "wikidata"
           "wikipedia"
+          "yahoo"
         ];
         description = "Metasearch engines allowed by server policy.";
       };

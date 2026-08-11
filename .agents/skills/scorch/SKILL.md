@@ -33,11 +33,18 @@ Pass `--api-url <URL>` before the subcommand when the configured endpoint differ
 ```bash
 scorch search "query" --limit 10
 scorch search "query" --country us --language en
+scorch search "code or repository query" --category github
+scorch search "independent web query" --engine brave-web
+scorch search "localized or Google-derived query" --engine google-cse
+scorch search "alternate English web query" --engine yahoo
+scorch search "Rust package" --engine crates-io
+scorch search "TypeScript package" --engine npm
+scorch search "container image" --engine docker-hub
 scorch search "reference query" --engine wikipedia
 scorch search "query" --limit 5 --scrape
 ```
 
-Search is metasearch: `scorchd` concurrently queries the selected engines, merges duplicate URLs, and reranks results. Omit `--engine` to use server defaults, or repeat/comma-separate it to narrow the server allowlist. A request cannot activate an engine excluded by server policy.
+Search is metasearch: `scorchd` concurrently queries selected engines, merges duplicate URLs, and reranks results. Omit `--engine` to use only DuckDuckGo, or repeat/comma-separate it to select from the server allowlist. Use `bing`, `brave-web`, `google-cse`, `mwmbl`, or `yahoo` for alternate English web coverage; `crates-io`, `npm`, and `docker-hub` for package/container discovery; and the explicit research or security engines when their corpus fits. Public frontend integrations may rate-limit or change independently of Scorch. Use `--category github` for GitHub-only discovery. A request cannot activate an engine excluded by server policy.
 
 For location-sensitive searches, set `--country` and `--language` deliberately and include an unambiguous place name. A native-language query often improves regional results. Start with compact search metadata; use `--scrape` only when result-page content is actually required. `--scrape` already enriches returned results, so do not scrape the same pages again without a reason.
 

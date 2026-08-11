@@ -7,7 +7,7 @@ use clap::{Args, Parser, Subcommand, ValueEnum};
 use client::ApiClient;
 use scorch_types::{
     CrawlRequest, CrawlStatus, MapRequest, RenderMode, ScrapeFormat, ScrapeOptions, ScrapeRequest,
-    SearchEngine, SearchRequest,
+    SearchCategory, SearchEngine, SearchRequest,
 };
 use uuid::Uuid;
 
@@ -128,16 +128,40 @@ struct SearchArgs {
     language: String,
     #[arg(long = "engine", value_enum, value_delimiter = ',')]
     engines: Vec<SearchEngineArg>,
+    #[arg(long = "category", value_enum, value_delimiter = ',')]
+    categories: Vec<SearchCategoryArg>,
 }
 
 #[derive(Debug, Clone, Copy, ValueEnum)]
 enum SearchEngineArg {
     Bing,
     Brave,
+    #[value(name = "brave-web")]
+    BraveWeb,
+    #[value(name = "crates-io")]
+    CratesIo,
+    Crossref,
+    #[value(name = "docker-hub")]
+    DockerHub,
     Duckduckgo,
+    Github,
     Google,
-    Naver,
+    #[value(name = "google-cse")]
+    GoogleCse,
+    #[value(name = "hacker-news")]
+    HackerNews,
+    #[value(name = "hugging-face")]
+    HuggingFace,
+    Mwmbl,
+    Npm,
+    Nvd,
+    Openalex,
+    #[value(name = "open-library")]
+    OpenLibrary,
+    Pubmed,
+    Wikidata,
     Wikipedia,
+    Yahoo,
 }
 
 impl From<SearchEngineArg> for SearchEngine {
@@ -145,10 +169,38 @@ impl From<SearchEngineArg> for SearchEngine {
         match value {
             SearchEngineArg::Bing => Self::Bing,
             SearchEngineArg::Brave => Self::Brave,
+            SearchEngineArg::BraveWeb => Self::BraveWeb,
+            SearchEngineArg::CratesIo => Self::CratesIo,
+            SearchEngineArg::Crossref => Self::Crossref,
+            SearchEngineArg::DockerHub => Self::DockerHub,
             SearchEngineArg::Duckduckgo => Self::DuckDuckGo,
+            SearchEngineArg::Github => Self::GitHub,
             SearchEngineArg::Google => Self::Google,
-            SearchEngineArg::Naver => Self::Naver,
+            SearchEngineArg::GoogleCse => Self::GoogleCse,
+            SearchEngineArg::HackerNews => Self::HackerNews,
+            SearchEngineArg::HuggingFace => Self::HuggingFace,
+            SearchEngineArg::Mwmbl => Self::Mwmbl,
+            SearchEngineArg::Npm => Self::Npm,
+            SearchEngineArg::Nvd => Self::Nvd,
+            SearchEngineArg::Openalex => Self::Openalex,
+            SearchEngineArg::OpenLibrary => Self::OpenLibrary,
+            SearchEngineArg::Pubmed => Self::Pubmed,
+            SearchEngineArg::Wikidata => Self::Wikidata,
             SearchEngineArg::Wikipedia => Self::Wikipedia,
+            SearchEngineArg::Yahoo => Self::Yahoo,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, ValueEnum)]
+enum SearchCategoryArg {
+    Github,
+}
+
+impl From<SearchCategoryArg> for SearchCategory {
+    fn from(value: SearchCategoryArg) -> Self {
+        match value {
+            SearchCategoryArg::Github => Self::GitHub,
         }
     }
 }
@@ -207,6 +259,7 @@ async fn run_client(client: &ApiClient, command: Command) -> anyhow::Result<()> 
                     country: args.country,
                     language: args.language,
                     engines: args.engines.into_iter().map(Into::into).collect(),
+                    categories: args.categories.into_iter().map(Into::into).collect(),
                 })
                 .await?,
         )?,
@@ -285,14 +338,17 @@ mod tests {
             "search",
             "Rust",
             "--engine",
-            "bing,duckduckgo",
+            "bing,brave-web,duckduckgo",
             "--engine",
-            "wikipedia",
+            "wikipedia,google-cse",
+            "--category",
+            "github",
         ])
         .unwrap();
         let Command::Search(args) = cli.command else {
             panic!("expected search command");
         };
-        assert_eq!(args.engines.len(), 3);
+        assert_eq!(args.engines.len(), 5);
+        assert_eq!(args.categories.len(), 1);
     }
 }

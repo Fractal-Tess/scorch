@@ -80,7 +80,9 @@ const headings = [
         >
         <tr
           ><td><code>SCORCH_SEARCH_ENGINES</code></td><td
-            ><code>bing,duckduckgo,naver,wikipedia</code></td
+            ><code
+              >bing,brave-web,crates-io,crossref,docker-hub,duckduckgo,github,google-cse,hacker-news,hugging-face,mwmbl,npm,nvd,openalex,open-library,pubmed,wikidata,wikipedia,yahoo</code
+            ></td
           ><td>Comma-separated server allowlist for internal search engines.</td
           ><td><code>--search-engines</code></td></tr
         >
@@ -154,25 +156,34 @@ const headings = [
 
   <h2 id="search-engines">Search engine policy</h2>
   <p>
-    The allowed values are <code>bing</code>, <code>brave</code>, <code
-      >duckduckgo</code
-    >, <code>google</code>, <code>naver</code>, and <code>wikipedia</code>. The
-    server allowlist is an upper bound: requests may select a subset but cannot
-    activate an engine excluded by server policy.
+    The credential-free values are <code>bing</code>, <code>brave-web</code>, <code
+      >crates-io</code
+    >, <code>crossref</code>, <code>docker-hub</code>, <code>duckduckgo</code>, <code
+      >github</code
+    >, <code>google-cse</code>, <code>hacker-news</code>, <code
+      >hugging-face</code
+    >, <code>mwmbl</code>, <code>npm</code>, <code>nvd</code>, <code
+      >openalex</code
+    >, <code>open-library</code>, <code>pubmed</code>, <code>wikidata</code>, <code
+      >wikipedia</code
+    >, and <code>yahoo</code>. The optional credential-backed values are <code
+      >brave</code
+    > and <code>google</code>. The server allowlist is an upper bound.
   </p>
   <h3>Credential-free policy</h3>
-  <pre><code>SCORCH_SEARCH_ENGINES=bing,duckduckgo,naver,wikipedia scorchd</code></pre>
+  <pre><code>SCORCH_SEARCH_ENGINES=bing,brave-web,crates-io,crossref,docker-hub,duckduckgo,github,google-cse,hacker-news,hugging-face,mwmbl,npm,nvd,openalex,open-library,pubmed,wikidata,wikipedia,yahoo scorchd</code></pre>
   <p>
-    Requests that omit <code>engines</code> use whichever of Bing and DuckDuckGo the
-    server allows. Select Naver or Wikipedia explicitly when regional or reference
-    results are useful. If neither default is allowed, requests must select an allowed
-    engine explicitly.
+    Requests that omit <code>engines</code> use only DuckDuckGo when the server allows
+    it. Other general, package, developer, security, and research sources are request-explicit.
+    Brave Web, Google CSE, and Yahoo depend on public frontend protocols and remain
+    best-effort. If DuckDuckGo is not allowed, requests must select an allowed engine
+    explicitly.
   </p>
-  <h3>Add Brave</h3>
-  <pre><code>SCORCH_SEARCH_ENGINES=bing,brave,duckduckgo,naver,wikipedia \
+  <h3>Add the official Brave API</h3>
+  <pre><code>SCORCH_SEARCH_ENGINES=bing,brave,duckduckgo,wikipedia \
 SCORCH_BRAVE_SEARCH_API_KEY='...' \
 scorchd</code></pre>
-  <h3>Add Google Custom Search</h3>
+  <h3>Add the credentialed Google JSON API</h3>
   <pre><code>SCORCH_SEARCH_ENGINES=bing,duckduckgo,google,wikipedia \
 SCORCH_GOOGLE_SEARCH_API_KEY='...' \
 SCORCH_GOOGLE_SEARCH_ENGINE_ID='...' \

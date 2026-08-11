@@ -44,7 +44,7 @@ impl ScorchMcp {
 
     #[tool(
         name = "scorch_search",
-        description = "Search the public web with server defaults or an allowed engines subset; set country and language for local queries, and omit scrapeOptions unless page content is required"
+        description = "Search with DuckDuckGo by default or select from the server's live-validated general, package, developer, security, and research engines; brave-web, google-cse, and yahoo are best-effort public frontend integrations; use the github category for GitHub-only discovery and omit scrapeOptions unless page content is required"
     )]
     async fn search(
         &self,
@@ -226,7 +226,19 @@ mod tests {
         )
         .unwrap();
         assert!(search_schema.contains("engines"));
+        assert!(search_schema.contains("brave-web"));
         assert!(search_schema.contains("duckduckgo"));
+        assert!(search_schema.contains("google-cse"));
+        assert!(search_schema.contains("crates-io"));
+        assert!(search_schema.contains("docker-hub"));
+        assert!(search_schema.contains("hugging-face"));
+        assert!(search_schema.contains("npm"));
+        assert!(search_schema.contains("pubmed"));
+        assert!(search_schema.contains("yahoo"));
+        assert!(!search_schema.contains("microsoft-learn"));
+        assert!(!search_schema.contains("stack-overflow"));
+        assert!(search_schema.contains("categories"));
+        assert!(search_schema.contains("github"));
 
         for tool in tools {
             let schema = serde_json::to_string(&tool).unwrap();

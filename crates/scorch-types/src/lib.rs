@@ -127,10 +127,39 @@ pub struct ScrapeDocument {
 pub enum SearchEngine {
     Bing,
     Brave,
+    #[serde(rename = "brave-web")]
+    BraveWeb,
+    #[serde(rename = "crates-io")]
+    CratesIo,
+    Crossref,
+    #[serde(rename = "docker-hub")]
+    DockerHub,
     DuckDuckGo,
+    #[serde(rename = "github")]
+    GitHub,
     Google,
-    Naver,
+    #[serde(rename = "google-cse")]
+    GoogleCse,
+    #[serde(rename = "hacker-news")]
+    HackerNews,
+    #[serde(rename = "hugging-face")]
+    HuggingFace,
+    Mwmbl,
+    Npm,
+    Nvd,
+    Openalex,
+    #[serde(rename = "open-library")]
+    OpenLibrary,
+    Pubmed,
+    Wikidata,
     Wikipedia,
+    Yahoo,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum SearchCategory {
+    GitHub,
 }
 
 impl SearchEngine {
@@ -138,10 +167,25 @@ impl SearchEngine {
         match self {
             Self::Bing => "bing",
             Self::Brave => "brave",
+            Self::BraveWeb => "brave-web",
+            Self::CratesIo => "crates-io",
+            Self::Crossref => "crossref",
+            Self::DockerHub => "docker-hub",
             Self::DuckDuckGo => "duckduckgo",
+            Self::GitHub => "github",
             Self::Google => "google",
-            Self::Naver => "naver",
+            Self::GoogleCse => "google-cse",
+            Self::HackerNews => "hacker-news",
+            Self::HuggingFace => "hugging-face",
+            Self::Mwmbl => "mwmbl",
+            Self::Npm => "npm",
+            Self::Nvd => "nvd",
+            Self::Openalex => "openalex",
+            Self::OpenLibrary => "open-library",
+            Self::Pubmed => "pubmed",
+            Self::Wikidata => "wikidata",
             Self::Wikipedia => "wikipedia",
+            Self::Yahoo => "yahoo",
         }
     }
 }
@@ -160,6 +204,8 @@ pub struct SearchRequest {
     pub language: String,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub engines: Vec<SearchEngine>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub categories: Vec<SearchCategory>,
 }
 
 fn default_search_limit() -> usize {
@@ -184,6 +230,8 @@ pub struct SearchResult {
     pub description: Option<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub sources: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub category: Option<SearchCategory>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub document: Option<ScrapeDocument>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -380,9 +428,49 @@ mod tests {
     }
 
     #[test]
+    fn credential_free_engines_use_stable_wire_names() {
+        assert_eq!(
+            serde_json::to_string(&SearchEngine::BraveWeb).unwrap(),
+            "\"brave-web\""
+        );
+        assert_eq!(
+            serde_json::to_string(&SearchEngine::GoogleCse).unwrap(),
+            "\"google-cse\""
+        );
+        assert_eq!(
+            serde_json::to_string(&SearchEngine::CratesIo).unwrap(),
+            "\"crates-io\""
+        );
+        assert_eq!(
+            serde_json::to_string(&SearchEngine::DockerHub).unwrap(),
+            "\"docker-hub\""
+        );
+        assert_eq!(
+            serde_json::to_string(&SearchEngine::HuggingFace).unwrap(),
+            "\"hugging-face\""
+        );
+        assert_eq!(
+            serde_json::to_string(&SearchEngine::Yahoo).unwrap(),
+            "\"yahoo\""
+        );
+    }
+
+    #[test]
+    fn search_categories_use_stable_wire_names() {
+        assert_eq!(
+            serde_json::to_string(&SearchCategory::GitHub).unwrap(),
+            "\"github\""
+        );
+        let request: SearchRequest =
+            serde_json::from_str(r#"{"query":"Rust","categories":["github"]}"#).unwrap();
+        assert_eq!(request.categories, [SearchCategory::GitHub]);
+    }
+
+    #[test]
     fn omitted_search_engines_preserve_default_behavior() {
         let request: SearchRequest = serde_json::from_str(r#"{"query":"Rust"}"#).unwrap();
         assert!(request.engines.is_empty());
+        assert!(request.categories.is_empty());
         assert_eq!(request.country, "us");
         assert_eq!(request.language, "en");
     }

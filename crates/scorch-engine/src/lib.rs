@@ -216,6 +216,7 @@ impl ScorchEngine {
             provider = "metasearch",
             query_length = request.query.len(),
             limit = request.limit,
+            category_count = request.categories.len(),
             enrich_results = request.scrape_options.is_some(),
             "search started"
         );

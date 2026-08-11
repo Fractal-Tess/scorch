@@ -51,8 +51,18 @@ const server = createServer(async (request, response) => {
       send(response, 200, {
         query: body.query,
         provider: "metasearch",
-        engines: body.engines ?? ["bing", "duckduckgo"],
-        results: [],
+        engines: body.engines ?? ["duckduckgo"],
+        results:
+          body.categories?.[0] === "github"
+            ? [
+                {
+                  position: 1,
+                  title: "Repository",
+                  url: "https://github.com/example/repository",
+                  category: "github",
+                },
+              ]
+            : [],
         elapsedMs: 1,
       });
     }
@@ -127,9 +137,25 @@ test("health, readiness, and search", async () => {
   const result = await client.search("Rust", {
     country: "bg",
     language: "en",
-    engines: ["wikipedia"],
+    engines: [
+      "brave-web",
+      "crates-io",
+      "docker-hub",
+      "google-cse",
+      "npm",
+      "yahoo",
+    ],
+    categories: ["github"],
   });
-  assert.deepEqual(result.engines, ["wikipedia"]);
+  assert.deepEqual(result.engines, [
+    "brave-web",
+    "crates-io",
+    "docker-hub",
+    "google-cse",
+    "npm",
+    "yahoo",
+  ]);
+  assert.equal(result.results[0].category, "github");
 });
 
 test("scrape, map, and crawl", async () => {

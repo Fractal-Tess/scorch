@@ -3,7 +3,30 @@ from typing import Literal, NotRequired, TypedDict
 ScrapeFormat = Literal["markdown", "html", "text", "links", "metadata", "screenshot"]
 RenderMode = Literal["auto", "always", "never"]
 ScrapeEngine = Literal["fetch", "obscura"]
-SearchEngine = Literal["bing", "brave", "duckduckgo", "google", "naver", "wikipedia"]
+SearchEngine = Literal[
+    "bing",
+    "brave",
+    "brave-web",
+    "crates-io",
+    "crossref",
+    "docker-hub",
+    "duckduckgo",
+    "github",
+    "google",
+    "google-cse",
+    "hacker-news",
+    "hugging-face",
+    "mwmbl",
+    "npm",
+    "nvd",
+    "openalex",
+    "open-library",
+    "pubmed",
+    "wikidata",
+    "wikipedia",
+    "yahoo",
+]
+SearchCategory = Literal["github"]
 CrawlStatus = Literal["queued", "running", "completed", "cancelled", "failed"]
 
 
@@ -52,6 +75,7 @@ class SearchResult(TypedDict):
     url: str
     description: NotRequired[str]
     sources: NotRequired[list[str]]
+    category: NotRequired[SearchCategory]
     document: NotRequired[ScrapeDocument]
     error: NotRequired[str]
 

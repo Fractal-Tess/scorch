@@ -139,21 +139,32 @@ scorch scrape https://example.com \
           ></tr
         >
         <tr
-          ><td><code>--engine</code></td><td>server defaults</td><td
+          ><td><code>--engine</code></td><td><code>duckduckgo</code></td><td
             >Repeat or comma-separate to select an allowed engine subset.</td
+          ></tr
+        >
+        <tr
+          ><td><code>--category</code></td><td>none</td><td
+            >Use <code>github</code> to restrict results to GitHub.</td
           ></tr
         >
       </tbody>
     </table>
   </div>
   <pre><code>scorch search "rust async runtime" --limit 8
-scorch search "времето в София" --country bg --language bg
-scorch search "Rust history" --engine bing,duckduckgo --engine wikipedia</code></pre>
+scorch search "Rust HTTP clients" --category github
+scorch search "rust async runtime" --engine brave-web
+scorch search "времето в София" --country bg --language bg --engine google-cse
+scorch search "времето в София" --country bg --language bg --engine bing,duckduckgo
+scorch search "Rust history" --engine wikipedia</code></pre>
   <p>
-    Engine selection can only narrow the server allowlist. An excluded or
-    unconfigured engine is rejected rather than activated by a request. Search
-    compact metadata first; use <code>--scrape</code> only when every result needs
-    page content.
+    DuckDuckGo is used when <code>--engine</code> is omitted. Engine selection can
+    only narrow the server allowlist; an excluded or unconfigured engine is rejected
+    rather than activated by a request. <code>brave-web</code> and <code
+      >google-cse</code
+    >
+    are credential-free, best-effort public frontend integrations. Search compact
+    metadata first; use <code>--scrape</code> only when every result needs page content.
   </p>
 
   <h2 id="map">scorch map</h2>

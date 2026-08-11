@@ -54,7 +54,7 @@ const headings = [
   "obscuraStealth": true,
   "maxConcurrency": 4,
   "searchProvider": "metasearch",
-  "searchEngines": ["bing", "duckduckgo", "naver", "wikipedia"]
+  "searchEngines": ["bing", "brave-web", "crates-io", "crossref", "docker-hub", "duckduckgo", "github", "google-cse", "hacker-news", "hugging-face", "mwmbl", "npm", "nvd", "openalex", "open-library", "pubmed", "wikidata", "wikipedia", "yahoo"]
 &#125;</code></pre>
 
   <h2 id="scrape">Scrape</h2>
@@ -147,26 +147,33 @@ const headings = [
   "limit": 5,
   "country": "us",
   "language": "en",
-  "engines": ["bing", "duckduckgo"],
+  "categories": ["github"],
   "scrapeOptions": null
 &#125;</code></pre>
   <p>
     Limits range from 1 to 20 and queries are capped at 512 bytes. Metasearch is
-    the only public provider. Omit <code>engines</code> to use server defaults, or
-    select a subset of the server allowlist. Results identify their contributing
-    <code>sources</code>.
+    the only public provider. Omit <code>engines</code> to use DuckDuckGo, or select
+    a subset of the server allowlist. The <code>github</code> category restricts the
+    upstream web query to <code>site:github.com</code>. Select <code
+      >brave-web</code
+    >
+    for credential-free Brave website results or <code>google-cse</code> for credential-free
+    Google-derived Programmable Search results. Both public frontend integrations
+    are best-effort. Results identify contributing <code>sources</code>
+    and matching categories.
   </p>
   <pre><code>&#123;
   "query": "rust async runtime",
   "provider": "metasearch",
-  "engines": ["bing", "duckduckgo"],
+  "engines": ["duckduckgo"],
   "results": [
     &#123;
       "position": 1,
-      "title": "Result title",
-      "url": "https://example.com/result",
+      "title": "Repository title",
+      "url": "https://github.com/example/repository",
       "description": "Result description",
-      "sources": ["bing", "duckduckgo"]
+      "sources": ["duckduckgo"],
+      "category": "github"
     &#125;
   ],
   "elapsedMs": 911,

@@ -29,6 +29,7 @@ from .types import (
     ReadinessResponse,
     ScrapeDocument,
     ScrapeOptions,
+    SearchCategory,
     SearchEngine,
     SearchResponse,
 )
@@ -177,6 +178,7 @@ class ScorchClient:
         country: str | None = None,
         language: str | None = None,
         engines: Sequence[SearchEngine] | None = None,
+        categories: Sequence[SearchCategory] | None = None,
         scrape_options: ScrapeOptions | None = None,
     ) -> SearchResponse:
         body: dict[str, object] = {"query": query}
@@ -185,6 +187,8 @@ class ScorchClient:
         _set_if_not_none(body, "language", language)
         if engines is not None:
             body["engines"] = list(engines)
+        if categories is not None:
+            body["categories"] = list(categories)
         _set_if_not_none(body, "scrapeOptions", scrape_options)
         return cast(SearchResponse, self._request("POST", "/v1/search", body))
 

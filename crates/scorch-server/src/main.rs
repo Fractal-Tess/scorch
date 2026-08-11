@@ -29,7 +29,7 @@ struct ServerArgs {
         value_enum,
         value_delimiter = ',',
         env = "SCORCH_SEARCH_ENGINES",
-        default_value = "bing,duckduckgo,naver,wikipedia"
+        default_value = "bing,brave-web,crates-io,crossref,docker-hub,duckduckgo,github,google-cse,hacker-news,hugging-face,mwmbl,npm,nvd,openalex,open-library,pubmed,wikidata,wikipedia,yahoo"
     )]
     search_engines: Vec<SearchEngineArg>,
     #[arg(long, env = "SCORCH_BRAVE_SEARCH_API_KEY", hide_env_values = true)]
@@ -73,10 +73,32 @@ fn unique_engines(engines: &[SearchEngineArg]) -> Vec<EngineKind> {
 enum SearchEngineArg {
     Bing,
     Brave,
+    #[value(name = "brave-web")]
+    BraveWeb,
+    #[value(name = "crates-io")]
+    CratesIo,
+    Crossref,
+    #[value(name = "docker-hub")]
+    DockerHub,
     Duckduckgo,
+    Github,
     Google,
-    Naver,
+    #[value(name = "google-cse")]
+    GoogleCse,
+    #[value(name = "hacker-news")]
+    HackerNews,
+    #[value(name = "hugging-face")]
+    HuggingFace,
+    Mwmbl,
+    Npm,
+    Nvd,
+    Openalex,
+    #[value(name = "open-library")]
+    OpenLibrary,
+    Pubmed,
+    Wikidata,
     Wikipedia,
+    Yahoo,
 }
 
 impl From<SearchEngineArg> for EngineKind {
@@ -84,10 +106,25 @@ impl From<SearchEngineArg> for EngineKind {
         match value {
             SearchEngineArg::Bing => Self::Bing,
             SearchEngineArg::Brave => Self::Brave,
+            SearchEngineArg::BraveWeb => Self::BraveWeb,
+            SearchEngineArg::CratesIo => Self::CratesIo,
+            SearchEngineArg::Crossref => Self::Crossref,
+            SearchEngineArg::DockerHub => Self::DockerHub,
             SearchEngineArg::Duckduckgo => Self::DuckDuckGo,
+            SearchEngineArg::Github => Self::GitHub,
             SearchEngineArg::Google => Self::Google,
-            SearchEngineArg::Naver => Self::Naver,
+            SearchEngineArg::GoogleCse => Self::GoogleCse,
+            SearchEngineArg::HackerNews => Self::HackerNews,
+            SearchEngineArg::HuggingFace => Self::HuggingFace,
+            SearchEngineArg::Mwmbl => Self::Mwmbl,
+            SearchEngineArg::Npm => Self::Npm,
+            SearchEngineArg::Nvd => Self::Nvd,
+            SearchEngineArg::Openalex => Self::OpenAlex,
+            SearchEngineArg::OpenLibrary => Self::OpenLibrary,
+            SearchEngineArg::Pubmed => Self::PubMed,
+            SearchEngineArg::Wikidata => Self::Wikidata,
             SearchEngineArg::Wikipedia => Self::Wikipedia,
+            SearchEngineArg::Yahoo => Self::Yahoo,
         }
     }
 }
@@ -150,6 +187,14 @@ mod tests {
     fn obscura_stealth_is_enabled_by_default() {
         let args = ServerArgs::try_parse_from(["scorchd"]).unwrap();
         assert!(args.engine_config().obscura_stealth);
+    }
+
+    #[test]
+    fn credential_free_engines_are_allowed_by_default() {
+        let args = ServerArgs::try_parse_from(["scorchd"]).unwrap();
+        let engines = args.engine_config().search_engines;
+        assert!(engines.contains(&EngineKind::BraveWeb));
+        assert!(engines.contains(&EngineKind::GoogleCse));
     }
 
     #[test]

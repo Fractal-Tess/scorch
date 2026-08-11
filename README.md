@@ -35,6 +35,9 @@ Start `scorchd`, then search, extract, render, map, or crawl with the lightweigh
 scorchd
 
 scorch search "rust async runtime" --limit 5
+scorch search "rust HTTP clients" --category github
+scorch search "времето в София" --country bg --language bg --engine google-cse
+scorch search "rust HTTP clients" --engine brave-web
 scorch search "времето в София" --country bg --language bg --engine bing,duckduckgo
 scorch scrape https://example.com --format markdown,links
 scorch scrape https://example.com --render always --format markdown
@@ -43,7 +46,7 @@ scorch map https://example.com --limit 100
 scorch crawl https://example.com --limit 20 --max-depth 2 --wait
 ```
 
-The default endpoint is `http://127.0.0.1:33000`. Override it with `SCORCH_API_URL` or `--api-url`. The server allows Bing, DuckDuckGo, Naver, and Wikipedia by default, while ordinary requests use Bing and DuckDuckGo unless they select another allowed subset. Brave and Google remain credential-backed; [Google's Custom Search JSON API](https://developers.google.com/custom-search/v1/overview) is closed to new customers and scheduled for retirement on January 1, 2027.
+The default endpoint is `http://127.0.0.1:33000`. Override it with `SCORCH_API_URL` or `--api-url`. The server allows 19 live-validated, credential-free engines by default: bing, brave-web, crates-io, crossref, docker-hub, duckduckgo, github, google-cse, hacker-news, hugging-face, mwmbl, npm, nvd, openalex, open-library, pubmed, wikidata, wikipedia, yahoo. Ordinary requests still use only DuckDuckGo unless they select another allowed subset. Use `--category github` for GitHub-restricted discovery, select `--engine brave-web` for Brave's public website results, select `--engine google-cse` for Google-derived Programmable Search results, or add Bing with `--engine bing,duckduckgo`. The `brave-web` integration scrapes Brave's public HTML and is best-effort; `brave` remains the separate official credential-backed API adapter. The official Google JSON API adapter is also credential-backed; [Google's Custom Search JSON API](https://developers.google.com/custom-search/v1/overview) is closed to new customers and scheduled for retirement on January 1, 2027. Google CSE uses Blackle's public Programmable Search Engine and may change independently of Scorch.
 
 ## Smaller than self-hosted Firecrawl
 
@@ -79,8 +82,8 @@ wget -qO- https://github.com/Fractal-Tess/scorch/releases/latest/download/instal
 The installer detects the Linux architecture and verifies the release checksum. Pin a version or choose another directory with:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/Fractal-Tess/scorch/v0.4.0/install.sh \
-  | sh -s -- --version 0.4.0 --install-dir ~/.local/bin
+curl -fsSL https://raw.githubusercontent.com/Fractal-Tess/scorch/v0.5.0/install.sh \
+  | sh -s -- --version 0.5.0 --install-dir ~/.local/bin
 ```
 
 ### Release archive
@@ -88,7 +91,7 @@ curl -fsSL https://raw.githubusercontent.com/Fractal-Tess/scorch/v0.4.0/install.
 Download the archive from [GitHub Releases](https://github.com/Fractal-Tess/scorch/releases) for the current Linux architecture and verify its published checksum:
 
 ```sh
-VERSION=0.4.0
+VERSION=0.5.0
 TARGET="$(uname -m)-unknown-linux-gnu"
 ARCHIVE="scorch-v${VERSION}-${TARGET}.tar.xz"
 BASE="https://github.com/Fractal-Tess/scorch/releases/download/v${VERSION}"
@@ -110,11 +113,11 @@ Release archives support `x86_64-linux` and `aarch64-linux`.
 Nix downloads the same fixed-hash CI binaries rather than compiling the Rust workspace:
 
 ```sh
-nix run github:Fractal-Tess/scorch/v0.4.0#scorch -- --help
-nix run github:Fractal-Tess/scorch/v0.4.0#scorchd -- --help
+nix run github:Fractal-Tess/scorch/v0.5.0#scorch -- --help
+nix run github:Fractal-Tess/scorch/v0.5.0#scorchd -- --help
 ```
 
-Use `github:Fractal-Tess/scorch/v0.4.0` as a flake input. The flake exports packages, an overlay, NixOS and Home Manager modules, checks, and the Agent Skill. See the [Nix guide](docs/src/pages/nix.astro) for a complete declarative configuration.
+Use `github:Fractal-Tess/scorch/v0.5.0` as a flake input. The flake exports packages, an overlay, NixOS and Home Manager modules, checks, and the Agent Skill. See the [Nix guide](docs/src/pages/nix.astro) for a complete declarative configuration.
 
 ## Python and JavaScript clients
 
@@ -128,14 +131,14 @@ npm install ./clients/javascript
 ```python
 from scorch_client import ScorchClient
 
-results = ScorchClient().search("Rust", engines=["bing", "duckduckgo"])
+results = ScorchClient().search("Rust", categories=["github"])
 ```
 
 ```js
 import { ScorchClient } from "@fractal-tess/scorch";
 
 const results = await new ScorchClient().search("Rust", {
-  engines: ["bing", "duckduckgo"],
+  categories: ["github"],
 });
 ```
 
@@ -207,7 +210,7 @@ npx skills add Fractal-Tess/scorch --skill scorch
 Alternatively, build its installable Nix package:
 
 ```sh
-nix build github:Fractal-Tess/scorch/v0.4.0#skill
+nix build github:Fractal-Tess/scorch/v0.5.0#skill
 ```
 
 ## Development

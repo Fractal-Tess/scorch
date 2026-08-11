@@ -7,7 +7,28 @@ export type ScrapeFormat =
 export type RenderMode = "auto" | "always" | "never";
 export type ScrapeEngine = "fetch" | "obscura";
 export type SearchEngine =
-  "bing" | "brave" | "duckduckgo" | "google" | "naver" | "wikipedia";
+  | "bing"
+  | "brave"
+  | "brave-web"
+  | "crates-io"
+  | "crossref"
+  | "docker-hub"
+  | "duckduckgo"
+  | "github"
+  | "google"
+  | "google-cse"
+  | "hacker-news"
+  | "hugging-face"
+  | "mwmbl"
+  | "npm"
+  | "nvd"
+  | "openalex"
+  | "open-library"
+  | "pubmed"
+  | "wikidata"
+  | "wikipedia"
+  | "yahoo";
+export type SearchCategory = "github";
 export type CrawlStatus =
   "queued" | "running" | "completed" | "cancelled" | "failed";
 
@@ -55,6 +76,7 @@ export interface SearchOptions {
   country?: string;
   language?: string;
   engines?: readonly SearchEngine[];
+  categories?: readonly SearchCategory[];
   scrapeOptions?: ScrapeOptions | null;
 }
 
@@ -64,6 +86,7 @@ export interface SearchResult {
   url: string;
   description?: string;
   sources?: string[];
+  category?: SearchCategory;
   document?: ScrapeDocument;
   error?: string;
 }
