@@ -15,7 +15,7 @@ All notable changes to Scorch are documented in this file. The project follows [
 
 - Made Bing and DuckDuckGo the default search engines while keeping Naver and Wikipedia available on explicit requests.
 - Improved Agent Skill guidance for locale-sensitive search, compact results, and structured JSON APIs.
-- Updated pinned GitHub artifact actions to their Node.js 24 releases.
+- Updated pinned core GitHub Actions to their current major releases.
 
 ## [0.3.0] - 2026-08-11
 
