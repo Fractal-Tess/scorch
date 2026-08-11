@@ -45,7 +45,7 @@ jobs:
           fi
 
       - name: Download exact prepared archives
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
         with:
           pattern: scorch-v${{ inputs.version }}-*
           path: dist
@@ -54,7 +54,7 @@ jobs:
           run-id: ${{ inputs.run_id }}
 
       - name: Download source manifest
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
         with:
           name: scorch-v${{ inputs.version }}-manifest
           path: manifest

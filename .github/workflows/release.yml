@@ -24,7 +24,7 @@ jobs:
       sha: ${{ steps.revision.outputs.sha }}
     steps:
       - name: Check out requested revision
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           ref: ${{ inputs.ref }}
 
@@ -45,7 +45,7 @@ jobs:
             > release-manifest.json
 
       - name: Upload source manifest
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
         with:
           name: scorch-v${{ inputs.version }}-manifest
           path: |
@@ -70,7 +70,7 @@ jobs:
     runs-on: ${{ matrix.runner }}
     steps:
       - name: Check out resolved source
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           ref: ${{ needs.resolve.outputs.sha }}
 
@@ -184,7 +184,7 @@ jobs:
           rm -rf "${root}"
 
       - name: Upload prepared archive
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
         with:
           name: scorch-v${{ steps.version.outputs.version }}-${{ matrix.target }}
           path: |
