@@ -19,15 +19,15 @@
 
           # Keep the release tag and fixed archive hashes together. Promotion CI
           # updates these only after both immutable artifacts have been prepared.
-          version = "0.1.3";
+          version = "0.3.0";
           releaseArtifacts = {
             x86_64-linux = {
               target = "x86_64-unknown-linux-gnu";
-              hash = "sha256-u9sKkqGUEHjOcXnRck2krBgJFHuz1XqM7XesvO0yPqs=";
+              hash = "sha256-9B1wAWkAJHcNScPtsCt0WXVYj8psWlqQUeNH/8L0HKA=";
             };
             aarch64-linux = {
               target = "aarch64-unknown-linux-gnu";
-              hash = "sha256-WFC4qqHkES5OSpj4t+7wJsjqrrbXu9bcnsj9dHSWEqo=";
+              hash = "sha256-xz70PBMqCiI2QPcvHJ0dREF/LLl7FUvRMqzmHDa2bmw=";
             };
           };
           artifact = releaseArtifacts.${pkgs.stdenv.hostPlatform.system};
@@ -60,6 +60,8 @@
                 runHook preInstall
                 install -Dm755 "bin/${binary}" "$out/bin/${binary}"
                 install -Dm644 "share/licenses/scorch/LICENSE" "$out/share/licenses/scorch/LICENSE"
+                install -Dm644 "share/licenses/scorch/THIRD_PARTY_LICENSES.html" \
+                  "$out/share/licenses/scorch/THIRD_PARTY_LICENSES.html"
                 runHook postInstall
               '';
               installCheckPhase = ''
@@ -155,8 +157,8 @@
               touch "$out"
             '';
           version = pkgs.runCommand "scorch-version-check" { } ''
-            test "$(${packages.scorch}/bin/scorch --version)" = 'scorch 0.1.3'
-            test "$(${packages.scorchd}/bin/scorchd --version)" = 'scorchd 0.1.3'
+            test "$(${packages.scorch}/bin/scorch --version)" = 'scorch 0.3.0'
+            test "$(${packages.scorchd}/bin/scorchd --version)" = 'scorchd 0.3.0'
             touch "$out"
           '';
         }
