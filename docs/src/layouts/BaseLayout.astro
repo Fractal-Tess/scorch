@@ -20,27 +20,38 @@ const {
   hideFooter = false,
   noindex = false,
 } = Astro.props;
-const canonical = Astro.site
-  ? new URL(Astro.url.pathname, Astro.site)
-  : undefined;
-const socialImage = image.startsWith("http")
-  ? new URL(image)
-  : Astro.site
-    ? new URL(image, Astro.site)
-    : new URL(
-        `https://raw.githubusercontent.com/Fractal-Tess/scorch/main/docs/public${image}`,
-      );
+const siteUrl = Astro.site ?? new URL("https://scorch.fractal-tess.xyz");
+const canonical = new URL(Astro.url.pathname, siteUrl);
+const socialImage = new URL(image, siteUrl);
 const fullTitle = title.startsWith("Scorch") ? title : `${title} · Scorch`;
 const structuredData = {
   "@context": "https://schema.org",
-  "@type": "SoftwareApplication",
-  name: "Scorch",
-  description,
-  applicationCategory: "DeveloperApplication",
-  operatingSystem: "Linux",
-  codeRepository: "https://github.com/Fractal-Tess/scorch",
-  license: "https://opensource.org/license/mit",
-  image: socialImage.toString(),
+  "@graph": [
+    {
+      "@type": "WebSite",
+      "@id": `${siteUrl}#website`,
+      name: "Scorch",
+      url: siteUrl.toString(),
+      description:
+        "Documentation for Scorch, a self-hosted web intelligence service built in Rust.",
+      inLanguage: "en-US",
+    },
+    {
+      "@type": "SoftwareApplication",
+      "@id": `${siteUrl}#software`,
+      name: "Scorch",
+      url: siteUrl.toString(),
+      description,
+      applicationCategory: "DeveloperApplication",
+      applicationSubCategory: "Web intelligence and extraction",
+      operatingSystem: "Linux",
+      codeRepository: "https://github.com/Fractal-Tess/scorch",
+      license: "https://opensource.org/license/mit",
+      isAccessibleForFree: true,
+      image: socialImage.toString(),
+      sameAs: ["https://github.com/Fractal-Tess/scorch"],
+    },
+  ],
 };
 ---
 
@@ -52,6 +63,9 @@ const structuredData = {
     <meta name="generator" content={Astro.generator} />
     <meta name="description" content={description} />
     <meta name="author" content="Fractal-Tess" />
+    <meta name="application-name" content="Scorch" />
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
+    <meta name="format-detection" content="telephone=no" />
     <meta
       name="robots"
       content={noindex
@@ -60,23 +74,30 @@ const structuredData = {
     />
     <meta name="theme-color" content="#0a0b0d" />
     <meta name="color-scheme" content="dark light" />
-    <link rel="icon" type="image/png" href="/favicon.png" />
-    <link rel="apple-touch-icon" href="/brand/scorch-shadow-mark.png" />
+    <link rel="icon" type="image/png" sizes="64x64" href="/favicon.png" />
+    <link
+      rel="apple-touch-icon"
+      sizes="512x512"
+      href="/brand/scorch-shadow-mark.png"
+    />
     <link rel="manifest" href="/site.webmanifest" />
-    {canonical && <link rel="canonical" href={canonical} />}
+    <link rel="canonical" href={canonical} />
+    <link rel="image_src" href={socialImage} />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Scorch" />
     <meta property="og:locale" content="en_US" />
     <meta property="og:title" content={fullTitle} />
     <meta property="og:description" content={description} />
-    {canonical && <meta property="og:url" content={canonical} />}
+    <meta property="og:url" content={canonical} />
     <meta property="og:image" content={socialImage} />
+    <meta property="og:image:url" content={socialImage} />
     <meta property="og:image:secure_url" content={socialImage} />
     <meta property="og:image:type" content="image/png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
     <meta property="og:image:alt" content={imageAlt} />
     <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:url" content={canonical} />
     <meta name="twitter:title" content={fullTitle} />
     <meta name="twitter:description" content={description} />
     <meta name="twitter:image" content={socialImage} />

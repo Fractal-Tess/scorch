@@ -1,8 +1,10 @@
 {
+  "id": "/",
   "name": "Scorch Documentation",
   "short_name": "Scorch",
-  "description": "Self-hosted web intelligence for agents and applications.",
+  "description": "Self-hosted web search, scraping, mapping, and crawling in Rust.",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#0a0b0d",
   "theme_color": "#0a0b0d",
@@ -10,7 +12,8 @@
     {
       "src": "/brand/scorch-shadow-mark.png",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
     }
   ]
 }

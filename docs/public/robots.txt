@@ -1,2 +1,5 @@
 User-agent: *
 Allow: /
+
+Sitemap: https://scorch.fractal-tess.xyz/sitemap.xml
+Host: scorch.fractal-tess.xyz
