@@ -72,6 +72,16 @@ Memory was sampled every 50 ms from cgroup v2 as `memory.current - inactive_file
 
 ## Install
 
+### Docker
+
+The release image is a multi-platform `scratch` image containing only `scorchd`, the `scorch` client, their required shared libraries, TLS roots, and an empty temporary directory. It runs as an unprivileged user and starts `scorchd` automatically:
+
+```sh
+docker run --rm -p 33000:33000 ghcr.io/fractal-tess/scorch:latest
+```
+
+Use the bundled client from another container on the same network, or point a host-installed client at `http://127.0.0.1:33000`. Configuration is available through the same `SCORCH_*` environment variables as `scorchd`.
+
 ### Installer
 
 Install the latest release into `~/.local/bin` with either curl or wget:

@@ -51,8 +51,10 @@ cosmic-text = { git = "https://github.com/h4ckf0r0day/obscura.git", rev = "97124
 taffy = { git = "https://github.com/h4ckf0r0day/obscura.git", rev = "97124edeb2ea610615e78f43e097454e3b221f6b" }
 
 [profile.release]
-lto = "thin"
+opt-level = 3
+lto = "fat"
 codegen-units = 1
+panic = "abort"
 strip = "symbols"
 overflow-checks = true
 
