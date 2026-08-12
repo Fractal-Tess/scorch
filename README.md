@@ -48,22 +48,27 @@ scorch crawl https://example.com --limit 20 --max-depth 2 --wait
 
 The default endpoint is `http://127.0.0.1:33000`. Override it with `SCORCH_API_URL` or `--api-url`. The server allows 19 live-validated, credential-free engines by default: bing, brave-web, crates-io, crossref, docker-hub, duckduckgo, github, google-cse, hacker-news, hugging-face, mwmbl, npm, nvd, openalex, open-library, pubmed, wikidata, wikipedia, yahoo. Ordinary requests still use only DuckDuckGo unless they select another allowed subset. Use `--category github` for GitHub-restricted discovery, select `--engine brave-web` for Brave's public website results, select `--engine google-cse` for Google-derived Programmable Search results, or add Bing with `--engine bing,duckduckgo`. The `brave-web` integration scrapes Brave's public HTML and is best-effort; `brave` remains the separate official credential-backed API adapter. The official Google JSON API adapter is also credential-backed; [Google's Custom Search JSON API](https://developers.google.com/custom-search/v1/overview) is closed to new customers and scheduled for retirement on January 1, 2027. Google CSE uses Blackle's public Programmable Search Engine and may change independently of Scorch.
 
-## Smaller than self-hosted Firecrawl
+## Self-hosted footprint and browser-scrape benchmark
 
-Firecrawl's [official self-hosted stack](https://github.com/firecrawl/firecrawl/blob/e72fe3acac88651c31fc2ac8398926d7fa2fcdd3/docker-compose.yaml) runs six long-lived services. Scorch runs one daemon with no database, cache, or message broker.
+We compared Scorch `0.5.0` with Firecrawl `2.11.0` at commit [`ef12eb36`](https://github.com/firecrawl/firecrawl/tree/ef12eb36b2f3382838dfe0a0c1a5add3d5df7fe5). Firecrawl used its pinned, unmodified full Docker Compose configuration, which starts six long-running containers plus a completed one-shot FoundationDB initializer. Scorch ran as one systemd service with maximum concurrency four.
 
-| | Self-hosted Firecrawl | Scorch |
+| Measured result | Firecrawl | Scorch |
 | --- | ---: | ---: |
-| Long-running services | 6 | **1** |
-| First render | 0.661 s | **0.192 s** |
-| Warm renderer memory | 407.9 MiB | **37.3 MiB** |
-| Peak renderer processes | 14 | **1** |
-| Parallel render speed | 3.03 req/s | 1.99 req/s |
-| Database, cache, and broker | PostgreSQL, Redis, RabbitMQ | **None** |
+| Long-running deployment units | 6 containers | **1 service** |
+| Sequential scrape latency, median (12 requests) | **0.859 s** | 1.822 s |
+| Parallel trial duration, median (8 requests, concurrency 4) | **2.296 s** | 7.644 s |
+| Successful scrape throughput at concurrency 4 | **3.48 req/s** | 1.05 req/s |
+| Successful parallel requests | 24 / 24 | 24 / 24 |
+| Warm-idle measured cgroup memory | 2,931 MiB | **118 MiB** |
+| Observed peak measured cgroup memory | 3,107 MiB | **236 MiB** |
+| Observed OS processes, warm / peak | 49 / 57 | **1 / 1** |
+| Bundled state and queue services started | PostgreSQL, Redis, RabbitMQ, FoundationDB | **None** |
 
-Scorch is lighter because Obscura runs inside `scorchd`, static pages skip the browser, and crawl jobs stay in bounded memory. That means less startup and coordination before a crawl begins.
+This is a small end-to-end browser-rendered Markdown scrape and deployment-footprint microbenchmark, not a feature-parity, extraction-quality, crawl-speed, startup-time, maximum-throughput, or CPU-efficiency comparison. It shows the tradeoff in the tested configurations: Firecrawl processed this workload faster, while Scorch used about 25× less warm-idle memory, about 13× less observed peak memory, and one process.
 
-The Scorch figures were confirmed on an optimized `0.2.0` release-candidate build using the median of three trials, four public pages, and eight parallel renders at concurrency four; all requests succeeded. The Firecrawl column uses the same host's Chromium baseline because Firecrawl uses Playwright with Chromium and publishes no equivalent reproducible self-hosted benchmark. This is not an end-to-end crawl-speed claim. See the [architecture guide](docs/src/pages/architecture.astro) for details.
+Four public pages were used: Example Domain, Scrape This Site, Books to Scrape, and Quotes to Scrape's JavaScript page. Sequential latency is the pooled median of 12 balanced requests—three per URL. Parallel throughput is derived from the median of three balanced eight-request trials—two requests per URL per trial—at client concurrency four. Product and URL order were alternated. Both APIs had browser rendering forced with a 1 ms post-load wait and 30-second timeout; Firecrawl caching was disabled. Success required a successful API response, a 2xx/3xx page status, non-empty Markdown containing page-specific expected content, and, for Scorch, confirmation that Obscura rendered the page.
+
+Memory was sampled every 50 ms from cgroup v2 as `memory.current - inactive_file`, matching Docker's Linux working-set convention. Firecrawl values are simultaneous sums across its six running container cgroups; Scorch uses the `scorchd` service cgroup. Process counts come from recursive `cgroup.procs` and exclude threads. Docker/containerd daemons and shims, systemd, the benchmark client, build time, and the completed one-shot initializer are excluded. Results were collected on August 13, 2026, on a 16-thread Ryzen 7 5825U host with 30.7 GiB RAM, Docker 29.6.2, and Compose 5.4.0. Public-network conditions and the small page sample make the timing figures host- and run-specific.
 
 ## Install
 
