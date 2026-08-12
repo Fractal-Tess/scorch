@@ -71,7 +71,7 @@ const { shape } = Astro.props;
       context.fillStyle =
         getComputedStyle(document.documentElement)
           .getPropertyValue("--accent")
-          .trim() || "#2f80ff";
+          .trim() || "#7c3aed";
       const reveal = reduceMotion
         ? rows
         : Math.min(rows, ((now - started) / 620) * rows);

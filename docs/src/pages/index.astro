@@ -39,36 +39,51 @@ const trust = [
 
 <BaseLayout>
   <span id="top" class="sr-only"></span>
-  <section class="relative isolate overflow-hidden">
+  <section class="shadow-hero relative isolate overflow-hidden">
+    <img
+      src="/brand/scorch-shadow-hero.webp"
+      alt=""
+      width="1920"
+      height="1080"
+      fetchpriority="high"
+      decoding="async"
+      class="shadow-hero-image pointer-events-none absolute inset-0 -z-20 h-full w-full object-cover"
+    />
     <div
-      class="pointer-events-none absolute inset-x-0 -top-16 bottom-0 -z-20 [mask-image:linear-gradient(to_bottom,transparent_0%,black_18%,black_82%,transparent_100%)]"
+      class="shadow-hero-wash pointer-events-none absolute inset-0 -z-10"
       aria-hidden="true"
     >
-      <AsciiWaves
-        class="opacity-60 dark:opacity-75"
-        interactive={true}
-        size={10}
-      />
     </div>
     <div
-      class="pointer-events-none absolute top-[31%] left-1/2 -z-10 h-[62%] w-[72%] -translate-x-1/2 -translate-y-1/2 bg-[radial-gradient(ellipse_at_center,var(--background)_0%,color-mix(in_srgb,var(--background)_82%,transparent)_46%,transparent_74%)]"
+      class="pointer-events-none absolute inset-x-0 -top-16 bottom-0 -z-10 [mask-image:linear-gradient(to_bottom,transparent_0%,black_18%,black_72%,transparent_100%)] opacity-35"
       aria-hidden="true"
     >
+      <AsciiWaves class="opacity-45" interactive={true} size={10} />
     </div>
 
     <div class="mx-auto max-w-[1440px] px-5 sm:px-8 lg:px-10">
       <div
-        class="hero-sequence relative mx-auto flex max-w-2xl flex-col items-center pt-24 pb-12 text-center"
+        class="hero-sequence relative mx-auto flex max-w-5xl flex-col items-center pt-16 pb-14 text-center sm:pt-20"
       >
+        <img
+          src="/brand/scorch-shadow-mark.png"
+          alt="Scorch"
+          width="512"
+          height="512"
+          fetchpriority="high"
+          decoding="async"
+          class="hero-mark h-40 w-40 object-contain sm:h-48 sm:w-48"
+        />
         <h1
-          class="font-serif text-4xl leading-[1.08] font-normal tracking-[-0.015em] text-balance sm:text-5xl lg:text-[3.5rem]"
+          class="mt-2 max-w-5xl font-serif text-4xl leading-[1.04] font-normal tracking-[-0.025em] text-balance text-white sm:text-6xl lg:text-[4.5rem]"
         >
           Search and extract the public web <span
-            class="font-sans font-semibold tracking-tight">at Rust speed</span
+            class="font-sans font-semibold tracking-tight text-[#c5a7ff]"
+            >at Rust speed</span
           >
         </h1>
         <p
-          class="text-muted-foreground mt-5 max-w-xl text-[15px] leading-relaxed text-balance sm:text-base"
+          class="mt-6 max-w-2xl text-[15px] leading-relaxed text-balance text-[#c9bfd8] sm:text-base"
         >
           Scorch gives applications one guarded service for search, scraping,
           mapping, and crawling—without a database, broker, browser farm, or
@@ -81,7 +96,7 @@ const trust = [
           >
         </div>
         <p
-          class="text-muted-foreground mt-6 font-mono text-[10px] tracking-[0.13em] uppercase"
+          class="mt-6 font-mono text-[10px] tracking-[0.13em] text-[#a99aba] uppercase"
         >
           API · 127.0.0.1:33000&nbsp;&nbsp; / &nbsp;&nbsp;Renderer · Obscura
         </p>
@@ -186,8 +201,8 @@ const trust = [
         class="generated-art aspect-[4/3] overflow-hidden [clip-path:polygon(28px_0,100%_0,100%_calc(100%-28px),calc(100%-28px)_100%,0_100%,0_28px)] sm:aspect-square lg:order-2"
       >
         <img
-          src="/value-prop.webp"
-          alt="Abstract Scorch extraction flow transforming web data into clean documents"
+          src="/scorch-pipeline.webp"
+          alt="Purple Scorch pipeline transforming web signals into clean documents"
           width="1024"
           height="1024"
           loading="lazy"

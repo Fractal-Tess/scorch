@@ -3,7 +3,7 @@ import CutButton from "./CutButton.astro";
 
 const images = Array.from(
   { length: 9 },
-  (_, index) => `/grid/${String(index + 1).padStart(2, "0")}.webp`,
+  (_, index) => `/signals/${String(index + 1).padStart(2, "0")}.webp`,
 );
 const columns = [0, 1, 2].map((column) =>
   images.filter((_, index) => index % 3 === column),

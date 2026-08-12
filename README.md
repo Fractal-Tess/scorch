@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/public/brand/scorch-mark.png" alt="Scorch flame mark" width="160" height="160">
+  <img src="docs/public/brand/scorch-shadow-mark.png" alt="Scorch shadow mark" width="160" height="160">
 </p>
 
 <h1 align="center">Scorch</h1>

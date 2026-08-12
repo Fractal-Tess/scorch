@@ -8,7 +8,7 @@
   "theme_color": "#0a0b0d",
   "icons": [
     {
-      "src": "/brand/scorch-mark.png",
+      "src": "/brand/scorch-shadow-mark.png",
       "sizes": "512x512",
       "type": "image/png"
     }

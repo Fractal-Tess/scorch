@@ -13,8 +13,8 @@
   --muted-foreground: #737373;
   --border: #e5e5e5;
   --border-strong: #c9c9c9;
-  --accent: #2f80ff;
-  --accent-soft: #edf4ff;
+  --accent: #7c3aed;
+  --accent-soft: #f3edff;
   --accent-foreground: #ffffff;
   --success: #16835c;
   --font-sans: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
@@ -31,8 +31,8 @@
   --muted-foreground: #a3a3a3;
   --border: #262626;
   --border-strong: #3a3a3a;
-  --accent: #4388ff;
-  --accent-soft: #0d1c3d;
+  --accent: #a970ff;
+  --accent-soft: #24113d;
   --accent-foreground: #ffffff;
   --success: #45c99a;
 }
@@ -422,6 +422,37 @@ details summary::-webkit-details-marker {
   }
 }
 
+.shadow-hero {
+  min-height: calc(100svh - 4rem);
+  background: #08040e;
+}
+
+.shadow-hero-image {
+  filter: saturate(0.92) contrast(1.08);
+  transform: scale(1.02);
+}
+
+.shadow-hero-wash {
+  background:
+    radial-gradient(
+      58% 60% at 50% 30%,
+      rgba(8, 4, 14, 0.2) 0%,
+      rgba(8, 4, 14, 0.67) 64%,
+      rgba(8, 4, 14, 0.9) 100%
+    ),
+    linear-gradient(
+      to bottom,
+      rgba(8, 4, 14, 0.22) 0%,
+      rgba(8, 4, 14, 0.1) 45%,
+      var(--background) 100%
+    );
+}
+
+.hero-mark {
+  filter: drop-shadow(0 0 20px rgba(170, 92, 255, 0.28))
+    drop-shadow(0 22px 36px rgba(5, 1, 12, 0.72));
+}
+
 .hero-sequence > * {
   opacity: 0;
   transform: translateY(20px);
@@ -472,7 +503,7 @@ details summary::-webkit-details-marker {
 
 .generated-art {
   position: relative;
-  background: #071426;
+  background: #0b0514;
   clip-path: polygon(
     12px 0,
     100% 0,
@@ -580,7 +611,7 @@ details summary::-webkit-details-marker {
 .reference-frame::after {
   position: absolute;
   z-index: 2;
-  color: #2f80ff;
+  color: #9b5cff;
   background: var(--background);
   font: 400 16px/1 var(--font-mono);
   content: "+";
