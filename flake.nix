@@ -19,15 +19,15 @@
 
           # Keep the release tag and fixed archive hashes together. Promotion CI
           # updates these only after both immutable artifacts have been prepared.
-          version = "0.4.0";
+          version = "0.5.0";
           releaseArtifacts = {
             x86_64-linux = {
               target = "x86_64-unknown-linux-gnu";
-              hash = "sha256-654LNVbWPMo7HOJd25oZfAVyD51woHNOWZZ5M1WNwOg=";
+              hash = "sha256-BYilpvdmfd9SCZdN+6BYFwnBN0sySwh/z9Zm7Deb58k=";
             };
             aarch64-linux = {
               target = "aarch64-unknown-linux-gnu";
-              hash = "sha256-G+zFshBETanaw6imgpNuIWsr3+tYCMq8PLPnI+HOZmE=";
+              hash = "sha256-OYvBDuApVVxRsQqE+hJoaMEA26BVya7TwahgVjY03aw=";
             };
           };
           artifact = releaseArtifacts.${pkgs.stdenv.hostPlatform.system};
@@ -153,14 +153,15 @@
               !(nixpkgs.lib.hasInfix "--browser" moduleSystem.config.systemd.services.scorchd.serviceConfig.ExecStart);
             assert nixpkgs.lib.hasInfix "--bind 127.0.0.1:33000"
               moduleSystem.config.systemd.services.scorchd.serviceConfig.ExecStart;
-            assert nixpkgs.lib.hasInfix "--search-engines bing,brave-web,crates-io,crossref,docker-hub,duckduckgo,github,google-cse,hacker-news,hugging-face,mwmbl,npm,nvd,openalex,open-library,pubmed,wikidata,wikipedia,yahoo"
+            assert nixpkgs.lib.hasInfix
+              "--search-engines bing,brave-web,crates-io,crossref,docker-hub,duckduckgo,github,google-cse,hacker-news,hugging-face,mwmbl,npm,nvd,openalex,open-library,pubmed,wikidata,wikipedia,yahoo"
               moduleSystem.config.systemd.services.scorchd.serviceConfig.ExecStart;
             pkgs.runCommand "scorch-module-check" { } ''
               touch "$out"
             '';
           version = pkgs.runCommand "scorch-version-check" { } ''
-            test "$(${packages.scorch}/bin/scorch --version)" = 'scorch 0.4.0'
-            test "$(${packages.scorchd}/bin/scorchd --version)" = 'scorchd 0.4.0'
+            test "$(${packages.scorch}/bin/scorch --version)" = 'scorch 0.5.0'
+            test "$(${packages.scorchd}/bin/scorchd --version)" = 'scorchd 0.5.0'
             touch "$out"
           '';
         }
