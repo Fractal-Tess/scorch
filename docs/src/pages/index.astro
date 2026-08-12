@@ -3,7 +3,6 @@ import AsciiIcon from "../components/AsciiIcon.astro";
 import AsciiWaves from "../components/AsciiWaves.astro";
 import CoverageGrid from "../components/CoverageGrid.astro";
 import CutButton from "../components/CutButton.astro";
-import TerminalDemo from "../components/TerminalDemo.astro";
 import BaseLayout from "../layouts/BaseLayout.astro";
 
 const capabilities = [
@@ -40,76 +39,85 @@ const trust = [
 <BaseLayout>
   <span id="top" class="sr-only"></span>
   <section class="shadow-hero relative isolate overflow-hidden">
+    <div
+      class="shadow-hero-art pointer-events-none absolute inset-0 -z-20"
+      aria-hidden="true"
+    >
+      <img
+        src="/brand/scorch-shadow-hero.webp"
+        alt=""
+        width="1920"
+        height="1080"
+        fetchpriority="high"
+        decoding="async"
+        class="shadow-hero-image h-full w-full object-cover"
+      />
+    </div>
     <img
-      src="/brand/scorch-shadow-hero.webp"
+      src="/brand/scorch-purple-fire.png"
       alt=""
-      width="1920"
-      height="1080"
-      fetchpriority="high"
+      width="1440"
+      height="810"
       decoding="async"
-      class="shadow-hero-image pointer-events-none absolute inset-0 -z-20 h-full w-full object-cover"
+      class="shadow-hero-fire pointer-events-none absolute inset-0 -z-10 h-full w-full object-cover"
+      aria-hidden="true"
     />
     <div
       class="shadow-hero-wash pointer-events-none absolute inset-0 -z-10"
       aria-hidden="true"
     >
     </div>
-    <div
-      class="pointer-events-none absolute inset-x-0 -top-16 bottom-0 -z-10 [mask-image:linear-gradient(to_bottom,transparent_0%,black_18%,black_72%,transparent_100%)] opacity-35"
-      aria-hidden="true"
-    >
-      <AsciiWaves class="opacity-45" interactive={true} size={10} />
-    </div>
 
     <div class="mx-auto max-w-[1440px] px-5 sm:px-8 lg:px-10">
       <div
-        class="hero-sequence relative mx-auto flex max-w-5xl flex-col items-center pt-16 pb-14 text-center sm:pt-20"
+        class="hero-sequence relative mx-auto flex max-w-5xl flex-col items-center text-center"
       >
-        <img
-          src="/brand/scorch-shadow-mark.png"
-          alt="Scorch"
-          width="512"
-          height="512"
-          fetchpriority="high"
-          decoding="async"
-          class="hero-mark h-44 w-44 object-contain sm:h-52 sm:w-52"
-        />
-        <h1
-          class="mt-4 max-w-5xl font-serif text-4xl leading-[1.04] font-normal tracking-[-0.025em] text-balance text-white sm:text-6xl lg:text-[4.5rem]"
-        >
-          Search and extract the public web <span
-            class="font-sans font-semibold tracking-tight text-[#c5a7ff]"
-            >at Rust speed</span
-          >
-        </h1>
-        <p
-          class="mt-6 max-w-2xl text-[15px] leading-relaxed text-balance text-[#c9bfd8] sm:text-base"
-        >
-          Scorch gives applications one guarded service for search, scraping,
-          mapping, and crawling—without a database, broker, browser farm, or
-          worker fleet.
-        </p>
-        <div class="mt-8 flex flex-wrap items-center justify-center gap-3">
-          <CutButton href="/getting-started/">Get started</CutButton>
-          <CutButton href="/architecture/" variant="outline"
-            >How it works</CutButton
-          >
+        <div class="hero-mark-space flex w-full items-center justify-center">
+          <img
+            src="/brand/scorch-shadow-mark.png"
+            alt="Scorch"
+            width="512"
+            height="512"
+            fetchpriority="high"
+            decoding="async"
+            class="hero-mark h-56 w-56 object-contain sm:h-64 sm:w-64 lg:h-72 lg:w-72"
+          />
         </div>
-        <p
-          class="mt-6 font-mono text-[10px] tracking-[0.13em] text-[#a99aba] uppercase"
-        >
-          API · 127.0.0.1:33000&nbsp;&nbsp; / &nbsp;&nbsp;Renderer · Obscura
-        </p>
+        <div class="hero-copy flex flex-col items-center">
+          <h1
+            class="max-w-5xl font-serif text-4xl leading-[1.04] font-normal tracking-[-0.025em] text-balance text-white sm:text-6xl lg:text-[4.5rem]"
+          >
+            Search and extract the public web <span
+              class="font-sans font-semibold tracking-tight text-[#c5a7ff]"
+              >at Rust speed</span
+            >
+          </h1>
+          <p
+            class="mt-6 max-w-2xl text-[15px] leading-relaxed text-balance text-[#c9bfd8] sm:text-base"
+          >
+            Scorch gives applications one guarded service for search, scraping,
+            mapping, and crawling—without a database, broker, browser farm, or
+            worker fleet.
+          </p>
+          <div class="mt-8 flex flex-wrap items-center justify-center gap-3">
+            <CutButton href="/getting-started/">Get started</CutButton>
+            <CutButton href="/architecture/" variant="outline"
+              >How it works</CutButton
+            >
+          </div>
+          <p
+            class="mt-6 font-mono text-[10px] tracking-[0.13em] text-[#a99aba] uppercase"
+          >
+            API · 127.0.0.1:33000&nbsp;&nbsp; / &nbsp;&nbsp;Renderer · Obscura
+          </p>
+        </div>
       </div>
-    </div>
-    <div
-      class="hero-window relative mx-auto max-w-[1180px] px-5 pb-24 sm:px-8 lg:px-10"
-    >
-      <TerminalDemo />
     </div>
   </section>
 
-  <section class="mx-auto max-w-[1440px] px-5 pb-24 sm:px-8 sm:pb-32 lg:px-10">
+  <section
+    class="hero-followup mx-auto max-w-[1440px] px-5 pb-24 sm:px-8 sm:pb-32 lg:px-10"
+  >
     <div class="reference-frame grid sm:grid-cols-2 lg:grid-cols-4">
       {
         trust.map(([value, label], index) => (

@@ -424,33 +424,71 @@ details summary::-webkit-details-marker {
 
 .shadow-hero {
   min-height: calc(100svh - 4rem);
+  padding-bottom: clamp(8rem, 16vw, 15rem);
   background: #08040e;
 }
 
+.shadow-hero-art {
+  bottom: 0;
+  overflow: hidden;
+  mask-image: linear-gradient(
+    to bottom,
+    #000 0%,
+    #000 57%,
+    rgba(0, 0, 0, 0.82) 68%,
+    rgba(0, 0, 0, 0.24) 84%,
+    transparent 100%
+  );
+}
+
 .shadow-hero-image {
-  filter: saturate(0.92) contrast(1.08);
-  transform: scale(1.02);
+  filter: saturate(0.94) contrast(1.08);
+  transform: scale(1.035);
+  transform-origin: 50% 28%;
+}
+
+.shadow-hero-fire {
+  opacity: 0.19;
+  filter: saturate(0.78) blur(0.4px);
+  mask-image: linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0.64) 0%,
+    #000 52%,
+    rgba(0, 0, 0, 0.72) 74%,
+    transparent 100%
+  );
 }
 
 .shadow-hero-wash {
   background:
     radial-gradient(
-      58% 60% at 50% 30%,
-      rgba(8, 4, 14, 0.2) 0%,
-      rgba(8, 4, 14, 0.67) 64%,
-      rgba(8, 4, 14, 0.9) 100%
+      52% 43% at 50% 35%,
+      rgba(8, 4, 14, 0.05) 0%,
+      rgba(8, 4, 14, 0.18) 66%,
+      rgba(8, 4, 14, 0.48) 100%
     ),
     linear-gradient(
       to bottom,
-      rgba(8, 4, 14, 0.22) 0%,
-      rgba(8, 4, 14, 0.1) 45%,
+      rgba(8, 4, 14, 0.06) 0%,
+      rgba(8, 4, 14, 0.12) 50%,
+      rgba(8, 4, 14, 0.82) 82%,
       var(--background) 100%
     );
 }
 
+.hero-mark-space {
+  min-height: clamp(25rem, 50vh, 36rem);
+  padding-top: clamp(2.5rem, 7vh, 5rem);
+}
+
+.hero-copy {
+  margin-top: clamp(2.5rem, 6vh, 5.5rem);
+}
+
 .hero-mark {
-  filter: drop-shadow(0 0 20px rgba(170, 92, 255, 0.28))
-    drop-shadow(0 22px 36px rgba(5, 1, 12, 0.72));
+  filter: drop-shadow(0 0 28px rgba(170, 92, 255, 0.3))
+    drop-shadow(0 26px 42px rgba(5, 1, 12, 0.74));
+  animation: hero-mark-float 7s 1.15s ease-in-out infinite;
   will-change: transform;
 }
 
@@ -464,22 +502,7 @@ details summary::-webkit-details-marker {
   animation-delay: 180ms;
 }
 .hero-sequence > :nth-child(2) {
-  animation-delay: 300ms;
-}
-.hero-sequence > :nth-child(3) {
-  animation-delay: 420ms;
-}
-.hero-sequence > :nth-child(4) {
-  animation-delay: 540ms;
-}
-.hero-sequence > :nth-child(5) {
-  animation-delay: 660ms;
-}
-
-.hero-sequence > .hero-mark {
-  animation:
-    hero-rise 700ms 180ms cubic-bezier(0.22, 1, 0.36, 1) forwards,
-    hero-mark-float 7s 1.15s ease-in-out infinite;
+  animation-delay: 320ms;
 }
 
 @keyframes hero-mark-float {
@@ -492,23 +515,15 @@ details summary::-webkit-details-marker {
   }
 }
 
-.hero-window {
-  opacity: 0;
-  transform: translateY(24px) scale(0.985);
-  animation: window-rise 850ms 620ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+.hero-followup {
+  position: relative;
+  z-index: 1;
 }
 
 @keyframes hero-rise {
   to {
     opacity: 1;
     transform: translateY(0);
-  }
-}
-
-@keyframes window-rise {
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
   }
 }
 
@@ -669,13 +684,12 @@ details summary::-webkit-details-marker {
   }
   .js .reveal,
   .hero-sequence > *,
-  .hero-window,
   .ascii-waves canvas {
     opacity: 1;
     transform: none;
     animation: none;
   }
-  .hero-sequence > .hero-mark {
+  .hero-mark {
     animation: none;
   }
 }
