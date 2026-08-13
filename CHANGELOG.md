@@ -4,6 +4,17 @@ All notable changes to Scorch are documented in this file. The project follows [
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-08-13
+
+### Added
+
+- Added standalone, checksummed `scorch` CLI and `scorchd` daemon assets for each supported Linux architecture.
+- Added a minimal multi-platform `scratch` container image that starts `scorchd` automatically and also contains the `scorch` client.
+
+### Changed
+
+- Optimized release binaries with level-three optimization, fat LTO, one codegen unit, stripped symbols, and abort-on-panic behavior.
+
 ## [0.5.0] - 2026-08-12
 
 ### Added
@@ -110,7 +121,8 @@ All notable changes to Scorch are documented in this file. The project follows [
 - Embedded Obscura requests use fresh context, page, cookie, cache, and JavaScript state to prevent caller data leakage.
 - Render requests enforce one caller-visible deadline across validation, queueing, navigation, execution, serialization, and screenshots.
 
-[Unreleased]: https://github.com/Fractal-Tess/scorch/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/Fractal-Tess/scorch/compare/v0.5.1...HEAD
+[0.5.1]: https://github.com/Fractal-Tess/scorch/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/Fractal-Tess/scorch/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/Fractal-Tess/scorch/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/Fractal-Tess/scorch/compare/v0.1.3...v0.3.0
