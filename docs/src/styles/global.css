@@ -477,12 +477,12 @@ details summary::-webkit-details-marker {
 }
 
 .hero-mark-space {
-  min-height: clamp(25rem, 50vh, 36rem);
-  padding-top: clamp(2.5rem, 7vh, 5rem);
+  min-height: clamp(18rem, 38vh, 26rem);
+  padding-top: clamp(1.5rem, 4vh, 3rem);
 }
 
 .hero-copy {
-  margin-top: clamp(2.5rem, 6vh, 5.5rem);
+  margin-top: clamp(1rem, 2.5vh, 2rem);
 }
 
 .hero-mark {
