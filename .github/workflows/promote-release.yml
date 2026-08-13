@@ -136,6 +136,7 @@ jobs:
           cmp dist/scorchd-x86_64-unknown-linux-gnu image-context/docker/amd64/scorchd
           cmp dist/scorch-aarch64-unknown-linux-gnu image-context/docker/arm64/scorch
           cmp dist/scorchd-aarch64-unknown-linux-gnu image-context/docker/arm64/scorchd
+          chmod 755 image-context/docker/amd64/scorch image-context/docker/amd64/scorchd
           test "$(image-context/docker/amd64/scorch --version)" = "scorch ${VERSION}"
           test "$(image-context/docker/amd64/scorchd --version)" = "scorchd ${VERSION}"
           grep -F -- 'FROM scratch' image-context/Dockerfile
