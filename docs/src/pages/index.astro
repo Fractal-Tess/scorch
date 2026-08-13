@@ -118,19 +118,23 @@ const trust = [
   <section
     class="hero-followup mx-auto max-w-[1440px] px-5 pb-24 sm:px-8 sm:pb-32 lg:px-10"
   >
-    <div class="reference-frame grid sm:grid-cols-2 lg:grid-cols-4">
+    <div
+      class="reference-frame trust-strip reveal grid sm:grid-cols-2 lg:grid-cols-4"
+    >
       {
         trust.map(([value, label], index) => (
           <div
             class:list={[
-              "flex items-center justify-between gap-4 px-6 py-6",
+              "trust-item relative flex items-center justify-between gap-4 overflow-hidden px-6 py-6",
               index > 0 && "border-border border-t sm:border-t-0 sm:border-l",
               index === 2 && "sm:border-t lg:border-t-0",
             ]}
           >
             <>
-              <strong class="font-serif text-3xl font-normal">{value}</strong>
-              <span class="text-muted-foreground max-w-[120px] text-right text-xs leading-relaxed">
+              <strong class="trust-value font-serif text-3xl font-normal">
+                {value}
+              </strong>
+              <span class="trust-label text-muted-foreground max-w-[120px] text-right text-xs leading-relaxed">
                 {label}
               </span>
             </>
