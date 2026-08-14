@@ -4,6 +4,10 @@ All notable changes to Scorch are documented in this file. The project follows [
 
 ## [Unreleased]
 
+### Fixed
+
+- Rendered pages no longer open a second connection to their own origin. Obscura fetched documents, stylesheets, and images over its stealth HTTP client but fetched `<script src>` and ES modules over a separate plain client, so every render paid an extra TCP and TLS handshake and requested subresources with a different TLS fingerprint than the navigation itself. Routing both over the page's own client cut median browser scrape time by 22 percent and raised parallel throughput by 30 percent, with byte-identical Markdown across twelve pages. Applied through a patched Obscura until the fix lands upstream.
+
 ### Changed
 
 - Direct fetches now share one pooled HTTP client that pins DNS at connect time instead of building a client per request. Repeat requests to a known host reuse the connection and TLS session, cutting median scrape latency on the fetch path by 67 percent and `map` by 63 percent, with byte-identical output.

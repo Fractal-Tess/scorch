@@ -59,4 +59,9 @@ wildcards = "deny"
 unknown-registry = "deny"
 unknown-git = "deny"
 allow-registry = ["https://github.com/rust-lang/crates.io-index"]
-allow-git = ["https://github.com/h4ckf0r0day/obscura.git"]
+allow-git = [
+  "https://github.com/h4ckf0r0day/obscura.git",
+  # Obscura patched to fetch scripts and ES modules over the page's own client.
+  # Drop once the fix is upstream and the [patch] in Cargo.toml goes away.
+  "https://github.com/Fractal-Tess/obscura.git",
+]
