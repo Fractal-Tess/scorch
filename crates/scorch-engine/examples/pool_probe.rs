@@ -23,13 +23,14 @@
 //! `Page::new` mints its own stealth client and that is the client stealth
 //! pages fetch over.
 //!
-//! Sharing it *across* runtimes, which is what scorch would be doing today
-//! since it builds a runtime per render, does not work: the pool is driven by
-//! the runtime that opened its connections, so once that runtime is dropped the
-//! reused client hands out dead connections. This probe measured a 22.8 s
-//! navigation and an outright failure on httpbin that way. Reusing connections
-//! therefore requires a runtime that outlives individual renders, not just a
-//! shared client.
+//! Sharing it *across* runtimes, which is what scorch used to do since it built
+//! a runtime per render, does not work: the pool is driven by the runtime that
+//! opened its connections, so once that runtime is dropped the reused client
+//! hands out dead connections. This probe measured a 22.8 s navigation and an
+//! outright failure on httpbin that way. Reusing connections therefore requires
+//! a runtime that outlives individual renders, not just a shared client, which
+//! is why scorch now renders on a fixed pool of slots that each own a thread, a
+//! runtime, a context, and a stealth client for the life of the process.
 //!
 //! Run with: cargo run --release -p scorch-engine --example pool_probe -- <url>
 

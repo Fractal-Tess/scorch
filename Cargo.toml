@@ -51,9 +51,11 @@ uuid = { version = "1.24.0", features = ["serde", "v7"] }
 # clients hold separate connection pools, so every render paid a second TCP and
 # TLS handshake to its own origin, and subresources carried a different TLS
 # fingerprint than the navigation that requested them. The fork routes both over
-# the page's own client. Remove this patch once the fix lands upstream.
+# the page's own client, and re-exports `StealthHttpClient` so the type of the
+# public `Page::stealth_client` field can be named without depending on
+# obscura-net. Remove this patch once both land upstream.
 [patch."https://github.com/h4ckf0r0day/obscura.git"]
-obscura-browser = { git = "https://github.com/Fractal-Tess/obscura.git", rev = "630c8f944022f07c8b0809e10c92fe8c985da671" }
+obscura-browser = { git = "https://github.com/Fractal-Tess/obscura.git", rev = "4601649cbbf9e7a4df87970aac91594c4299fca7" }
 
 [profile.release]
 opt-level = 3

@@ -146,8 +146,11 @@ const headings = [
     controls.
   </p>
   <div class="callout">
-    Requests do not select a browser backend. Every browser render uses isolated
-    embedded Obscura state, with stealth transport enabled by default.
+    Requests do not select a browser backend. Every browser render gets a fresh
+    page and an empty cookie jar, with stealth transport enabled by default.
+    Renders are dispatched onto a fixed set of long-lived render slots, so two
+    renders on the same slot reuse its connections and TLS sessions; no page,
+    DOM, or cookie crosses between them.
   </div>
   <h3>Why Obscura replaced the older renderer</h3>
   <p>

@@ -28,8 +28,10 @@ pub struct EngineConfig {
 /// which occupies one thread for the duration, so a fixed default left most of
 /// a multi-core host idle: measured on a 16-thread host, raising this from 4 to
 /// 16 more than doubled scrape throughput while idle memory was unchanged.
-/// Peak memory scales with the value, so it stays clamped rather than tracking
-/// very large hosts.
+/// This is also the number of resident render slots, each holding a browser
+/// context and its connection pool for the life of the process, so peak memory
+/// scales with the value and it stays clamped rather than tracking very large
+/// hosts.
 pub fn default_max_concurrency() -> usize {
     std::thread::available_parallelism()
         .map(usize::from)

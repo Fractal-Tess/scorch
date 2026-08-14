@@ -1,11 +1,15 @@
 use std::{
     collections::BTreeMap,
-    sync::Arc,
+    sync::{Arc, Mutex},
+    thread,
     time::{Duration, Instant},
 };
 
-use obscura_browser::{BrowserContext, Page};
-use tokio::{sync::OwnedSemaphorePermit, task::spawn_blocking, time::timeout};
+use obscura_browser::{BrowserContext, Page, StealthHttpClient};
+use tokio::{
+    sync::{OwnedSemaphorePermit, mpsc, oneshot},
+    time::timeout,
+};
 use tracing::debug;
 use uuid::Uuid;
 
@@ -17,14 +21,67 @@ use crate::{
 
 const VIEWPORT: (f32, f32) = (1280.0, 720.0);
 
+/// A pool of render slots, one per allowed concurrent render.
+///
+/// Each slot is a thread with its own Tokio runtime, browser context, and
+/// stealth HTTP client, all of which outlive the renders that run on it. That
+/// is the whole point: a connection pool belongs to the runtime whose reactor
+/// drives it, so a runtime built per render throws its connections away with
+/// itself and every render pays a fresh TCP and TLS handshake to the origin.
+/// Across twelve pages this halved the median scrape time on the browser path
+/// and raised throughput at concurrency eight by 53 percent, with identical
+/// extracted Markdown. `examples/pool_probe.rs` is the measurement this came
+/// from.
+///
+/// Renders that land on the same slot therefore share connections and TLS
+/// sessions with each other, which is weaker isolation than a context per
+/// render gave. Cookies are still isolated: the slot's jar is cleared before
+/// each render, and the client holds no response cache, so no page content or
+/// credential can cross between renders. Requests still go through the safe
+/// proxy, and a reused tunnel is pinned to the address the policy already
+/// approved when it was opened, so reuse cannot reach an address that was never
+/// validated.
 pub(super) struct ObscuraBackend {
-    config: EngineConfig,
-    proxy_url: String,
+    slots: Vec<mpsc::Sender<Job>>,
+    /// Indices of slots that are not rendering. A worker publishes its own
+    /// index here when it finishes, before releasing the permit that admitted
+    /// the render, so a caller holding a permit always finds a free slot.
+    idle: Arc<Mutex<Vec<usize>>>,
+}
+
+struct Job {
+    url: String,
+    request_timeout: Duration,
+    wait_for: Duration,
+    block_media: bool,
+    reply: oneshot::Sender<Result<RenderedPage>>,
+    /// Held by the worker for the whole render. A caller that times out and
+    /// walks away must not let the next render into a slot that is still busy,
+    /// so the permit is released by whoever actually finishes the work.
+    permit: OwnedSemaphorePermit,
 }
 
 impl ObscuraBackend {
     pub fn new(config: EngineConfig, proxy_url: String) -> Self {
-        Self { config, proxy_url }
+        let slot_count = config.max_concurrency;
+        let idle = Arc::new(Mutex::new((0..slot_count).rev().collect::<Vec<_>>()));
+        let slots = (0..slot_count)
+            .map(|index| {
+                // Capacity one is enough: a slot is only handed out while it is
+                // idle, and it does not become idle again until the worker has
+                // taken the previous job out of the channel and finished it.
+                let (sender, receiver) = mpsc::channel(1);
+                let config = config.clone();
+                let proxy_url = proxy_url.clone();
+                let idle = Arc::clone(&idle);
+                thread::Builder::new()
+                    .name(format!("scorch-render-{index}"))
+                    .spawn(move || worker(index, config, proxy_url, receiver, idle))
+                    .expect("the operating system can start a render thread");
+                sender
+            })
+            .collect();
+        Self { slots, idle }
     }
 
     pub async fn render(
@@ -35,53 +92,116 @@ impl ObscuraBackend {
         wait_for: Duration,
         block_media: bool,
     ) -> Result<RenderedPage> {
-        let config = self.config.clone();
-        let proxy_url = self.proxy_url.clone();
-        let url = url.to_owned();
-        let task = spawn_blocking(move || {
-            let _permit = permit;
-            let runtime = tokio::runtime::Builder::new_current_thread()
-                .enable_all()
-                .build()
-                .map_err(|error| {
-                    EngineError::Browser(format!("failed to start Obscura runtime: {error}"))
-                })?;
-            runtime.block_on(render_page(
-                &config,
-                &proxy_url,
-                &url,
-                request_timeout,
-                wait_for,
-                block_media,
-            ))
-        });
-        timeout(request_timeout, task)
+        let slot = self
+            .idle
+            .lock()
+            .ok()
+            .and_then(|mut idle| idle.pop())
+            .ok_or_else(|| EngineError::Browser("no render slot is available".into()))?;
+        let (reply, response) = oneshot::channel();
+        let job = Job {
+            url: url.to_owned(),
+            request_timeout,
+            wait_for,
+            block_media,
+            reply,
+            permit,
+        };
+        // Sent without awaiting: the slot came off the idle list, so its channel
+        // has room, and an await here would be a point at which a cancelled
+        // request could drop the job after taking the slot but before anything
+        // could hand it back. A failure means the worker thread is gone, which
+        // under `panic = "abort"` cannot happen without taking the process with
+        // it, and the slot is deliberately not returned because it has no worker
+        // left to run anything.
+        self.slots[slot]
+            .try_send(job)
+            .map_err(|_| EngineError::Browser("render slot stopped unexpectedly".into()))?;
+        timeout(request_timeout, response)
             .await
             .map_err(|_| EngineError::Timeout)?
-            .map_err(|error| {
-                EngineError::Browser(format!("Obscura worker stopped unexpectedly: {error}"))
-            })?
+            .map_err(|_| EngineError::Browser("Obscura worker stopped unexpectedly".into()))?
     }
 }
 
+/// State a slot keeps between renders.
+struct Slot {
+    context: Arc<BrowserContext>,
+    /// The stealth client minted by this slot's first page. `Page::new` builds a
+    /// fresh one every time, and with stealth on that client is what fetches the
+    /// document and its subresources, so handing it to later pages is what makes
+    /// them reuse connections. `None` when stealth is off, in which case pages
+    /// fetch over the context's own client and reusing the context is enough.
+    stealth: Option<Arc<StealthHttpClient>>,
+}
+
+fn worker(
+    index: usize,
+    config: EngineConfig,
+    proxy_url: String,
+    mut jobs: mpsc::Receiver<Job>,
+    idle: Arc<Mutex<Vec<usize>>>,
+) {
+    let Ok(runtime) = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+    else {
+        return;
+    };
+    // The whole loop runs inside one `block_on` so the reactor keeps running
+    // while the slot waits for work. Pooled connections are owned by tasks on
+    // this runtime; if it stopped between renders, those tasks would not see a
+    // peer close its end until a later render tried to write to it.
+    runtime.block_on(async move {
+        let mut slot: Option<Slot> = None;
+        while let Some(job) = jobs.recv().await {
+            let Job {
+                url,
+                request_timeout,
+                wait_for,
+                block_media,
+                reply,
+                permit,
+            } = job;
+            let slot = slot.get_or_insert_with(|| Slot {
+                context: Arc::new(BrowserContext::with_options(
+                    format!("scorch-slot-{index}"),
+                    Some(proxy_url.clone()),
+                    config.obscura_stealth,
+                )),
+                stealth: None,
+            });
+            // Nothing of the previous render may be visible to this one.
+            slot.context.cookie_jar.clear();
+            let result =
+                render_page(slot, &config, &url, request_timeout, wait_for, block_media).await;
+            let _ = reply.send(result);
+            if let Ok(mut idle) = idle.lock() {
+                idle.push(index);
+            }
+            drop(permit);
+        }
+    });
+}
+
 async fn render_page(
+    slot: &mut Slot,
     config: &EngineConfig,
-    proxy_url: &str,
     url: &str,
     request_timeout: Duration,
     wait_for: Duration,
     block_media: bool,
 ) -> Result<RenderedPage> {
     let started = Instant::now();
-    let context = Arc::new(BrowserContext::with_options(
-        format!("scorch-{}", Uuid::now_v7()),
-        Some(proxy_url.to_owned()),
-        config.obscura_stealth,
-    ));
-    let context_elapsed = started.elapsed();
-    let page_started = Instant::now();
-    let mut page = Page::new(format!("page-{}", Uuid::now_v7()), context);
-    let page_elapsed = page_started.elapsed();
+    let mut page = Page::new(
+        format!("page-{}", Uuid::now_v7()),
+        Arc::clone(&slot.context),
+    );
+    match &slot.stealth {
+        Some(client) => page.stealth_client = Some(Arc::clone(client)),
+        None => slot.stealth = page.stealth_client.clone(),
+    }
+    let page_elapsed = started.elapsed();
     page.set_viewport(VIEWPORT);
     page.set_navigation_timeout(request_timeout);
     page.set_blocked_urls(blocked_url_patterns(block_media));
@@ -118,7 +238,6 @@ async fn render_page(
     debug!(
         browser = "obscura",
         stealth = config.obscura_stealth,
-        context_ms = context_elapsed.as_millis(),
         page_ms = page_elapsed.as_millis(),
         navigation_ms = navigation_elapsed.as_millis(),
         serialization_ms = serialization_elapsed.as_millis(),
