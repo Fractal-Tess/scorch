@@ -1,11 +1,17 @@
 use std::{
     collections::BTreeMap,
+    net::SocketAddr,
     sync::Arc,
     time::{Duration, Instant},
 };
 
 use futures_util::StreamExt;
-use reqwest::{StatusCode, header::LOCATION, redirect::Policy};
+use reqwest::{
+    StatusCode,
+    dns::{Addrs, Name, Resolve, Resolving},
+    header::LOCATION,
+    redirect::Policy,
+};
 use tokio::sync::Semaphore;
 
 use crate::{
@@ -26,17 +32,56 @@ pub struct FetchResponse {
     pub body: Vec<u8>,
 }
 
+/// Resolves hostnames through [`SecurityPolicy`] so the connector can only ever
+/// reach an address the policy accepts. Building the client once and pinning at
+/// connect time (instead of rebuilding a client per request with a static
+/// address override) keeps the TLS session and connection pool alive across
+/// requests, which is most of the cost of a fetch to an already-seen host.
+struct PinnedResolver {
+    security: SecurityPolicy,
+}
+
+impl Resolve for PinnedResolver {
+    fn resolve(&self, name: Name) -> Resolving {
+        let security = self.security.clone();
+        Box::pin(async move {
+            let addresses = security.resolve_public_ips(name.as_str()).await?;
+            // Port zero is a placeholder: the connector overwrites it with the
+            // destination port before connecting.
+            let addresses: Addrs = Box::new(
+                addresses
+                    .into_iter()
+                    .map(|ip| SocketAddr::new(ip, 0))
+                    .collect::<Vec<_>>()
+                    .into_iter(),
+            );
+            Ok(addresses)
+        })
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct SafeFetcher {
     security: SecurityPolicy,
+    client: reqwest::Client,
     semaphore: Arc<Semaphore>,
     config: EngineConfig,
 }
 
 impl SafeFetcher {
     pub fn new(security: SecurityPolicy, config: EngineConfig) -> Self {
+        let client = reqwest::Client::builder()
+            .connect_timeout(config.connect_timeout)
+            .redirect(Policy::none())
+            .no_proxy()
+            .dns_resolver(Arc::new(PinnedResolver {
+                security: security.clone(),
+            }))
+            .build()
+            .expect("the fetch client has a static configuration");
         Self {
             security,
+            client,
             semaphore: Arc::new(Semaphore::new(config.max_concurrency)),
             config,
         }
@@ -67,17 +112,11 @@ impl SafeFetcher {
             let target = tokio::time::timeout(remaining, self.security.validate(&current))
                 .await
                 .map_err(|_| EngineError::Timeout)??;
-            let client = reqwest::Client::builder()
-                .connect_timeout(self.config.connect_timeout.min(remaining))
-                .timeout(remaining)
-                .redirect(Policy::none())
-                .no_proxy()
-                .user_agent(user_agent)
-                .resolve_to_addrs(&target.host, &target.addresses)
-                .build()
-                .map_err(|error| EngineError::Fetch(error.to_string()))?;
-            let response = client
+            let response = self
+                .client
                 .get(target.url.clone())
+                .timeout(remaining)
+                .header(reqwest::header::USER_AGENT, user_agent)
                 .header(
                     "accept",
                     "text/html,application/xhtml+xml,text/plain,application/xml;q=0.9,*/*;q=0.1",

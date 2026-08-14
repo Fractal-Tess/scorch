@@ -83,9 +83,7 @@ async fn render_page(
     let page_elapsed = page_started.elapsed();
     page.set_viewport(VIEWPORT);
     page.set_navigation_timeout(request_timeout);
-    if block_media {
-        page.set_blocked_urls(media_block_patterns());
-    }
+    page.set_blocked_urls(blocked_url_patterns(block_media));
     let navigation_started = Instant::now();
     page.navigate(url)
         .await
@@ -143,14 +141,27 @@ fn ensure_size(size: usize, limit: usize) -> Result<()> {
     Ok(())
 }
 
-fn media_block_patterns() -> Vec<String> {
-    [
-        "*.png", "*.jpg", "*.jpeg", "*.gif", "*.webp", "*.svg", "*.mp4", "*.webm", "*.mp3",
-        "*.woff", "*.woff2",
-    ]
-    .into_iter()
-    .map(str::to_owned)
-    .collect()
+/// Stylesheets never reach the caller: extraction reads the serialized DOM, not
+/// computed style, so fetching them only adds round trips. They are blocked on
+/// every render.
+const STYLESHEET_PATTERNS: [&str; 2] = ["*.css", "*.css?*"];
+
+const MEDIA_PATTERNS: [&str; 11] = [
+    "*.png", "*.jpg", "*.jpeg", "*.gif", "*.webp", "*.svg", "*.mp4", "*.webm", "*.mp3", "*.woff",
+    "*.woff2",
+];
+
+fn blocked_url_patterns(block_media: bool) -> Vec<String> {
+    let media = if block_media {
+        MEDIA_PATTERNS.as_slice()
+    } else {
+        &[]
+    };
+    STYLESHEET_PATTERNS
+        .iter()
+        .chain(media)
+        .map(|pattern| (*pattern).to_owned())
+        .collect()
 }
 
 fn duration_millis(duration: Duration) -> u64 {

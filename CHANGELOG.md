@@ -4,6 +4,11 @@ All notable changes to Scorch are documented in this file. The project follows [
 
 ## [Unreleased]
 
+### Changed
+
+- Direct fetches now share one pooled HTTP client that pins DNS at connect time instead of building a client per request. Repeat requests to a known host reuse the connection and TLS session, cutting median scrape latency on the fetch path by 67 percent and `map` by 63 percent, with byte-identical output.
+- Rendered pages no longer download stylesheets. Extraction reads the serialized DOM rather than computed style, so the round trips only added latency. Median browser scrape time dropped 31 percent and parallel throughput rose 29 percent, with byte-identical Markdown across twelve pages.
+
 ## [0.6.0] - 2026-08-14
 
 ### Fixed

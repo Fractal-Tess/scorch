@@ -20,11 +20,11 @@ const DNS_CACHE_CAPACITY: usize = 1024;
 
 #[derive(Debug, Clone)]
 struct CachedAddresses {
-    addresses: Vec<SocketAddr>,
+    addresses: Vec<IpAddr>,
     expires_at: Instant,
 }
 
-type HostKey = (String, u16);
+type HostKey = String;
 
 #[derive(Debug, Clone, Default)]
 pub struct SecurityPolicy {
@@ -39,8 +39,8 @@ impl SecurityPolicy {
         Self::default()
     }
 
-    fn cached_addresses(&self, host: &str, port: u16) -> Option<Vec<SocketAddr>> {
-        let entry = self.dns_cache.get(&(host.to_owned(), port))?;
+    fn cached_addresses(&self, host: &str) -> Option<Vec<IpAddr>> {
+        let entry = self.dns_cache.get(host)?;
         if entry.expires_at <= Instant::now() {
             return None;
         }
@@ -66,7 +66,7 @@ impl SecurityPolicy {
             .remove_if(key, |_, gate| Arc::strong_count(gate) <= 2);
     }
 
-    fn store_addresses(&self, host: &str, port: u16, addresses: &[SocketAddr]) {
+    fn store_addresses(&self, host: &str, addresses: &[IpAddr]) {
         if self.dns_cache.len() >= DNS_CACHE_CAPACITY {
             let now = Instant::now();
             self.dns_cache.retain(|_, entry| entry.expires_at > now);
@@ -75,19 +75,81 @@ impl SecurityPolicy {
             }
         }
         self.dns_cache.insert(
-            (host.to_owned(), port),
+            host.to_owned(),
             CachedAddresses {
                 addresses: addresses.to_vec(),
                 expires_at: Instant::now() + DNS_CACHE_TTL,
             },
         );
     }
+
+    /// Resolve a hostname to the public addresses it is allowed to reach.
+    ///
+    /// This is the single choke point that both the direct fetch client and URL
+    /// validation go through, so a host that resolves to a private, loopback, or
+    /// otherwise reserved address is rejected wherever a connection is made.
+    pub async fn resolve_public_ips(&self, host: &str) -> Result<Vec<IpAddr>> {
+        if let Ok(ip) = host.parse::<IpAddr>() {
+            return ensure_public(host, vec![ip]);
+        }
+        if let Some(cached) = self.cached_addresses(host) {
+            return ensure_public(host, cached);
+        }
+        let key = host.to_owned();
+        let gate = self.resolve_gate(&key);
+        let resolved = {
+            let _guard = gate.lock().await;
+            // Another caller may have resolved this host while we waited.
+            match self.cached_addresses(host) {
+                Some(cached) => cached,
+                None => {
+                    let dns_started = Instant::now();
+                    let resolved = timeout(Duration::from_secs(5), lookup_host((host, 0))).await;
+                    let mut resolved: Vec<IpAddr> = resolved
+                        .map_err(|_| EngineError::Dns("resolution timed out".into()))?
+                        .map_err(|error| EngineError::Dns(error.to_string()))?
+                        .take(16)
+                        .map(|address| address.ip())
+                        .collect();
+                    resolved.sort_unstable();
+                    resolved.dedup();
+                    tracing::debug!(
+                        dns_ms = dns_started.elapsed().as_millis() as u64,
+                        %host,
+                        addresses = resolved.len(),
+                        "resolved host"
+                    );
+                    // Only successful lookups are cached, and the public-address
+                    // check below still runs on every hit.
+                    self.store_addresses(host, &resolved);
+                    resolved
+                }
+            }
+        };
+        // Runs while `gate` is still held locally, so the strong count reveals
+        // whether any other caller is still waiting on this host.
+        self.release_gate(&key);
+        ensure_public(host, resolved)
+    }
+}
+
+fn ensure_public(host: &str, mut addresses: Vec<IpAddr>) -> Result<Vec<IpAddr>> {
+    addresses.sort_unstable();
+    addresses.dedup();
+    if addresses.is_empty() {
+        return Err(EngineError::Dns(format!("{host} resolved to no addresses")));
+    }
+    if let Some(address) = addresses.iter().find(|address| !is_public_ip(**address)) {
+        return Err(EngineError::UnsafeUrl(format!(
+            "{host} resolves to non-public address {address}"
+        )));
+    }
+    Ok(addresses)
 }
 
 #[derive(Debug, Clone)]
 pub struct ValidatedTarget {
     pub url: Url,
-    pub host: String,
     pub addresses: Vec<SocketAddr>,
 }
 
@@ -128,66 +190,15 @@ impl SecurityPolicy {
                 "port {port} is not allowed for web requests"
             )));
         }
-        let mut addresses = if let Some(ip) = literal_ip {
-            vec![SocketAddr::new(ip, port)]
-        } else if let Some(cached) = self.cached_addresses(&host, port) {
-            cached
-        } else {
-            let key = (host.clone(), port);
-            let gate = self.resolve_gate(&key);
-            let resolved = {
-                let _guard = gate.lock().await;
-                // Another caller may have resolved this host while we waited.
-                match self.cached_addresses(&host, port) {
-                    Some(cached) => cached,
-                    None => {
-                        let dns_started = Instant::now();
-                        let resolved =
-                            timeout(Duration::from_secs(5), lookup_host((host.as_str(), port)))
-                                .await;
-                        let mut resolved: Vec<SocketAddr> = resolved
-                            .map_err(|_| EngineError::Dns("resolution timed out".into()))?
-                            .map_err(|error| EngineError::Dns(error.to_string()))?
-                            .take(16)
-                            .collect();
-                        resolved.sort_unstable();
-                        resolved.dedup();
-                        tracing::debug!(
-                            dns_ms = dns_started.elapsed().as_millis() as u64,
-                            %host,
-                            addresses = resolved.len(),
-                            "resolved host"
-                        );
-                        // Only successful lookups are cached, and the
-                        // public-address check below still runs on every hit.
-                        self.store_addresses(&host, port, &resolved);
-                        resolved
-                    }
-                }
-            };
-            // Runs while `gate` is still held locally, so the strong count
-            // reveals whether any other caller is still waiting on this host.
-            self.release_gate(&key);
-            resolved
-        };
-        addresses.sort_unstable();
-        addresses.dedup();
-
-        if addresses.is_empty() {
-            return Err(EngineError::Dns(format!("{host} resolved to no addresses")));
+        let addresses = match literal_ip {
+            Some(ip) => ensure_public(&host, vec![ip])?,
+            None => self.resolve_public_ips(&host).await?,
         }
-        if let Some(address) = addresses.iter().find(|address| !is_public_ip(address.ip())) {
-            return Err(EngineError::UnsafeUrl(format!(
-                "{host} resolves to non-public address {}",
-                address.ip()
-            )));
-        }
+        .into_iter()
+        .map(|ip| SocketAddr::new(ip, port))
+        .collect();
 
-        Ok(ValidatedTarget {
-            url,
-            host,
-            addresses,
-        })
+        Ok(ValidatedTarget { url, addresses })
     }
 }
 
@@ -341,31 +352,23 @@ mod tests {
     #[test]
     fn caches_resolved_addresses_until_they_expire() {
         let policy = SecurityPolicy::new();
-        let address: SocketAddr = "93.184.216.34:443".parse().unwrap();
-        policy.store_addresses("example.com", 443, &[address]);
+        let address: IpAddr = "93.184.216.34".parse().unwrap();
+        policy.store_addresses("example.com", &[address]);
 
-        assert_eq!(
-            policy.cached_addresses("example.com", 443),
-            Some(vec![address])
-        );
-        // The port is part of the key, so a different port must miss.
-        assert_eq!(policy.cached_addresses("example.com", 80), None);
-        assert_eq!(policy.cached_addresses("other.example", 443), None);
+        assert_eq!(policy.cached_addresses("example.com"), Some(vec![address]));
+        assert_eq!(policy.cached_addresses("other.example"), None);
 
-        policy
-            .dns_cache
-            .get_mut(&("example.com".into(), 443))
-            .unwrap()
-            .expires_at = Instant::now() - Duration::from_secs(1);
-        assert_eq!(policy.cached_addresses("example.com", 443), None);
+        policy.dns_cache.get_mut("example.com").unwrap().expires_at =
+            Instant::now() - Duration::from_secs(1);
+        assert_eq!(policy.cached_addresses("example.com"), None);
     }
 
     #[test]
     fn dns_cache_stays_bounded() {
         let policy = SecurityPolicy::new();
-        let address: SocketAddr = "93.184.216.34:443".parse().unwrap();
+        let address: IpAddr = "93.184.216.34".parse().unwrap();
         for index in 0..(DNS_CACHE_CAPACITY + 50) {
-            policy.store_addresses(&format!("host{index}.example"), 443, &[address]);
+            policy.store_addresses(&format!("host{index}.example"), &[address]);
         }
         assert!(policy.dns_cache.len() <= DNS_CACHE_CAPACITY);
     }
@@ -373,7 +376,7 @@ mod tests {
     #[tokio::test]
     async fn concurrent_resolutions_share_one_gate() {
         let policy = SecurityPolicy::new();
-        let key = ("example.com".to_owned(), 443);
+        let key = "example.com".to_owned();
         let first = policy.resolve_gate(&key);
         let second = policy.resolve_gate(&key);
         assert!(Arc::ptr_eq(&first, &second));
