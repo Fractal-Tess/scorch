@@ -56,7 +56,7 @@ const structuredData = {
 ---
 
 <!doctype html>
-<html lang="en">
+<html lang="en" class="dark">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width" />
@@ -73,7 +73,7 @@ const structuredData = {
         : "index, follow, max-image-preview:large"}
     />
     <meta name="theme-color" content="#0a0b0d" />
-    <meta name="color-scheme" content="dark light" />
+    <meta name="color-scheme" content="dark" />
     <link rel="icon" type="image/png" sizes="64x64" href="/favicon.png" />
     <link
       rel="apple-touch-icon"
@@ -109,14 +109,7 @@ const structuredData = {
     />
     <title>{fullTitle}</title>
     <script is:inline>
-      (() => {
-        document.documentElement.classList.add("js");
-        const saved = localStorage.getItem("scorch-theme");
-        const dark =
-          saved === "dark" ||
-          (!saved && matchMedia("(prefers-color-scheme: dark)").matches);
-        document.documentElement.classList.toggle("dark", dark);
-      })();
+      document.documentElement.classList.add("js");
     </script>
   </head>
   <body class="bg-background text-foreground min-h-screen">
@@ -130,13 +123,6 @@ const structuredData = {
     {!hideFooter && <Footer />}
 
     <script>
-      const themeButton =
-        document.querySelector<HTMLButtonElement>("#theme-toggle");
-      themeButton?.addEventListener("click", () => {
-        const dark = document.documentElement.classList.toggle("dark");
-        localStorage.setItem("scorch-theme", dark ? "dark" : "light");
-      });
-
       const siteHeader =
         document.querySelector<HTMLElement>("[data-site-header]");
       const updateHeader = () =>

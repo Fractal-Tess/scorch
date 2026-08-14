@@ -4,24 +4,10 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
-:root {
-  --background: #ffffff;
-  --foreground: #0a0a0a;
-  --surface: #fafafa;
-  --surface-raised: #ffffff;
-  --muted: #f5f5f5;
-  --muted-foreground: #737373;
-  --border: #e5e5e5;
-  --border-strong: #c9c9c9;
-  --accent: #7c3aed;
-  --accent-soft: #f3edff;
-  --accent-foreground: #ffffff;
-  --success: #16835c;
-  --font-sans: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
-  --font-serif: "Source Serif 4 Variable", ui-serif, Georgia, serif;
-  --font-mono: "Geist Mono", "SFMono-Regular", Consolas, monospace;
-}
-
+/* The site is dark-only. `.dark` is still set on `<html>` so the `dark:`
+   variant keeps working in markup, but the palette lives here so a document
+   that somehow renders without that class is still dark rather than unreadable. */
+:root,
 .dark {
   --background: #0a0a0a;
   --foreground: #fafafa;
@@ -35,6 +21,9 @@
   --accent-soft: #24113d;
   --accent-foreground: #ffffff;
   --success: #45c99a;
+  --font-sans: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Source Serif 4 Variable", ui-serif, Georgia, serif;
+  --font-mono: "Geist Mono", "SFMono-Regular", Consolas, monospace;
 }
 
 @theme inline {
@@ -61,12 +50,8 @@
 
 html {
   scroll-behavior: smooth;
-  color-scheme: light;
-  scroll-padding-top: 6rem;
-}
-
-html.dark {
   color-scheme: dark;
+  scroll-padding-top: 6rem;
 }
 
 body {
