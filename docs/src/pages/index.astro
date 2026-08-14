@@ -28,6 +28,31 @@ const capabilities = [
     href: "/api/#crawl",
   },
 ];
+// Measured together on one host on August 14, 2026, against Firecrawl 2.11.0 at
+// commit ef12eb36. Figures are the ones least favourable to Scorch of two
+// collections; methodology and exclusions live in the README.
+const measured = [
+  {
+    value: "1.5×",
+    label: "higher scrape throughput",
+    detail: "5.56 vs 3.61 req/s at concurrency four",
+  },
+  {
+    value: "82×",
+    label: "less warm-idle memory",
+    detail: "38 MiB vs 3,128 MiB resident",
+  },
+  {
+    value: "1 vs 6",
+    label: "long-running units",
+    detail: "One service, no queue or browser sidecar",
+  },
+  {
+    value: "1 vs 55",
+    label: "processes at peak",
+    detail: "The renderer stays in-process",
+  },
+];
 const trust = [
   ["2", "purpose-built binaries"],
   ["0", "required runtime services"],
@@ -260,6 +285,65 @@ const trust = [
         </dl>
       </div>
     </div>
+  </section>
+
+  <section class="mx-auto max-w-[1440px] px-5 pb-24 sm:px-8 sm:pb-32 lg:px-10">
+    <div class="reveal max-w-3xl">
+      <p class="text-muted-foreground text-sm font-medium">
+        Measured, not asserted
+      </p>
+      <h2
+        class="mt-5 font-serif text-3xl leading-[1.12] font-normal tracking-[-0.015em] text-balance sm:text-4xl lg:text-[2.8rem]"
+      >
+        Against <span class="font-sans font-semibold tracking-tight"
+          >Firecrawl</span
+        > on one host, the same scrape costs <span
+          class="font-sans font-semibold tracking-tight">far less</span
+        >
+      </h2>
+      <p
+        class="text-muted-foreground mt-4 max-w-xl text-sm leading-relaxed sm:text-base"
+      >
+        Both products rendered the same four public pages in a browser and
+        returned Markdown, collected side by side on August 14, 2026. Every
+        request succeeded on both.
+      </p>
+    </div>
+    <div
+      class="reference-frame trust-strip reveal mt-12 grid sm:grid-cols-2 lg:grid-cols-4"
+    >
+      {
+        measured.map((item, index) => (
+          <div
+            class:list={[
+              "relative flex flex-col gap-3 px-6 py-8 sm:px-7",
+              index > 0 && "border-border border-t sm:border-t-0 sm:border-l",
+              index === 2 && "sm:border-t lg:border-t-0",
+            ]}
+          >
+            <>
+              <strong class="trust-value font-serif text-4xl leading-none font-normal">
+                {item.value}
+              </strong>
+              <span class="text-sm font-semibold tracking-tight">
+                {item.label}
+              </span>
+              <span class="text-muted-foreground text-xs leading-relaxed">
+                {item.detail}
+              </span>
+            </>
+          </div>
+        ))
+      }
+    </div>
+    <p class="text-muted-foreground reveal mt-6 text-xs leading-relaxed">
+      A deployment-footprint and browser-scrape microbenchmark, not a
+      feature-parity or extraction-quality comparison. Where two collections
+      disagreed these are the figures least favourable to Scorch. <a
+        class="underline-offset-4 hover:underline"
+        href="/architecture/#footprint">See the full comparison and method</a
+      >.
+    </p>
   </section>
 
   <section

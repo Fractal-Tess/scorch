@@ -5,6 +5,7 @@ const headings = [
   { label: "Process boundary", href: "#process-boundary" },
   { label: "Scrape pipeline", href: "#scrape-pipeline" },
   { label: "Browser rendering", href: "#browser-rendering" },
+  { label: "Measured footprint", href: "#footprint" },
   { label: "Metasearch", href: "#metasearch" },
   { label: "Mapping and crawl", href: "#mapping-and-crawl" },
   { label: "Security boundary", href: "#security-boundary" },
@@ -199,7 +200,67 @@ const headings = [
     The legacy path delivered higher steady-state throughput, but its warm start
     was slower and its runtime substantially larger. Scorch prioritizes the
     smaller self-contained renderer for local Pi agent workflows and predictable
-    deployment.
+    deployment. That throughput row predates the render slot pool, which was
+    added afterwards and raised browser throughput substantially; the figures
+    below were collected after it landed.
+  </p>
+
+  <h2 id="footprint">Measured footprint</h2>
+  <p>
+    Unreleased Scorch after the render slot pool was compared with Firecrawl <code
+      >2.11.0</code
+    > at commit <a
+      href="https://github.com/firecrawl/firecrawl/tree/ef12eb36b2f3382838dfe0a0c1a5add3d5df7fe5"
+      rel="noopener">ef12eb36</a
+    >. Both columns were collected together on August 14, 2026, on one 16-thread
+    Linux host. Firecrawl ran its pinned, unmodified full Docker Compose
+    configuration; Scorch ran as one process at maximum concurrency four to match
+    it.
+  </p>
+  <div class="table-wrap">
+    <table>
+      <thead
+        ><tr><th>Measured result</th><th>Firecrawl</th><th>Scorch</th></tr></thead
+      ><tbody>
+        <tr
+          ><td>Long-running deployment units</td><td>6 containers</td><td
+            >1 service</td
+          ></tr
+        >
+        <tr
+          ><td>Sequential scrape latency, median</td><td>0.892 s</td><td
+            >0.638 s</td
+          ></tr
+        >
+        <tr
+          ><td>Throughput at concurrency four</td><td>3.61 req/s</td><td
+            >5.56 req/s</td
+          ></tr
+        >
+        <tr
+          ><td>Warm-idle cgroup memory</td><td>3,128 MiB</td><td>38 MiB</td></tr
+        >
+        <tr
+          ><td>Peak cgroup memory</td><td>3,329 MiB</td><td>75 MiB</td></tr
+        >
+        <tr
+          ><td>OS processes, warm / peak</td><td>49 / 55</td><td>1 / 1</td></tr
+        >
+      </tbody>
+    </table>
+  </div>
+  <p>
+    Both products scraped all 24 parallel requests successfully. This is an
+    end-to-end browser-rendered Markdown scrape and deployment-footprint
+    microbenchmark over four public pages, not a feature-parity,
+    extraction-quality, crawl-speed, or maximum-throughput comparison. The
+    benchmark was collected twice and these are the figures least favorable to
+    Scorch. Memory is cgroup v2 working set sampled every 50 ms, summed across
+    Firecrawl's running containers. Full methodology, exclusions, and host
+    details are in the <a
+      href="https://github.com/Fractal-Tess/scorch#self-hosted-footprint-and-browser-scrape-benchmark"
+      rel="noopener">project README</a
+    >.
   </p>
 
   <h2 id="metasearch">Metasearch</h2>
