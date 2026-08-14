@@ -1,6 +1,7 @@
 mod obscura;
 
 use std::{
+    collections::BTreeMap,
     sync::Arc,
     time::{Duration, Instant},
 };
@@ -30,6 +31,12 @@ pub struct BrowserManager {
 pub struct RenderedPage {
     pub html: String,
     pub final_url: String,
+    /// Status and headers of the main document, taken from the browser's own
+    /// record of the navigation. The browser already fetched the document, so
+    /// reading them here is what lets a forced render skip a second download.
+    pub status: u16,
+    pub content_type: Option<String>,
+    pub headers: BTreeMap<String, String>,
 }
 
 impl BrowserManager {

@@ -1,4 +1,5 @@
 use std::{
+    collections::BTreeMap,
     sync::Arc,
     time::{Duration, Instant},
 };
@@ -112,6 +113,7 @@ async fn render_page(
         .ok_or_else(|| EngineError::Browser("Obscura could not serialize the page DOM".into()))?;
     let serialization_elapsed = serialization_started.elapsed();
     ensure_size(html.len(), config.max_response_bytes)?;
+    let (status, content_type, headers) = document_response(&page);
 
     debug!(
         browser = "obscura",
@@ -123,7 +125,50 @@ async fn render_page(
         total_ms = started.elapsed().as_millis(),
         "browser render phases completed"
     );
-    Ok(RenderedPage { html, final_url })
+    Ok(RenderedPage {
+        html,
+        final_url,
+        status,
+        content_type,
+        headers,
+    })
+}
+
+/// Status and headers of the main document, read off the page's own navigation
+/// record.
+///
+/// The browser clears these per navigation and appends one `Document` event per
+/// hop, so the last one is the response the DOM was built from. A page that
+/// never recorded one (`about:blank`, a navigation that produced no HTTP
+/// response) reports 200, matching the synthesized response this replaces.
+fn document_response(page: &Page) -> (u16, Option<String>, BTreeMap<String, String>) {
+    let Some(event) = page
+        .network_events
+        .iter()
+        .rev()
+        .find(|event| event.resource_type == "Document")
+    else {
+        return (
+            200,
+            Some("text/html; charset=utf-8".into()),
+            BTreeMap::new(),
+        );
+    };
+    let lowercased: BTreeMap<String, String> = event
+        .response_headers
+        .iter()
+        .map(|(name, value)| (name.to_ascii_lowercase(), value.clone()))
+        .collect();
+    let content_type = lowercased.get("content-type").cloned();
+    let headers = crate::fetch::REPORTED_HEADERS
+        .into_iter()
+        .filter_map(|name| {
+            lowercased
+                .get(name)
+                .map(|value| (name.to_owned(), value.clone()))
+        })
+        .collect();
+    (event.status, content_type, headers)
 }
 
 fn remaining_time(started: Instant, timeout: Duration) -> Result<Duration> {

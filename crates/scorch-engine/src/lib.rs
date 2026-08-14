@@ -149,34 +149,40 @@ impl ScorchEngine {
                 .await
         };
 
-        let (fetched, forced_rendered) = if forced_browser {
-            let (fetched, rendered) =
-                tokio::join!(self.fetcher.get(&request.url, timeout), render());
-            (fetched, Some(rendered?))
-        } else {
-            (self.fetcher.get(&request.url, timeout).await, None)
-        };
-        let should_render = forced_rendered.is_some()
-            || matches!((&fetched, request.options.render), (Ok(response), RenderMode::Auto) if needs_browser(response));
-
-        if should_render {
-            let rendered = match forced_rendered {
-                Some(rendered) => rendered,
-                None => render().await?,
+        // A forced render does not fetch the page itself. The browser downloads
+        // the document anyway and records its status and headers, which is all
+        // the fetch contributed here -- its body was always discarded in favour
+        // of the rendered DOM. Fetching alongside the render doubled the
+        // document download and hit the origin twice per scrape, with two
+        // different TLS fingerprints milliseconds apart.
+        if forced_browser {
+            let rendered = render().await?;
+            let response = FetchResponse {
+                final_url: rendered.final_url,
+                status: reqwest::StatusCode::from_u16(rendered.status)
+                    .unwrap_or(reqwest::StatusCode::OK),
+                content_type: rendered.content_type,
+                headers: rendered.headers,
+                body: Vec::new(),
             };
-            let response = match fetched {
-                Ok(mut response) => {
-                    response.final_url = rendered.final_url.clone();
-                    response
-                }
-                Err(_) => FetchResponse {
-                    final_url: rendered.final_url.clone(),
-                    status: reqwest::StatusCode::OK,
-                    content_type: Some("text/html; charset=utf-8".into()),
-                    headers: Default::default(),
-                    body: Vec::new(),
+            return extract::extract(
+                ExtractInput {
+                    requested_url: &request.url,
+                    html: rendered.html,
+                    response: &response,
+                    engine: ScrapeEngine::Obscura,
+                    elapsed_ms: started.elapsed().as_millis() as u64,
                 },
-            };
+                &request.options,
+            );
+        }
+
+        let fetched = self.fetcher.get(&request.url, timeout).await;
+        if matches!((&fetched, request.options.render), (Ok(response), RenderMode::Auto) if needs_browser(response))
+        {
+            let rendered = render().await?;
+            let mut response = fetched?;
+            response.final_url = rendered.final_url;
             return extract::extract(
                 ExtractInput {
                     requested_url: &request.url,

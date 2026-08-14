@@ -168,8 +168,14 @@ impl SafeFetcher {
     }
 }
 
+/// The only response headers a caller ever sees. Everything else is withheld,
+/// which keeps `set-cookie` and other credential-bearing headers out of scrape
+/// responses. The browser path reports the same set from its own navigation.
+pub(crate) const REPORTED_HEADERS: [&str; 4] =
+    ["content-type", "content-language", "last-modified", "etag"];
+
 fn selected_headers(headers: &reqwest::header::HeaderMap) -> BTreeMap<String, String> {
-    ["content-type", "content-language", "last-modified", "etag"]
+    REPORTED_HEADERS
         .into_iter()
         .filter_map(|name| {
             headers
