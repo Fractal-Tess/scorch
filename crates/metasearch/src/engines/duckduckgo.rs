@@ -2,10 +2,13 @@ use std::time::{Duration, Instant};
 
 use reqwest::{
     Client, StatusCode,
-    header::{ACCEPT, ACCEPT_ENCODING, ACCEPT_LANGUAGE, HeaderMap, HeaderValue},
+    header::{
+        ACCEPT, ACCEPT_ENCODING, ACCEPT_LANGUAGE, CONTENT_TYPE, HeaderMap, HeaderName, HeaderValue,
+        REFERER,
+    },
 };
 use scraper::{ElementRef, Html, Selector};
-use url::Url;
+use url::{Url, form_urlencoded};
 
 use crate::{BoxSearchFuture, EngineOutput, Error, Result, SearchEngine, SearchHit, SearchQuery};
 
@@ -13,6 +16,7 @@ use super::http::read_limited;
 
 const NAME: &str = "duckduckgo";
 const MAX_RESPONSE_BYTES: usize = 2 * 1024 * 1024;
+const ENDPOINT: &str = "https://html.duckduckgo.com/html/";
 
 pub struct DuckDuckGo {
     client: Client,
@@ -32,6 +36,12 @@ impl DuckDuckGo {
         // Advertising `gzip` does return HTTP 200, but the bytes stay compressed
         // and the parser quietly finds no results in them, which is the same
         // silent emptiness this header set exists to prevent.
+        //
+        // The rest of the set describes a form submission on the no-JS page,
+        // which is the only way this endpoint is reached by a browser. The
+        // `Sec-Fetch-*` values are the ones a navigation from that page carries,
+        // and the endpoint answers with `Referrer-Policy: origin`, so a browser's
+        // next request quotes it as the referrer.
         let mut headers = HeaderMap::new();
         headers.insert(
             ACCEPT,
@@ -41,13 +51,26 @@ impl DuckDuckGo {
         );
         headers.insert(ACCEPT_LANGUAGE, HeaderValue::from_static("en-US,en;q=0.9"));
         headers.insert(ACCEPT_ENCODING, HeaderValue::from_static("identity"));
+        headers.insert(REFERER, HeaderValue::from_static(ENDPOINT));
+        for (name, value) in [
+            ("sec-fetch-dest", "document"),
+            ("sec-fetch-mode", "navigate"),
+            ("sec-fetch-site", "same-origin"),
+            ("sec-fetch-user", "?1"),
+        ] {
+            headers.insert(
+                HeaderName::from_static(name),
+                HeaderValue::from_static(value),
+            );
+        }
         let client = Client::builder()
             .connect_timeout(Duration::from_secs(3))
             .timeout(Duration::from_secs(5))
             .default_headers(headers)
-            .user_agent(
-                "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/131 Safari/537.36",
-            )
+            // A real, current Firefox string. The previous value claimed to be
+            // Chrome but omitted the `(KHTML, like Gecko)` token and the full
+            // version, so it matched no browser that has ever shipped.
+            .user_agent("Mozilla/5.0 (X11; Linux x86_64; rv:153.0) Gecko/20100101 Firefox/153.0")
             .build()
             .map_err(|error| Error::Request {
                 engine: NAME,
@@ -58,22 +81,28 @@ impl DuckDuckGo {
 
     async fn execute(&self, query: &SearchQuery) -> Result<EngineOutput> {
         let started = Instant::now();
-        let mut url =
-            Url::parse("https://html.duckduckgo.com/html/").expect("constant URL is valid");
-        url.query_pairs_mut()
+        let region = format!(
+            "{}-{}",
+            query.country.to_ascii_lowercase(),
+            query.language.to_ascii_lowercase()
+        );
+        // This endpoint exists to serve browsers without JavaScript, which reach
+        // it by submitting its form. That is a POST, and `b` is the empty
+        // first-page marker the form carries. A GET with the same values in the
+        // query string returns results too, but it is a shape no browser
+        // produces here. Preferences such as safe search live in cookies rather
+        // than in the form, so `kp` is sent as one.
+        let body = form_urlencoded::Serializer::new(String::new())
             .append_pair("q", query.query.trim())
-            .append_pair(
-                "kl",
-                &format!(
-                    "{}-{}",
-                    query.country.to_ascii_lowercase(),
-                    query.language.to_ascii_lowercase()
-                ),
-            )
-            .append_pair("kp", "1");
+            .append_pair("b", "")
+            .append_pair("kl", &region)
+            .finish();
         let response = self
             .client
-            .get(url)
+            .post(ENDPOINT)
+            .header(CONTENT_TYPE, "application/x-www-form-urlencoded")
+            .header("cookie", format!("kl={region}; kp=1"))
+            .body(body)
             .send()
             .await
             .map_err(|error| request_error(error, NAME))?;
@@ -121,7 +150,11 @@ fn parse(html: &str) -> Result<Vec<SearchHit>> {
     // aggregator counts that as a successful search: the engine would keep its
     // clean health record, the breaker would never trip, the caller would see no
     // failure, and the empty answer would be cached for the rest of its TTL.
-    let challenge = Selector::parse(".anomaly-modal__modal").expect("valid selector");
+    //
+    // DuckDuckGo serves more than one challenge markup, so both known shapes
+    // are matched.
+    let challenge =
+        Selector::parse(".anomaly-modal__modal, form#challenge-form").expect("valid selector");
     if document.select(&challenge).next().is_some() {
         return Err(Error::RateLimited { engine: NAME });
     }
@@ -213,12 +246,16 @@ mod tests {
 
     #[test]
     fn challenge_page_is_an_error_not_an_empty_result() {
-        let html = r#"<div class="anomaly-modal__mask"></div>
-                      <div class="anomaly-modal__modal"><h1>Verify</h1></div>"#;
-        assert!(matches!(
-            parse(html),
-            Err(Error::RateLimited { engine: NAME })
-        ));
+        for html in [
+            r#"<div class="anomaly-modal__mask"></div>
+               <div class="anomaly-modal__modal"><h1>Verify</h1></div>"#,
+            r#"<form id="challenge-form" action="/html/"><h1>Verify</h1></form>"#,
+        ] {
+            assert!(matches!(
+                parse(html),
+                Err(Error::RateLimited { engine: NAME })
+            ));
+        }
     }
 
     #[tokio::test]

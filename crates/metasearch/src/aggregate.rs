@@ -30,6 +30,15 @@ pub struct MetaSearchConfig {
     pub per_engine_concurrency: usize,
     pub failure_threshold: usize,
     pub engine_cooldown: Duration,
+    /// Applied instead of `engine_cooldown` when an engine reports a rate
+    /// limit, and applied on the first such failure rather than after
+    /// `failure_threshold`.
+    ///
+    /// A timeout is worth retrying in half a minute; a block is not. Engines
+    /// that gate on bot detection block the caller's address, not a session,
+    /// and retrying inside the block extends it, so a short cooldown turns one
+    /// refusal into a standing one.
+    pub rate_limit_cooldown: Duration,
 }
 
 impl Default for MetaSearchConfig {
@@ -42,6 +51,7 @@ impl Default for MetaSearchConfig {
             per_engine_concurrency: 4,
             failure_threshold: 2,
             engine_cooldown: Duration::from_secs(30),
+            rate_limit_cooldown: Duration::from_secs(3600),
         }
     }
 }
@@ -241,7 +251,7 @@ impl MetaSearch {
                 }
                 Err(error) => {
                     warn!(engine = slot.engine.name(), %error, "metasearch engine failed");
-                    slot.record_failure(&self.config);
+                    slot.record_failure(&self.config, &error);
                     failures.push(error.to_string());
                 }
             }
@@ -356,13 +366,15 @@ impl EngineSlot {
         *state = EngineState::default();
     }
 
-    fn record_failure(&self, config: &MetaSearchConfig) {
+    fn record_failure(&self, config: &MetaSearchConfig, error: &Error) {
         let mut state = self
             .state
             .lock()
             .expect("engine state lock is not poisoned");
         state.consecutive_failures += 1;
-        if state.consecutive_failures >= config.failure_threshold.max(1) {
+        if matches!(error, Error::RateLimited { .. }) {
+            state.disabled_until = Some(Instant::now() + config.rate_limit_cooldown);
+        } else if state.consecutive_failures >= config.failure_threshold.max(1) {
             state.disabled_until = Some(Instant::now() + config.engine_cooldown);
         }
     }
@@ -724,11 +736,36 @@ mod tests {
             engine_cooldown: Duration::ZERO,
             ..Default::default()
         };
-        slot.record_failure(&config);
-        slot.record_failure(&config);
+        let error = Error::Timeout { engine: "test" };
+        slot.record_failure(&config, &error);
+        slot.record_failure(&config, &error);
         assert!(slot.available());
-        slot.record_failure(&config);
+        slot.record_failure(&config, &error);
         assert!(slot.available());
+    }
+
+    #[test]
+    fn a_rate_limit_disables_the_engine_immediately() {
+        let slot = EngineSlot::new(
+            None,
+            Arc::new(FakeEngine {
+                name: "test",
+                delay: Duration::ZERO,
+                hits: Vec::new(),
+            }),
+            1,
+        );
+        let config = MetaSearchConfig {
+            failure_threshold: 2,
+            engine_cooldown: Duration::ZERO,
+            rate_limit_cooldown: Duration::from_secs(3600),
+            ..Default::default()
+        };
+        // One refusal is enough. Waiting for the threshold would mean sending a
+        // second request into a block that the first one already reported, and
+        // the engines that block do so by address rather than by session.
+        slot.record_failure(&config, &Error::RateLimited { engine: "test" });
+        assert!(!slot.available());
     }
 
     #[tokio::test]
