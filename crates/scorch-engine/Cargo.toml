@@ -8,7 +8,6 @@ repository.workspace = true
 rust-version.workspace = true
 
 [dependencies]
-base64.workspace = true
 dashmap.workspace = true
 dom_smoothie.workspace = true
 futures-util.workspace = true

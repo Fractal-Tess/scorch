@@ -4,6 +4,21 @@ All notable changes to Scorch are documented in this file. The project follows [
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-08-14
+
+### Fixed
+
+- Fixed a startup race that segfaulted the process when two renders entered Obscura's lazy process-wide initialization at once, by rendering one throwaway page before serving traffic.
+- Fixed an abort that let a single ordinary page terminate the service. Certain page layouts tripped an assertion in the bundled `taffy` layout engine, and release builds abort on panic. Removing the `render` feature drops `taffy` from the dependency graph, so those pages now scrape normally.
+
+### Changed
+
+- Dropped Obscura's `render` feature. Rendering no longer prefetches images and web fonts for rasterization, cutting median render time by 29 percent and up to 65 percent on image-heavy pages. Extracted Markdown was byte-identical across twelve pages, including JavaScript-driven ones.
+
+### Removed
+
+- Removed screenshot capture. Scorch returns text content only, so the `screenshot` format, the `fullPageScreenshot` option, and the `screenshot` response field are gone from the HTTP API, CLI, and clients.
+
 ## [0.5.1] - 2026-08-13
 
 ### Added
@@ -121,7 +136,8 @@ All notable changes to Scorch are documented in this file. The project follows [
 - Embedded Obscura requests use fresh context, page, cookie, cache, and JavaScript state to prevent caller data leakage.
 - Render requests enforce one caller-visible deadline across validation, queueing, navigation, execution, serialization, and screenshots.
 
-[Unreleased]: https://github.com/Fractal-Tess/scorch/compare/v0.5.1...HEAD
+[Unreleased]: https://github.com/Fractal-Tess/scorch/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/Fractal-Tess/scorch/compare/v0.5.1...v0.6.0
 [0.5.1]: https://github.com/Fractal-Tess/scorch/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/Fractal-Tess/scorch/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/Fractal-Tess/scorch/compare/v0.3.0...v0.4.0

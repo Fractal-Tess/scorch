@@ -17,12 +17,12 @@ use std::{
 use futures_util::{StreamExt, stream};
 use scorch_types::{
     CrawlJob, CrawlPage, CrawlRequest, CrawlStatusRequest, MapRequest, MapResponse, RenderMode,
-    ScrapeDocument, ScrapeEngine, ScrapeFormat, ScrapeRequest, SearchRequest, SearchResponse,
+    ScrapeDocument, ScrapeEngine, ScrapeRequest, SearchRequest, SearchResponse,
 };
 use scraper::{Html, Selector};
 use tracing::{debug, info, warn};
 
-pub use config::EngineConfig;
+pub use config::{EngineConfig, default_max_concurrency};
 pub use error::{EngineError, Result};
 use extract::ExtractInput;
 use fetch::FetchResponse;
@@ -59,7 +59,7 @@ impl ScorchEngine {
             job_ttl_seconds = config.job_ttl.as_secs(),
             "initializing Scorch engine"
         );
-        let security = SecurityPolicy;
+        let security = SecurityPolicy::new();
         let fetcher = SafeFetcher::new(security.clone(), config.clone());
         let search = search::SearchService::new(&config)?;
         let browser = BrowserManager::new(config.clone(), security).await?;
@@ -133,8 +133,7 @@ impl ScorchEngine {
         validate_scrape_request(request)?;
         let timeout = Duration::from_millis(request.options.timeout_ms.min(120_000));
         let deadline = Instant::now() + timeout;
-        let wants_screenshot = request.options.formats.contains(&ScrapeFormat::Screenshot);
-        let forced_browser = request.options.render == RenderMode::Always || wants_screenshot;
+        let forced_browser = request.options.render == RenderMode::Always;
         let render = || async {
             let remaining = deadline.saturating_duration_since(Instant::now());
             if remaining.is_zero() {
@@ -145,9 +144,7 @@ impl ScorchEngine {
                     &request.url,
                     remaining,
                     Duration::from_millis(request.options.wait_for_ms.min(60_000)),
-                    request.options.block_media && !wants_screenshot,
-                    wants_screenshot,
-                    request.options.full_page_screenshot,
+                    request.options.block_media,
                 )
                 .await
         };
@@ -187,7 +184,6 @@ impl ScorchEngine {
                     response: &response,
                     engine: ScrapeEngine::Obscura,
                     elapsed_ms: started.elapsed().as_millis() as u64,
-                    screenshot: rendered.screenshot,
                 },
                 &request.options,
             );
@@ -203,7 +199,6 @@ impl ScorchEngine {
                 response: &response,
                 engine: ScrapeEngine::Fetch,
                 elapsed_ms: started.elapsed().as_millis() as u64,
-                screenshot: None,
             },
             &request.options,
         )
@@ -395,13 +390,6 @@ fn validate_scrape_request(request: &ScrapeRequest) -> Result<()> {
             "scrape formats cannot contain duplicates".into(),
         ));
     }
-    if request.options.full_page_screenshot
-        && !request.options.formats.contains(&ScrapeFormat::Screenshot)
-    {
-        return Err(EngineError::InvalidRequest(
-            "fullPageScreenshot requires the screenshot format".into(),
-        ));
-    }
     if request.options.timeout_ms < 100 || request.options.timeout_ms > 120_000 {
         return Err(EngineError::InvalidRequest(
             "timeoutMs must be between 100 and 120000".into(),
@@ -479,15 +467,6 @@ mod tests {
             },
         };
         assert!(validate_scrape_request(&duplicate_formats).is_err());
-
-        let full_page_without_screenshot = ScrapeRequest {
-            url: "https://example.com".into(),
-            options: ScrapeOptions {
-                full_page_screenshot: true,
-                ..Default::default()
-            },
-        };
-        assert!(validate_scrape_request(&full_page_without_screenshot).is_err());
     }
 
     #[test]

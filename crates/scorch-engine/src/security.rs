@@ -1,12 +1,88 @@
-use std::net::{IpAddr, SocketAddr};
+use std::{
+    net::{IpAddr, SocketAddr},
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
+use dashmap::DashMap;
 use tokio::{net::lookup_host, time::timeout};
 use url::{Host, Url};
 
 use crate::error::{EngineError, Result};
 
+/// How long a successful resolution stays usable. Kept short so that DNS
+/// changes take effect quickly while still collapsing the burst of lookups a
+/// single page load triggers (one per proxied subresource connection).
+const DNS_CACHE_TTL: Duration = Duration::from_secs(60);
+/// Upper bound on cached hosts, so a crawl over many domains cannot grow the
+/// map without limit.
+const DNS_CACHE_CAPACITY: usize = 1024;
+
+#[derive(Debug, Clone)]
+struct CachedAddresses {
+    addresses: Vec<SocketAddr>,
+    expires_at: Instant,
+}
+
+type HostKey = (String, u16);
+
 #[derive(Debug, Clone, Default)]
-pub struct SecurityPolicy;
+pub struct SecurityPolicy {
+    dns_cache: Arc<DashMap<HostKey, CachedAddresses>>,
+    /// Per-host locks so that a burst of concurrent requests for the same host
+    /// performs one lookup instead of one per caller.
+    resolving: Arc<DashMap<HostKey, Arc<tokio::sync::Mutex<()>>>>,
+}
+
+impl SecurityPolicy {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    fn cached_addresses(&self, host: &str, port: u16) -> Option<Vec<SocketAddr>> {
+        let entry = self.dns_cache.get(&(host.to_owned(), port))?;
+        if entry.expires_at <= Instant::now() {
+            return None;
+        }
+        Some(entry.addresses.clone())
+    }
+
+    fn resolve_gate(&self, key: &HostKey) -> Arc<tokio::sync::Mutex<()>> {
+        if let Some(existing) = self.resolving.get(key) {
+            return Arc::clone(existing.value());
+        }
+        Arc::clone(
+            self.resolving
+                .entry(key.clone())
+                .or_insert_with(|| Arc::new(tokio::sync::Mutex::new(())))
+                .value(),
+        )
+    }
+
+    fn release_gate(&self, key: &HostKey) {
+        // Drop the entry only when this caller holds the last reference, so a
+        // waiter that already cloned the Arc still shares the same lock.
+        self.resolving
+            .remove_if(key, |_, gate| Arc::strong_count(gate) <= 2);
+    }
+
+    fn store_addresses(&self, host: &str, port: u16, addresses: &[SocketAddr]) {
+        if self.dns_cache.len() >= DNS_CACHE_CAPACITY {
+            let now = Instant::now();
+            self.dns_cache.retain(|_, entry| entry.expires_at > now);
+            if self.dns_cache.len() >= DNS_CACHE_CAPACITY {
+                return;
+            }
+        }
+        self.dns_cache.insert(
+            (host.to_owned(), port),
+            CachedAddresses {
+                addresses: addresses.to_vec(),
+                expires_at: Instant::now() + DNS_CACHE_TTL,
+            },
+        );
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct ValidatedTarget {
@@ -54,16 +130,45 @@ impl SecurityPolicy {
         }
         let mut addresses = if let Some(ip) = literal_ip {
             vec![SocketAddr::new(ip, port)]
+        } else if let Some(cached) = self.cached_addresses(&host, port) {
+            cached
         } else {
-            timeout(
-                std::time::Duration::from_secs(5),
-                lookup_host((host.as_str(), port)),
-            )
-            .await
-            .map_err(|_| EngineError::Dns("resolution timed out".into()))?
-            .map_err(|error| EngineError::Dns(error.to_string()))?
-            .take(16)
-            .collect()
+            let key = (host.clone(), port);
+            let gate = self.resolve_gate(&key);
+            let resolved = {
+                let _guard = gate.lock().await;
+                // Another caller may have resolved this host while we waited.
+                match self.cached_addresses(&host, port) {
+                    Some(cached) => cached,
+                    None => {
+                        let dns_started = Instant::now();
+                        let resolved =
+                            timeout(Duration::from_secs(5), lookup_host((host.as_str(), port)))
+                                .await;
+                        let mut resolved: Vec<SocketAddr> = resolved
+                            .map_err(|_| EngineError::Dns("resolution timed out".into()))?
+                            .map_err(|error| EngineError::Dns(error.to_string()))?
+                            .take(16)
+                            .collect();
+                        resolved.sort_unstable();
+                        resolved.dedup();
+                        tracing::debug!(
+                            dns_ms = dns_started.elapsed().as_millis() as u64,
+                            %host,
+                            addresses = resolved.len(),
+                            "resolved host"
+                        );
+                        // Only successful lookups are cached, and the
+                        // public-address check below still runs on every hit.
+                        self.store_addresses(&host, port, &resolved);
+                        resolved
+                    }
+                }
+            };
+            // Runs while `gate` is still held locally, so the strong count
+            // reveals whether any other caller is still waiting on this host.
+            self.release_gate(&key);
+            resolved
         };
         addresses.sort_unstable();
         addresses.dedup();
@@ -177,7 +282,7 @@ mod tests {
 
     #[tokio::test]
     async fn rejects_loopback() {
-        let error = SecurityPolicy
+        let error = SecurityPolicy::new()
             .validate("http://127.0.0.1:8080/private")
             .await
             .unwrap_err();
@@ -186,7 +291,7 @@ mod tests {
 
     #[tokio::test]
     async fn rejects_credentials() {
-        let error = SecurityPolicy
+        let error = SecurityPolicy::new()
             .validate("https://user:pass@example.com")
             .await
             .unwrap_err();
@@ -231,6 +336,55 @@ mod tests {
         for address in ["8.8.8.8", "1.1.1.1", "2606:4700:4700::1111"] {
             assert!(is_public_ip(address.parse().unwrap()), "{address}");
         }
+    }
+
+    #[test]
+    fn caches_resolved_addresses_until_they_expire() {
+        let policy = SecurityPolicy::new();
+        let address: SocketAddr = "93.184.216.34:443".parse().unwrap();
+        policy.store_addresses("example.com", 443, &[address]);
+
+        assert_eq!(
+            policy.cached_addresses("example.com", 443),
+            Some(vec![address])
+        );
+        // The port is part of the key, so a different port must miss.
+        assert_eq!(policy.cached_addresses("example.com", 80), None);
+        assert_eq!(policy.cached_addresses("other.example", 443), None);
+
+        policy
+            .dns_cache
+            .get_mut(&("example.com".into(), 443))
+            .unwrap()
+            .expires_at = Instant::now() - Duration::from_secs(1);
+        assert_eq!(policy.cached_addresses("example.com", 443), None);
+    }
+
+    #[test]
+    fn dns_cache_stays_bounded() {
+        let policy = SecurityPolicy::new();
+        let address: SocketAddr = "93.184.216.34:443".parse().unwrap();
+        for index in 0..(DNS_CACHE_CAPACITY + 50) {
+            policy.store_addresses(&format!("host{index}.example"), 443, &[address]);
+        }
+        assert!(policy.dns_cache.len() <= DNS_CACHE_CAPACITY);
+    }
+
+    #[tokio::test]
+    async fn concurrent_resolutions_share_one_gate() {
+        let policy = SecurityPolicy::new();
+        let key = ("example.com".to_owned(), 443);
+        let first = policy.resolve_gate(&key);
+        let second = policy.resolve_gate(&key);
+        assert!(Arc::ptr_eq(&first, &second));
+
+        // While another caller still holds a reference the gate is retained.
+        policy.release_gate(&key);
+        assert!(policy.resolving.contains_key(&key));
+
+        drop(second);
+        policy.release_gate(&key);
+        assert!(!policy.resolving.contains_key(&key));
     }
 
     #[test]

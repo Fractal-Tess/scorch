@@ -3,7 +3,7 @@ export const DEFAULT_TIMEOUT_MS: 135000;
 export const DEFAULT_MAX_RESPONSE_BYTES: 67108864;
 
 export type ScrapeFormat =
-  "markdown" | "html" | "text" | "links" | "metadata" | "screenshot";
+  "markdown" | "html" | "text" | "links" | "metadata";
 export type RenderMode = "auto" | "always" | "never";
 export type ScrapeEngine = "fetch" | "obscura";
 export type SearchEngine =
@@ -39,7 +39,6 @@ export interface ScrapeOptions {
   waitForMs?: number;
   onlyMainContent?: boolean;
   blockMedia?: boolean;
-  fullPageScreenshot?: boolean;
 }
 
 export interface Link {
@@ -67,7 +66,6 @@ export interface ScrapeDocument {
   html?: string;
   text?: string;
   links?: Link[];
-  screenshot?: string;
   warnings?: string[];
 }
 

@@ -48,7 +48,6 @@ enum FormatArg {
     Text,
     Links,
     Metadata,
-    Screenshot,
 }
 
 impl From<FormatArg> for ScrapeFormat {
@@ -59,7 +58,6 @@ impl From<FormatArg> for ScrapeFormat {
             FormatArg::Text => Self::Text,
             FormatArg::Links => Self::Links,
             FormatArg::Metadata => Self::Metadata,
-            FormatArg::Screenshot => Self::Screenshot,
         }
     }
 }
@@ -94,8 +92,6 @@ struct ScrapeArgs {
     wait_for_ms: u64,
     #[arg(long)]
     full_content: bool,
-    #[arg(long)]
-    full_page_screenshot: bool,
 }
 
 impl ScrapeArgs {
@@ -108,7 +104,6 @@ impl ScrapeArgs {
                 timeout_ms: self.timeout_ms,
                 wait_for_ms: self.wait_for_ms,
                 only_main_content: !self.full_content,
-                full_page_screenshot: self.full_page_screenshot,
                 ..Default::default()
             },
         }

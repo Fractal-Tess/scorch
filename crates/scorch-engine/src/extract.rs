@@ -16,7 +16,6 @@ pub struct ExtractInput<'a> {
     pub response: &'a FetchResponse,
     pub engine: ScrapeEngine,
     pub elapsed_ms: u64,
-    pub screenshot: Option<String>,
 }
 
 pub fn extract(input: ExtractInput<'_>, options: &ScrapeOptions) -> Result<ScrapeDocument> {
@@ -94,7 +93,6 @@ pub fn extract(input: ExtractInput<'_>, options: &ScrapeOptions) -> Result<Scrap
         html: wants(ScrapeFormat::Html).then_some(content_html),
         text: wants(ScrapeFormat::Text).then_some(content_text),
         links: wants(ScrapeFormat::Links).then_some(links),
-        screenshot: input.screenshot,
         warnings,
     })
 }

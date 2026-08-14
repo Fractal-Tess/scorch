@@ -457,7 +457,6 @@ pub(crate) fn document_size(document: &scorch_types::ScrapeDocument) -> usize {
     document.markdown.as_ref().map_or(0, String::len)
         + document.html.as_ref().map_or(0, String::len)
         + document.text.as_ref().map_or(0, String::len)
-        + document.screenshot.as_ref().map_or(0, String::len)
         + document.links.as_ref().map_or(0, |links| {
             links
                 .iter()

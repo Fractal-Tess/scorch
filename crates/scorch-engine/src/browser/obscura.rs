@@ -3,8 +3,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use base64::{Engine as _, engine::general_purpose::STANDARD};
-use obscura_browser::{BrowserContext, CaptureRegion, Page};
+use obscura_browser::{BrowserContext, Page};
 use tokio::{sync::OwnedSemaphorePermit, task::spawn_blocking, time::timeout};
 use tracing::debug;
 use uuid::Uuid;
@@ -27,7 +26,6 @@ impl ObscuraBackend {
         Self { config, proxy_url }
     }
 
-    #[allow(clippy::too_many_arguments)]
     pub async fn render(
         &self,
         permit: OwnedSemaphorePermit,
@@ -35,8 +33,6 @@ impl ObscuraBackend {
         request_timeout: Duration,
         wait_for: Duration,
         block_media: bool,
-        screenshot: bool,
-        full_page: bool,
     ) -> Result<RenderedPage> {
         let config = self.config.clone();
         let proxy_url = self.proxy_url.clone();
@@ -56,8 +52,6 @@ impl ObscuraBackend {
                 request_timeout,
                 wait_for,
                 block_media,
-                screenshot,
-                full_page,
             ))
         });
         timeout(request_timeout, task)
@@ -69,7 +63,6 @@ impl ObscuraBackend {
     }
 }
 
-#[allow(clippy::too_many_arguments)]
 async fn render_page(
     config: &EngineConfig,
     proxy_url: &str,
@@ -77,8 +70,6 @@ async fn render_page(
     request_timeout: Duration,
     wait_for: Duration,
     block_media: bool,
-    screenshot: bool,
-    full_page: bool,
 ) -> Result<RenderedPage> {
     let started = Instant::now();
     let context = Arc::new(BrowserContext::with_options(
@@ -124,18 +115,6 @@ async fn render_page(
     let serialization_elapsed = serialization_started.elapsed();
     ensure_size(html.len(), config.max_response_bytes)?;
 
-    let screenshot_started = Instant::now();
-    let screenshot = if screenshot {
-        let remaining = remaining_time(started, request_timeout)?;
-        page.prepare_screenshot_resources(duration_millis(remaining).min(1_000))
-            .await;
-        remaining_time(started, request_timeout)?;
-        let bytes = capture_screenshot(&page, full_page)?;
-        ensure_size(bytes.len(), config.max_response_bytes)?;
-        Some(format!("data:image/png;base64,{}", STANDARD.encode(bytes)))
-    } else {
-        None
-    };
     debug!(
         browser = "obscura",
         stealth = config.obscura_stealth,
@@ -143,30 +122,10 @@ async fn render_page(
         page_ms = page_elapsed.as_millis(),
         navigation_ms = navigation_elapsed.as_millis(),
         serialization_ms = serialization_elapsed.as_millis(),
-        screenshot_ms = screenshot_started.elapsed().as_millis(),
         total_ms = started.elapsed().as_millis(),
         "browser render phases completed"
     );
-    Ok(RenderedPage {
-        html,
-        final_url,
-        screenshot,
-    })
-}
-
-fn capture_screenshot(page: &Page, full_page: bool) -> Result<Vec<u8>> {
-    if full_page {
-        let (width, height) = page.prepared_content_size().ok_or_else(|| {
-            EngineError::Browser("Obscura could not determine the document size".into())
-        })?;
-        return page
-            .screenshot_region(CaptureRegion::new(0.0, 0.0, width, height, 1.0))
-            .map_err(|error| {
-                EngineError::Browser(format!("Obscura screenshot failed: {error:?}"))
-            });
-    }
-    page.screenshot(VIEWPORT)
-        .ok_or_else(|| EngineError::Browser("Obscura screenshot failed".into()))
+    Ok(RenderedPage { html, final_url })
 }
 
 fn remaining_time(started: Instant, timeout: Duration) -> Result<Duration> {

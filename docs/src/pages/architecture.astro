@@ -90,12 +90,11 @@ const headings = [
     </li>
     <li>
       <strong>Choose an engine.</strong> Static content stays on the direct path.
-      JavaScript-dependent content, explicit rendering, and screenshots use embedded
-      Obscura.
+      JavaScript-dependent content and explicit rendering use embedded Obscura.
     </li>
     <li>
       <strong>Extract.</strong> The resulting HTML becomes requested Markdown, HTML,
-      text, links, metadata, and optionally a PNG screenshot data URI.
+      text, links, and metadata.
     </li>
     <li>
       <strong>Return only requested large fields.</strong> The response identifies
@@ -136,7 +135,7 @@ const headings = [
     Scorch does not pool contexts or pages across callers because that could
     leak cookies, authenticated cache entries, DOM state, or JavaScript state.
     Browser concurrency is bounded, and one absolute deadline covers validation,
-    queueing, navigation, explicit waiting, serialization, and screenshots.
+    queueing, navigation, explicit waiting, and serialization.
   </p>
   <p>
     Stealth transport is enabled by default. It provides browser-aligned TLS and

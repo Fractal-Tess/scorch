@@ -11,7 +11,7 @@ default-members = ["crates/scorch-cli"]
 resolver = "3"
 
 [workspace.package]
-version = "0.5.1"
+version = "0.6.0"
 edition = "2024"
 authors = ["Fractal-Tess <vgfractal@gmail.com>"]
 license = "MIT"
@@ -27,7 +27,7 @@ dashmap = "6.2.1"
 dom_smoothie = "0.18.0"
 futures-util = "0.3.33"
 htmd = "0.5.5"
-obscura-browser = { git = "https://github.com/h4ckf0r0day/obscura.git", rev = "97124edeb2ea610615e78f43e097454e3b221f6b", features = ["render", "stealth"] }
+obscura-browser = { git = "https://github.com/h4ckf0r0day/obscura.git", rev = "97124edeb2ea610615e78f43e097454e3b221f6b", features = ["stealth"] }
 quick-xml = "0.41.0"
 reqwest = { version = "0.13.4", default-features = false, features = ["json", "rustls", "stream"] }
 rmcp = { version = "3.1.2", default-features = false, features = ["macros", "server", "transport-io"] }
@@ -45,10 +45,6 @@ tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter", "json"] }
 url = { version = "2.5.8", features = ["serde"] }
 uuid = { version = "1.24.0", features = ["serde", "v7"] }
-
-[patch.crates-io]
-cosmic-text = { git = "https://github.com/h4ckf0r0day/obscura.git", rev = "97124edeb2ea610615e78f43e097454e3b221f6b" }
-taffy = { git = "https://github.com/h4ckf0r0day/obscura.git", rev = "97124edeb2ea610615e78f43e097454e3b221f6b" }
 
 [profile.release]
 opt-level = 3

@@ -21,7 +21,6 @@ pub enum ScrapeFormat {
     Text,
     Links,
     Metadata,
-    Screenshot,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -42,7 +41,6 @@ pub struct ScrapeOptions {
     pub wait_for_ms: u64,
     pub only_main_content: bool,
     pub block_media: bool,
-    pub full_page_screenshot: bool,
 }
 
 impl Default for ScrapeOptions {
@@ -54,7 +52,6 @@ impl Default for ScrapeOptions {
             wait_for_ms: 0,
             only_main_content: true,
             block_media: true,
-            full_page_screenshot: false,
         }
     }
 }
@@ -116,8 +113,6 @@ pub struct ScrapeDocument {
     pub text: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub links: Option<Vec<Link>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub screenshot: Option<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub warnings: Vec<String>,
 }

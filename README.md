@@ -18,14 +18,14 @@
 
 ## What is Scorch?
 
-Scorch is a local-first web retrieval service for people and AI agents. It searches multiple public engines, extracts clean page content, renders JavaScript and screenshots, discovers site URLs, and runs bounded crawls behind one HTTP API. It is designed for private, self-hosted deployments without a database or external browser stack.
+Scorch is a local-first web retrieval service for people and AI agents. It searches multiple public engines, extracts clean page content, renders JavaScript, discovers site URLs, and runs bounded crawls behind one HTTP API. It is designed for private, self-hosted deployments without a database or external browser stack.
 
 Scorch has two executables:
 
 - `scorchd` — HTTP API, metasearch, embedded Obscura rendering, and bounded crawl runtime.
 - `scorch` — lightweight HTTP client and MCP stdio adapter.
 
-Static pages use direct HTTP. JavaScript rendering and screenshots use embedded Obscura with stealth transport enabled by default. Scorch needs no database, broker, external browser service, or worker deployment.
+Static pages use direct HTTP. JavaScript rendering uses embedded Obscura with stealth transport enabled by default. Scorch needs no database, broker, external browser service, or worker deployment.
 
 ## Examples
 
@@ -41,7 +41,6 @@ scorch search "rust HTTP clients" --engine brave-web
 scorch search "времето в София" --country bg --language bg --engine bing,duckduckgo
 scorch scrape https://example.com --format markdown,links
 scorch scrape https://example.com --render always --format markdown
-scorch scrape https://example.com --format screenshot --full-page-screenshot
 scorch map https://example.com --limit 100
 scorch crawl https://example.com --limit 20 --max-depth 2 --wait
 ```
@@ -49,6 +48,8 @@ scorch crawl https://example.com --limit 20 --max-depth 2 --wait
 The default endpoint is `http://127.0.0.1:33000`. Override it with `SCORCH_API_URL` or `--api-url`. The server allows 19 live-validated, credential-free engines by default: bing, brave-web, crates-io, crossref, docker-hub, duckduckgo, github, google-cse, hacker-news, hugging-face, mwmbl, npm, nvd, openalex, open-library, pubmed, wikidata, wikipedia, yahoo. Ordinary requests still use only DuckDuckGo unless they select another allowed subset. Use `--category github` for GitHub-restricted discovery, select `--engine brave-web` for Brave's public website results, select `--engine google-cse` for Google-derived Programmable Search results, or add Bing with `--engine bing,duckduckgo`. The `brave-web` integration scrapes Brave's public HTML and is best-effort; `brave` remains the separate official credential-backed API adapter. The official Google JSON API adapter is also credential-backed; [Google's Custom Search JSON API](https://developers.google.com/custom-search/v1/overview) is closed to new customers and scheduled for retirement on January 1, 2027. Google CSE uses Blackle's public Programmable Search Engine and may change independently of Scorch.
 
 ## Self-hosted footprint and browser-scrape benchmark
+
+> **These figures are historical and no longer reproduce.** They describe Scorch `0.5.0` as measured on August 13, 2026. They predate the current browser changes, and one of the four benchmark pages now aborts the `0.5.0`/`0.5.1` process outright, so the Scorch column cannot be re-collected on that code. See [Benchmark status](#benchmark-status) below. The Firecrawl column has not been re-measured either, so do not read the two columns against current Scorch.
 
 We compared Scorch `0.5.0` with Firecrawl `2.11.0` at commit [`ef12eb36`](https://github.com/firecrawl/firecrawl/tree/ef12eb36b2f3382838dfe0a0c1a5add3d5df7fe5). Firecrawl used its pinned, unmodified full Docker Compose configuration, which starts six long-running containers plus a completed one-shot FoundationDB initializer. Scorch ran as one systemd service with maximum concurrency four.
 
@@ -69,6 +70,12 @@ This is a small end-to-end browser-rendered Markdown scrape and deployment-footp
 Four public pages were used: Example Domain, Scrape This Site, Books to Scrape, and Quotes to Scrape's JavaScript page. Sequential latency is the pooled median of 12 balanced requests—three per URL. Parallel throughput is derived from the median of three balanced eight-request trials—two requests per URL per trial—at client concurrency four. Product and URL order were alternated. Both APIs had browser rendering forced with a 1 ms post-load wait and 30-second timeout; Firecrawl caching was disabled. Success required a successful API response, a 2xx/3xx page status, non-empty Markdown containing page-specific expected content, and, for Scorch, confirmation that Obscura rendered the page.
 
 Memory was sampled every 50 ms from cgroup v2 as `memory.current - inactive_file`, matching Docker's Linux working-set convention. Firecrawl values are simultaneous sums across its six running container cgroups; Scorch uses the `scorchd` service cgroup. Process counts come from recursive `cgroup.procs` and exclude threads. Docker/containerd daemons and shims, systemd, the benchmark client, build time, and the completed one-shot initializer are excluded. Results were collected on August 13, 2026, on a 16-thread Ryzen 7 5825U host with 30.7 GiB RAM, Docker 29.6.2, and Compose 5.4.0. Public-network conditions and the small page sample make the timing figures host- and run-specific.
+
+### Benchmark status
+
+Re-running the Scorch side on `0.5.1` fails. Scraping `https://www.scrapethissite.com/pages/simple/`, one of the four benchmark pages, trips a debug assertion in the bundled `taffy` layout engine (`compute/float.rs:217`). Because release builds set `panic = "abort"`, that panic terminates the whole service, so a single ordinary page takes the server down. This is content-dependent and was not observed when the original numbers were collected.
+
+Current unreleased code removes screenshot support and with it Obscura's `render` feature, which drops `taffy` from the dependency graph entirely and makes that page scrape normally. Because the workload, the page content, and the Scorch code have all changed, no comparable Firecrawl re-measurement has been made, and the table above is kept only as a record of the `0.5.0` result. Treat the deployment-footprint rows as the durable finding and the timing rows as expired.
 
 ## Install
 

@@ -67,8 +67,7 @@ const headings = [
           ><td><code>--format</code></td><td><code>markdown</code></td><td
             >Comma-separated: <code>markdown</code>, <code>html</code>, <code
               >text</code
-            >, <code>links</code>, <code>metadata</code>, <code>screenshot</code
-            >.</td
+            >, <code>links</code>, and <code>metadata</code>.</td
           ></tr
         >
         <tr
@@ -91,11 +90,6 @@ const headings = [
             >Keep the full page instead of focusing extraction on main content.</td
           ></tr
         >
-        <tr
-          ><td><code>--full-page-screenshot</code></td><td>off</td><td
-            >Capture the complete page instead of the viewport.</td
-          ></tr
-        >
       </tbody>
     </table>
   </div>
@@ -105,12 +99,7 @@ scorch scrape https://example.com --format markdown,links
 # Force JavaScript rendering with embedded Obscura
 scorch scrape https://example.com/app \
   --render always \
-  --wait-for-ms 500
-
-# Return a full-page PNG data URI
-scorch scrape https://example.com \
-  --format screenshot \
-  --full-page-screenshot</code></pre>
+  --wait-for-ms 500</code></pre>
 
   <h2 id="search">scorch search</h2>
   <pre><code>scorch search [OPTIONS] &lt;QUERY&gt;</code></pre>

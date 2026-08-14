@@ -67,8 +67,7 @@ const headings = [
     "timeoutMs": 30000,
     "waitForMs": 0,
     "onlyMainContent": true,
-    "blockMedia": true,
-    "fullPageScreenshot": false
+    "blockMedia": true
   &#125;
 &#125;</code></pre>
   <div class="table-wrap">
@@ -84,7 +83,7 @@ const headings = [
           ><td><code>formats</code></td><td><code>["markdown"]</code></td><td
             ><code>markdown</code>, <code>html</code>, <code>text</code>, <code
               >links</code
-            >, <code>metadata</code>, <code>screenshot</code>.</td
+            >, and <code>metadata</code>.</td
           ></tr
         >
         <tr
@@ -112,18 +111,12 @@ const headings = [
             >Suppress browser media requests where supported.</td
           ></tr
         >
-        <tr
-          ><td><code>fullPageScreenshot</code></td><td><code>false</code></td
-          ><td>Capture full document height when screenshot is requested.</td
-          ></tr
-        >
       </tbody>
     </table>
   </div>
   <p>
-    Screenshot output is a PNG data URI. The response <code>engine</code> is <code
-      >fetch</code
-    > or <code>obscura</code>.
+    The response <code>engine</code> is <code>fetch</code> or <code>obscura</code
+    >.
   </p>
   <pre><code>&#123;
   "url": "https://example.com",

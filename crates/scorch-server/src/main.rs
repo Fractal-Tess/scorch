@@ -2,7 +2,7 @@ use std::{env, net::SocketAddr, time::Duration};
 
 use clap::{Parser, ValueEnum};
 use metasearch::{EngineCredentials, EngineKind};
-use scorch_engine::{EngineConfig, ScorchEngine};
+use scorch_engine::{EngineConfig, ScorchEngine, default_max_concurrency};
 use tracing::{info, warn};
 use tracing_subscriber::EnvFilter;
 
@@ -18,7 +18,7 @@ struct ServerArgs {
         action = clap::ArgAction::Set
     )]
     obscura_stealth: bool,
-    #[arg(long, env = "SCORCH_MAX_CONCURRENCY", default_value_t = 4)]
+    #[arg(long, env = "SCORCH_MAX_CONCURRENCY", default_value_t = default_max_concurrency())]
     max_concurrency: usize,
     #[arg(long, env = "SCORCH_MAX_RESPONSE_BYTES", default_value_t = 5 * 1024 * 1024)]
     max_response_bytes: usize,

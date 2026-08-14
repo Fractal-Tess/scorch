@@ -1,6 +1,6 @@
 from typing import Literal, NotRequired, TypedDict
 
-ScrapeFormat = Literal["markdown", "html", "text", "links", "metadata", "screenshot"]
+ScrapeFormat = Literal["markdown", "html", "text", "links", "metadata"]
 RenderMode = Literal["auto", "always", "never"]
 ScrapeEngine = Literal["fetch", "obscura"]
 SearchEngine = Literal[
@@ -37,7 +37,6 @@ class ScrapeOptions(TypedDict, total=False):
     waitForMs: int
     onlyMainContent: bool
     blockMedia: bool
-    fullPageScreenshot: bool
 
 
 class Link(TypedDict):
@@ -65,7 +64,6 @@ class ScrapeDocument(TypedDict):
     html: NotRequired[str]
     text: NotRequired[str]
     links: NotRequired[list[Link]]
-    screenshot: NotRequired[str]
     warnings: NotRequired[list[str]]
 
 
