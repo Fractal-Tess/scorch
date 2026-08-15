@@ -167,7 +167,11 @@ impl ScorchEngine {
             ));
         }
 
-        let observation = self.scrape_cache.begin_observation(&cache_key);
+        let observation = if request.options.store_in_cache {
+            self.scrape_cache.begin_observation(&cache_key)
+        } else {
+            0
+        };
         let timeout = Duration::from_millis(request.options.timeout_ms.min(120_000));
         let rendered = self
             .browser

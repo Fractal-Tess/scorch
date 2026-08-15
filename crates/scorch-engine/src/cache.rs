@@ -92,6 +92,15 @@ impl ScrapeCache {
                     break;
                 };
                 state.latest_observations.remove(&oldest);
+                let stale_keys = state
+                    .entries
+                    .keys()
+                    .filter(|key| cache_key_hash(key) == oldest)
+                    .cloned()
+                    .collect::<Vec<_>>();
+                for stale_key in stale_keys {
+                    remove_entry(&mut state, &stale_key);
+                }
             }
         }
         generation
@@ -158,11 +167,7 @@ impl ScrapeCache {
         let Ok(mut state) = self.state.lock() else {
             return false;
         };
-        if state
-            .latest_observations
-            .get(&cache_key_hash(&key))
-            .is_some_and(|latest| *latest != generation)
-        {
+        if state.latest_observations.get(&cache_key_hash(&key)) != Some(&generation) {
             return false;
         }
         insert_entry(
@@ -191,10 +196,7 @@ impl ScrapeCache {
         let Some(current) = state.entries.get(&key) else {
             return;
         };
-        if state
-            .latest_observations
-            .get(&cache_key_hash(&key))
-            .is_some_and(|latest| *latest != generation)
+        if state.latest_observations.get(&cache_key_hash(&key)) != Some(&generation)
             || current.generation != generation
             || Instant::now() > current.expires_at
         {
@@ -614,6 +616,41 @@ mod tests {
             .get(&key, &[ScrapeFormat::Markdown], Duration::from_secs(60))
             .unwrap();
         assert_eq!(cached.markdown.as_deref(), Some("new"));
+    }
+
+    #[test]
+    fn evicted_observation_removes_stale_entry_and_rejects_late_write() {
+        let cache = ScrapeCache::default();
+        let options = ScrapeOptions::default();
+        let key = ScrapeCacheKey::new("https://example.com", &options);
+        let original = cache.begin_observation(&key);
+        assert!(cache.insert(
+            key.clone(),
+            original,
+            Instant::now(),
+            Duration::from_secs(60),
+            document(),
+            &[ScrapeFormat::Markdown],
+        ));
+        let refresh = cache.begin_observation(&key);
+        for index in 0..MAX_OBSERVATION_TOMBSTONES {
+            let other = ScrapeCacheKey::new(&format!("https://example.com/{index}"), &options);
+            cache.begin_observation(&other);
+        }
+
+        assert!(
+            cache
+                .get(&key, &[ScrapeFormat::Markdown], Duration::from_secs(60))
+                .is_none()
+        );
+        assert!(!cache.insert(
+            key,
+            refresh,
+            Instant::now(),
+            Duration::from_secs(60),
+            document(),
+            &[ScrapeFormat::Markdown],
+        ));
     }
 
     #[test]

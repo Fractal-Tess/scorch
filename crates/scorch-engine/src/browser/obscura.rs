@@ -339,11 +339,7 @@ fn page_cache_ttl(page: &Page, document_count: usize) -> Option<Duration> {
 
     page.network_events
         .iter()
-        .filter(|event| {
-            event.resource_type == "Document"
-                || ((200..300).contains(&event.status)
-                    && matches!(event.resource_type.as_str(), "Script" | "Fetch" | "XHR"))
-        })
+        .filter(|event| event.resource_type == "Document" || (200..300).contains(&event.status))
         .try_fold(crate::cache::CACHE_TTL, |ttl, event| {
             let headers = lowercase_headers(&event.response_headers);
             crate::fetch::response_cache_ttl(
