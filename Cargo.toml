@@ -57,7 +57,7 @@ uuid = { version = "1.24.0", features = ["serde", "v7"] }
 # plain transport, and retains the earlier response-handoff API in the pinned
 # fork. Remove this patch once all four changes land upstream.
 [patch."https://github.com/h4ckf0r0day/obscura.git"]
-obscura-browser = { git = "https://github.com/Fractal-Tess/obscura.git", rev = "5646773b58da4762ca799abc286f723416d3788a" }
+obscura-browser = { git = "https://github.com/Fractal-Tess/obscura.git", rev = "a0831a5c86493d53824d84793938010112fffab3" }
 
 [profile.release]
 opt-level = 3

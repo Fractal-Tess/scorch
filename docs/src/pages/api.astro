@@ -111,9 +111,9 @@ const headings = [
           ><td><code>maxAgeMs</code></td><td><code>300000</code></td><td
             >Accept an eligible identical extracted result from the bounded
             in-memory cache up to this age. Set to <code>0</code> to force a fresh
-            scrape and refresh the cache. Only same-URL successful navigations with
-            safe freshness, cookie, redirect, and <code>Vary</code> provenance are
-            retained.</td
+            scrape and refresh the cache. Only same-URL successful navigations without
+            author scripts or inline event handlers and with safe freshness, cookie,
+            redirect, and <code>Vary</code> provenance are retained.</td
           ></tr
         >
         <tr

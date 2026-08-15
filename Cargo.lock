@@ -2067,7 +2067,7 @@ dependencies = [
 [[package]]
 name = "obscura-browser"
 version = "0.1.0"
-source = "git+https://github.com/Fractal-Tess/obscura.git?rev=5646773b58da4762ca799abc286f723416d3788a#5646773b58da4762ca799abc286f723416d3788a"
+source = "git+https://github.com/Fractal-Tess/obscura.git?rev=a0831a5c86493d53824d84793938010112fffab3#a0831a5c86493d53824d84793938010112fffab3"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -2085,7 +2085,7 @@ dependencies = [
 [[package]]
 name = "obscura-dom"
 version = "0.1.0"
-source = "git+https://github.com/Fractal-Tess/obscura.git?rev=5646773b58da4762ca799abc286f723416d3788a#5646773b58da4762ca799abc286f723416d3788a"
+source = "git+https://github.com/Fractal-Tess/obscura.git?rev=a0831a5c86493d53824d84793938010112fffab3#a0831a5c86493d53824d84793938010112fffab3"
 dependencies = [
  "cssparser 0.34.0",
  "html5ever 0.39.0",
@@ -2100,7 +2100,7 @@ dependencies = [
 [[package]]
 name = "obscura-js"
 version = "0.1.0"
-source = "git+https://github.com/Fractal-Tess/obscura.git?rev=5646773b58da4762ca799abc286f723416d3788a#5646773b58da4762ca799abc286f723416d3788a"
+source = "git+https://github.com/Fractal-Tess/obscura.git?rev=a0831a5c86493d53824d84793938010112fffab3#a0831a5c86493d53824d84793938010112fffab3"
 dependencies = [
  "aes",
  "aes-gcm",
@@ -2132,7 +2132,7 @@ dependencies = [
 [[package]]
 name = "obscura-net"
 version = "0.1.0"
-source = "git+https://github.com/Fractal-Tess/obscura.git?rev=5646773b58da4762ca799abc286f723416d3788a#5646773b58da4762ca799abc286f723416d3788a"
+source = "git+https://github.com/Fractal-Tess/obscura.git?rev=a0831a5c86493d53824d84793938010112fffab3#a0831a5c86493d53824d84793938010112fffab3"
 dependencies = [
  "async-trait",
  "encoding_rs",

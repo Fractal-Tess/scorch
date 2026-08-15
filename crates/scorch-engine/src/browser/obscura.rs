@@ -245,7 +245,7 @@ async fn render_page(
         .ok_or_else(|| EngineError::Browser("Obscura could not serialize the page DOM".into()))?;
     let serialization_elapsed = serialization_started.elapsed();
     ensure_size(html.len(), config.max_response_bytes)?;
-    let cache_candidate = same_url(url, &final_url);
+    let cache_candidate = same_url(url, &final_url) && !page.author_active_content_observed;
     if cache_candidate {
         page.sync_js_network_events();
     }
