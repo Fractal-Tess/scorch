@@ -98,7 +98,6 @@ pub async fn map(fetcher: &SafeFetcher, request: &MapRequest) -> Result<MapRespo
     if links.len() < request.limit {
         let options = scorch_types::ScrapeOptions {
             formats: vec![scorch_types::ScrapeFormat::Links],
-            render: scorch_types::RenderMode::Never,
             only_main_content: false,
             ..Default::default()
         };

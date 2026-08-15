@@ -112,7 +112,7 @@ const headings = [
         >
         <tr
           ><td><code>scorch_scrape</code></td><td
-            >Fetch or render one public page and extract clean content.</td
+            >Render one public page and extract clean content.</td
           ><td><code>url</code> and optional <code>options</code>.</td></tr
         >
         <tr
@@ -224,10 +224,10 @@ curl -v http://127.0.0.1:33000/ready</code></pre>
     Ensure no wrapper, shell startup file, or process supervisor writes
     informational text to stdout. Scorch itself keeps diagnostics on stderr.
   </p>
-  <h3>A browser field is rejected</h3>
+  <h3>A render or browser field is rejected</h3>
   <p>
-    Browser selection is no longer part of the scrape contract. Remove the
-    field; all rendered requests use embedded Obscura with service-managed
-    stealth policy.
+    Rendering and browser selection are no longer part of the scrape contract.
+    Remove the field; every scrape uses embedded Obscura with stealth statically
+    enabled.
   </p>
 </DocLayout>

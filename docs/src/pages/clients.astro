@@ -41,7 +41,7 @@ for result in response["results"]:
 
 page = client.scrape(
     "https://example.com",
-    options=&#123;"formats": ["markdown", "links"], "render": "auto"&#125;,
+    options=&#123;"formats": ["markdown", "links"]&#125;,
 )
 print(page.get("markdown", ""))</code></pre>
   <p>
@@ -70,7 +70,6 @@ for (const result of response.results) &#123;
 
 const page = await client.scrape("https://example.com", &#123;
   formats: ["markdown", "links"],
-  render: "auto",
 &#125;);</code></pre>
   <p>
     Every JavaScript operation accepts a final <code>&#123; signal &#125;</code> argument

@@ -60,7 +60,7 @@ impl ScorchMcp {
 
     #[tool(
         name = "scorch_scrape",
-        description = "Fetch or render a public web page and extract clean content"
+        description = "Render a public web page and extract clean content"
     )]
     async fn scrape(
         &self,

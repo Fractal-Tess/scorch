@@ -20,6 +20,8 @@ use crate::{
 };
 
 const VIEWPORT: (f32, f32) = (1280.0, 720.0);
+const SLOT_RESOURCE_CACHE_MAX_ENTRIES: usize = 128;
+const PROCESS_RESOURCE_CACHE_MAX_BYTES: usize = 128 * 1024 * 1024;
 
 /// A pool of render slots, one per allowed concurrent render.
 ///
@@ -36,8 +38,9 @@ const VIEWPORT: (f32, f32) = (1280.0, 720.0);
 /// Renders that land on the same slot therefore share connections and TLS
 /// sessions with each other, which is weaker isolation than a context per
 /// render gave. Cookies are still isolated: the slot's jar is cleared before
-/// each render, and the client holds no response cache, so no page content or
-/// credential can cross between renders. Requests still go through the safe
+/// each render. The only retained response bodies are explicitly public,
+/// anonymous scripts accepted by Obscura's bounded HTTP cache; documents and
+/// credentialed responses never enter it. Requests still go through the safe
 /// proxy, and a reused tunnel is pinned to the address the policy already
 /// approved when it was opened, so reuse cannot reach an address that was never
 /// validated.
@@ -128,10 +131,8 @@ impl ObscuraBackend {
 struct Slot {
     context: Arc<BrowserContext>,
     /// The stealth client minted by this slot's first page. `Page::new` builds a
-    /// fresh one every time, and with stealth on that client is what fetches the
-    /// document and its subresources, so handing it to later pages is what makes
-    /// them reuse connections. `None` when stealth is off, in which case pages
-    /// fetch over the context's own client and reusing the context is enough.
+    /// fresh one every time. Handing the first page's client to later pages is
+    /// what reuses stealth connections across renders assigned to this slot.
     stealth: Option<Arc<StealthHttpClient>>,
 }
 
@@ -167,7 +168,7 @@ fn worker(
                 context: Arc::new(BrowserContext::with_options(
                     format!("scorch-slot-{index}"),
                     Some(proxy_url.clone()),
-                    config.obscura_stealth,
+                    crate::OBSCURA_STEALTH,
                 )),
                 stealth: None,
             });
@@ -199,7 +200,18 @@ async fn render_page(
     );
     match &slot.stealth {
         Some(client) => page.stealth_client = Some(Arc::clone(client)),
-        None => slot.stealth = page.stealth_client.clone(),
+        None => {
+            if let Some(client) = &page.stealth_client {
+                // Each long-lived render slot owns one cache. Divide one
+                // process-wide budget between them so raising concurrency does
+                // not multiply retained script bodies without bound.
+                client.set_resource_cache_limits(
+                    SLOT_RESOURCE_CACHE_MAX_ENTRIES,
+                    PROCESS_RESOURCE_CACHE_MAX_BYTES / config.max_concurrency,
+                );
+            }
+            slot.stealth = page.stealth_client.clone();
+        }
     }
     let page_elapsed = started.elapsed();
     page.set_viewport(VIEWPORT);
@@ -233,11 +245,22 @@ async fn render_page(
         .ok_or_else(|| EngineError::Browser("Obscura could not serialize the page DOM".into()))?;
     let serialization_elapsed = serialization_started.elapsed();
     ensure_size(html.len(), config.max_response_bytes)?;
-    let (status, content_type, headers) = document_response(&page);
+    let cache_candidate = same_url(url, &final_url);
+    if cache_candidate {
+        page.sync_js_network_events();
+    }
+    let (status, content_type, headers, mut cache_ttl) = document_response(&page, cache_candidate);
+    if cache_candidate && !slot.context.cookie_jar.get_all_cookies().is_empty() {
+        cache_ttl = None;
+    }
+    cache_ttl = cache_ttl
+        .and_then(|ttl| ttl.checked_sub(navigation_started.elapsed()))
+        .filter(|ttl| !ttl.is_zero());
+    let cache_observed_at = cache_ttl.map(|_| Instant::now());
 
     debug!(
         browser = "obscura",
-        stealth = config.obscura_stealth,
+        stealth = crate::OBSCURA_STEALTH,
         page_ms = page_elapsed.as_millis(),
         navigation_ms = navigation_elapsed.as_millis(),
         serialization_ms = serialization_elapsed.as_millis(),
@@ -250,6 +273,8 @@ async fn render_page(
         status,
         content_type,
         headers,
+        cache_ttl,
+        cache_observed_at,
     })
 }
 
@@ -260,24 +285,29 @@ async fn render_page(
 /// hop, so the last one is the response the DOM was built from. A page that
 /// never recorded one (`about:blank`, a navigation that produced no HTTP
 /// response) reports 200, matching the synthesized response this replaces.
-fn document_response(page: &Page) -> (u16, Option<String>, BTreeMap<String, String>) {
-    let Some(event) = page
+fn document_response(
+    page: &Page,
+    check_cache: bool,
+) -> (
+    u16,
+    Option<String>,
+    BTreeMap<String, String>,
+    Option<Duration>,
+) {
+    let document_events = page
         .network_events
         .iter()
-        .rev()
-        .find(|event| event.resource_type == "Document")
-    else {
+        .filter(|event| event.resource_type == "Document")
+        .collect::<Vec<_>>();
+    let Some(event) = document_events.last() else {
         return (
             200,
             Some("text/html; charset=utf-8".into()),
             BTreeMap::new(),
+            None,
         );
     };
-    let lowercased: BTreeMap<String, String> = event
-        .response_headers
-        .iter()
-        .map(|(name, value)| (name.to_ascii_lowercase(), value.clone()))
-        .collect();
+    let lowercased = lowercase_headers(&event.response_headers);
     let content_type = lowercased.get("content-type").cloned();
     let headers = crate::fetch::REPORTED_HEADERS
         .into_iter()
@@ -287,7 +317,62 @@ fn document_response(page: &Page) -> (u16, Option<String>, BTreeMap<String, Stri
                 .map(|value| (name.to_owned(), value.clone()))
         })
         .collect();
-    (event.status, content_type, headers)
+    let cache_ttl = if check_cache {
+        page_cache_ttl(page, document_events.len())
+    } else {
+        None
+    };
+    (event.status, content_type, headers, cache_ttl)
+}
+
+fn page_cache_ttl(page: &Page, document_count: usize) -> Option<Duration> {
+    let has_private_response = page.network_events.iter().any(|event| {
+        let headers = lowercase_headers(&event.response_headers);
+        headers.contains_key("set-cookie")
+            || headers
+                .get("cache-control")
+                .is_some_and(|value| crate::fetch::cache_control_is_private(value))
+    });
+    if has_private_response {
+        return None;
+    }
+
+    page.network_events
+        .iter()
+        .filter(|event| {
+            event.resource_type == "Document"
+                || ((200..300).contains(&event.status)
+                    && matches!(event.resource_type.as_str(), "Script" | "Fetch" | "XHR"))
+        })
+        .try_fold(crate::cache::CACHE_TTL, |ttl, event| {
+            let headers = lowercase_headers(&event.response_headers);
+            crate::fetch::response_cache_ttl(
+                event.status,
+                event.resource_type == "Document" && document_count > 1,
+                false,
+                headers.get("cache-control").map(String::as_str),
+                headers.get("age").map(String::as_str),
+                headers.get("expires").map(String::as_str),
+                headers.get("vary").map(String::as_str),
+            )
+            .map(|event_ttl| ttl.min(event_ttl))
+        })
+}
+
+fn lowercase_headers(
+    headers: &std::collections::HashMap<String, String>,
+) -> BTreeMap<String, String> {
+    headers
+        .iter()
+        .map(|(name, value)| (name.to_ascii_lowercase(), value.clone()))
+        .collect()
+}
+
+fn same_url(left: &str, right: &str) -> bool {
+    match (url::Url::parse(left), url::Url::parse(right)) {
+        (Ok(left), Ok(right)) => left == right,
+        _ => left == right,
+    }
 }
 
 fn remaining_time(started: Instant, timeout: Duration) -> Result<Duration> {

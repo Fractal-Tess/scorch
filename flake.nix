@@ -147,8 +147,8 @@
           # Evaluate the generated systemd command to catch module regressions
           # without starting a daemon during flake evaluation.
           module =
-            assert nixpkgs.lib.hasInfix "--obscura-stealth true"
-              moduleSystem.config.systemd.services.scorchd.serviceConfig.ExecStart;
+            assert
+              !(nixpkgs.lib.hasInfix "--obscura-stealth" moduleSystem.config.systemd.services.scorchd.serviceConfig.ExecStart);
             assert
               !(nixpkgs.lib.hasInfix "--browser" moduleSystem.config.systemd.services.scorchd.serviceConfig.ExecStart);
             assert nixpkgs.lib.hasInfix "--bind 127.0.0.1:33000"

@@ -56,8 +56,8 @@ const headings = [
   <h2 id="scrape">scorch scrape</h2>
   <pre><code>scorch scrape [OPTIONS] &lt;URL&gt;</code></pre>
   <p>
-    Fetch or render one public page and print the API response as formatted
-    JSON.
+    Render one public page through embedded Obscura and print the API response
+    as formatted JSON.
   </p>
   <div class="table-wrap">
     <table>
@@ -71,11 +71,6 @@ const headings = [
           ></tr
         >
         <tr
-          ><td><code>--render</code></td><td><code>auto</code></td><td
-            ><code>auto</code>, <code>always</code>, or <code>never</code>.</td
-          ></tr
-        >
-        <tr
           ><td><code>--timeout-ms</code></td><td><code>30000</code></td><td
             >Total scrape deadline from 100 to 120,000 ms.</td
           ></tr
@@ -86,6 +81,18 @@ const headings = [
           ></tr
         >
         <tr
+          ><td><code>--max-age-ms</code></td><td><code>300000</code></td><td
+            >Maximum age accepted from the extracted-result cache; <code>0</code
+            >
+            forces a refresh.</td
+          ></tr
+        >
+        <tr
+          ><td><code>--store-in-cache</code></td><td><code>true</code></td><td
+            >Set to <code>false</code> to bypass cache reads and writes.</td
+          ></tr
+        >
+        <tr
           ><td><code>--full-content</code></td><td>off</td><td
             >Keep the full page instead of focusing extraction on main content.</td
           ></tr
@@ -93,13 +100,11 @@ const headings = [
       </tbody>
     </table>
   </div>
-  <pre><code># Direct-first Markdown and links
+  <pre><code># Render and extract Markdown and links
 scorch scrape https://example.com --format markdown,links
 
-# Force JavaScript rendering with embedded Obscura
-scorch scrape https://example.com/app \
-  --render always \
-  --wait-for-ms 500</code></pre>
+# Allow a JavaScript application to settle before extraction
+scorch scrape https://example.com/app --wait-for-ms 500</code></pre>
 
   <h2 id="search">scorch search</h2>
   <pre><code>scorch search [OPTIONS] &lt;QUERY&gt;</code></pre>

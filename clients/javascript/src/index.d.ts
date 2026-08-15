@@ -4,8 +4,7 @@ export const DEFAULT_MAX_RESPONSE_BYTES: 67108864;
 
 export type ScrapeFormat =
   "markdown" | "html" | "text" | "links" | "metadata";
-export type RenderMode = "auto" | "always" | "never";
-export type ScrapeEngine = "fetch" | "obscura";
+export type ScrapeEngine = "obscura";
 export type SearchEngine =
   | "bing"
   | "brave"
@@ -34,11 +33,12 @@ export type CrawlStatus =
 
 export interface ScrapeOptions {
   formats?: readonly ScrapeFormat[];
-  render?: RenderMode;
   timeoutMs?: number;
   waitForMs?: number;
   onlyMainContent?: boolean;
   blockMedia?: boolean;
+  maxAgeMs?: number;
+  storeInCache?: boolean;
 }
 
 export interface Link {

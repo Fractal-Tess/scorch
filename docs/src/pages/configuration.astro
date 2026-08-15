@@ -52,14 +52,6 @@ const headings = [
           ></tr
         >
         <tr
-          ><td><code>SCORCH_OBSCURA_STEALTH</code></td><td><code>true</code></td
-          ><td
-            ><code>true</code> for browser-aligned transport identity; <code
-              >false</code
-            > for faster standard transport.</td
-          ><td><code>--obscura-stealth</code></td></tr
-        >
-        <tr
           ><td><code>SCORCH_MAX_CONCURRENCY</code></td><td><code>4</code></td
           ><td
             >Global concurrent operation ceiling. Crawl concurrency cannot
@@ -143,16 +135,13 @@ const headings = [
 
   <h2 id="browser-policy">Obscura renderer</h2>
   <p>
-    Browser rendering always uses embedded Obscura. There is no backend
-    selector, browser executable path, or request-level browser override.
-    Stealth transport is enabled by default:
+    Every page scrape uses embedded Obscura with its Chrome-like stealth
+    transport statically enabled. There is no direct scrape transport, backend
+    selector, browser executable path, request-level rendering mode, or daemon
+    stealth override. Stealth changes browser, HTTP, and TLS fingerprints; it
+    does not rotate the egress IP or solve authorization, rate-limit, geography,
+    or active-challenge failures.
   </p>
-  <pre><code>SCORCH_OBSCURA_STEALTH=true scorchd</code></pre>
-  <div class="callout">
-    <strong>Stealth versus throughput:</strong> leave stealth enabled for browser-aligned
-    network behavior. Set <code>SCORCH_OBSCURA_STEALTH=false</code>
-    only where the standard transport's higher throughput is preferable.
-  </div>
 
   <h2 id="search-engines">Search engine policy</h2>
   <p>
@@ -228,10 +217,8 @@ scorchd</code></pre>
     Terminate TLS and enforce authentication, request size, rate, and network
     policy at the gateway. Preserve or generate request IDs for log correlation.
   </p>
-  <h3>Throughput-oriented Obscura</h3>
-  <pre><code>SCORCH_OBSCURA_STEALTH=false \
-SCORCH_MAX_CONCURRENCY=8 \
-scorchd</code></pre>
+  <h3>Higher browser concurrency</h3>
+  <pre><code>SCORCH_MAX_CONCURRENCY=8 scorchd</code></pre>
   <div class="callout warning">
     <strong>Do not bind publicly without a gateway.</strong>
     <code>SCORCH_BIND=0.0.0.0:33000</code> exposes an unauthenticated web-fetching

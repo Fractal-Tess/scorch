@@ -6,7 +6,6 @@ use crate::error::{EngineError, Result};
 
 #[derive(Debug, Clone)]
 pub struct EngineConfig {
-    pub obscura_stealth: bool,
     pub max_concurrency: usize,
     pub max_response_bytes: usize,
     pub search_engines: Vec<EngineKind>,
@@ -75,7 +74,6 @@ impl EngineConfig {
 impl Default for EngineConfig {
     fn default() -> Self {
         Self {
-            obscura_stealth: true,
             max_concurrency: default_max_concurrency(),
             max_response_bytes: 5 * 1024 * 1024,
             search_engines: EngineKind::ALL.to_vec(),

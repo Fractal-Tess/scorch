@@ -20,7 +20,6 @@ use crate::{
     security::SecurityPolicy,
 };
 
-const USER_AGENT: &str = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 const MAX_REDIRECTS: usize = 5;
 
 #[derive(Debug, Clone)]
@@ -88,7 +87,8 @@ impl SafeFetcher {
     }
 
     pub async fn get(&self, input: &str, timeout: Duration) -> Result<FetchResponse> {
-        self.get_with_user_agent(input, timeout, USER_AGENT).await
+        self.get_with_user_agent(input, timeout, obscura_browser::STEALTH_USER_AGENT)
+            .await
     }
 
     pub async fn get_with_user_agent(
@@ -186,6 +186,84 @@ fn selected_headers(headers: &reqwest::header::HeaderMap) -> BTreeMap<String, St
         .collect()
 }
 
+pub(crate) fn response_cache_ttl(
+    status: u16,
+    redirected: bool,
+    has_set_cookie: bool,
+    cache_control: Option<&str>,
+    age: Option<&str>,
+    expires: Option<&str>,
+    vary: Option<&str>,
+) -> Option<Duration> {
+    if !(200..300).contains(&status)
+        || redirected
+        || has_set_cookie
+        || vary.is_some_and(|value| {
+            value
+                .split(',')
+                .map(str::trim)
+                .any(|name| !name.eq_ignore_ascii_case("accept-encoding"))
+        })
+        || cache_control.is_some_and(cache_control_forbids_reuse)
+    {
+        return None;
+    }
+
+    let max_age = cache_control.and_then(cache_control_max_age);
+    let freshness = if let Some(seconds) = max_age {
+        let age = age.and_then(|value| value.parse::<u64>().ok()).unwrap_or(0);
+        Duration::from_secs(seconds.saturating_sub(age))
+    } else if let Some(expires) = expires {
+        httpdate::parse_http_date(expires)
+            .ok()?
+            .duration_since(std::time::SystemTime::now())
+            .ok()?
+    } else {
+        crate::cache::CACHE_TTL
+    };
+    (!freshness.is_zero()).then(|| freshness.min(crate::cache::CACHE_TTL))
+}
+
+pub(crate) fn cache_control_forbids_reuse(value: &str) -> bool {
+    value
+        .split(',')
+        .map(cache_directive)
+        .any(|(name, argument)| {
+            name.eq_ignore_ascii_case("no-store")
+                || name.eq_ignore_ascii_case("no-cache")
+                || name.eq_ignore_ascii_case("private")
+                || ((name.eq_ignore_ascii_case("max-age") || name.eq_ignore_ascii_case("s-maxage"))
+                    && argument.and_then(|value| value.parse::<u64>().ok()) == Some(0))
+        })
+}
+
+pub(crate) fn cache_control_is_private(value: &str) -> bool {
+    value.split(',').map(cache_directive).any(|(name, _)| {
+        name.eq_ignore_ascii_case("no-store") || name.eq_ignore_ascii_case("private")
+    })
+}
+
+fn cache_control_max_age(value: &str) -> Option<u64> {
+    let directives = value.split(',').map(cache_directive).collect::<Vec<_>>();
+    directives
+        .iter()
+        .find(|(name, _)| name.eq_ignore_ascii_case("s-maxage"))
+        .or_else(|| {
+            directives
+                .iter()
+                .find(|(name, _)| name.eq_ignore_ascii_case("max-age"))
+        })
+        .and_then(|(_, argument)| argument.as_ref()?.parse().ok())
+}
+
+fn cache_directive(directive: &str) -> (&str, Option<&str>) {
+    directive
+        .split_once('=')
+        .map_or((directive.trim(), None), |(name, argument)| {
+            (name.trim(), Some(argument.trim().trim_matches('"')))
+        })
+}
+
 async fn read_limited(response: reqwest::Response, limit: usize) -> Result<Vec<u8>> {
     if response
         .content_length()
@@ -210,5 +288,48 @@ fn map_reqwest_error(error: reqwest::Error) -> EngineError {
         EngineError::Timeout
     } else {
         EngineError::Fetch(error.to_string())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn output_cache_respects_freshness_and_privacy_directives() {
+        let ttl = |status, redirected, has_set_cookie, cache_control, age, vary| {
+            response_cache_ttl(
+                status,
+                redirected,
+                has_set_cookie,
+                cache_control,
+                age,
+                None,
+                vary,
+            )
+        };
+        assert_eq!(
+            ttl(200, false, false, None, None, None),
+            Some(crate::cache::CACHE_TTL)
+        );
+        assert_eq!(
+            ttl(
+                200,
+                false,
+                false,
+                Some("public, max-age=60"),
+                Some("50"),
+                None
+            ),
+            Some(Duration::from_secs(10))
+        );
+        assert!(ttl(200, true, false, Some("max-age=60"), None, None).is_none());
+        assert!(ttl(200, false, false, Some("private, max-age=60"), None, None).is_none());
+        assert!(ttl(200, false, false, Some("no-store"), None, None).is_none());
+        assert!(ttl(200, false, false, Some("no-cache"), None, None).is_none());
+        assert!(ttl(200, false, false, Some("max-age=0"), None, None).is_none());
+        assert!(ttl(200, false, true, None, None, None).is_none());
+        assert!(ttl(200, false, false, None, None, Some("referer")).is_none());
+        assert!(ttl(403, false, false, None, None, None).is_none());
     }
 }

@@ -29,7 +29,6 @@ for (const result of response.results) {
 
 const page = await client.scrape("https://example.com", {
   formats: ["markdown", "links"],
-  render: "auto",
 });
 console.log(page.markdown ?? "");
 ```

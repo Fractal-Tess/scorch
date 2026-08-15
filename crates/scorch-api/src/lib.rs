@@ -142,7 +142,7 @@ async fn readiness(State(state): State<AppState>) -> (StatusCode, Json<Readiness
             .into(),
             browser_available,
             browser: "obscura".into(),
-            obscura_stealth: state.engine.config().obscura_stealth,
+            obscura_stealth: scorch_engine::OBSCURA_STEALTH,
             max_concurrency: state.engine.config().max_concurrency,
             search_provider: "metasearch".into(),
             search_engines: state
@@ -369,26 +369,28 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn removed_browser_selection_is_rejected() {
+    async fn removed_scrape_controls_are_rejected() {
         let engine = ScorchEngine::new(EngineConfig::default()).await.unwrap();
-        let response = router(engine)
-            .oneshot(
-                Request::builder()
-                    .method("POST")
-                    .uri("/v1/scrape")
-                    .header("content-type", "application/json")
-                    .body(Body::from(
-                        r#"{"url":"https://example.com","options":{"render":"always","browser":"obscura"}}"#,
-                    ))
-                    .unwrap(),
-            )
-            .await
-            .unwrap();
-        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+        for options in [r#"{"render":"always"}"#, r#"{"browser":"obscura"}"#] {
+            let response = router(Arc::clone(&engine))
+                .oneshot(
+                    Request::builder()
+                        .method("POST")
+                        .uri("/v1/scrape")
+                        .header("content-type", "application/json")
+                        .body(Body::from(format!(
+                            r#"{{"url":"https://example.com","options":{options}}}"#
+                        )))
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+            assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+        }
     }
 
     #[tokio::test]
-    async fn forced_browser_render_rejects_non_http_urls() {
+    async fn browser_render_rejects_non_http_urls() {
         let engine = ScorchEngine::new(EngineConfig::default()).await.unwrap();
         let response = router(engine)
             .oneshot(
@@ -396,9 +398,7 @@ mod tests {
                     .method("POST")
                     .uri("/v1/scrape")
                     .header("content-type", "application/json")
-                    .body(Body::from(
-                        r#"{"url":"file:///etc/passwd","options":{"render":"always"}}"#,
-                    ))
+                    .body(Body::from(r#"{"url":"file:///etc/passwd"}"#))
                     .unwrap(),
             )
             .await

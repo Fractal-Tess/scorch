@@ -23,35 +23,28 @@ pub enum ScrapeFormat {
     Metadata,
 }
 
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-pub enum RenderMode {
-    #[default]
-    Auto,
-    Always,
-    Never,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase", default, deny_unknown_fields)]
 pub struct ScrapeOptions {
     pub formats: Vec<ScrapeFormat>,
-    pub render: RenderMode,
     pub timeout_ms: u64,
     pub wait_for_ms: u64,
     pub only_main_content: bool,
     pub block_media: bool,
+    pub max_age_ms: u64,
+    pub store_in_cache: bool,
 }
 
 impl Default for ScrapeOptions {
     fn default() -> Self {
         Self {
             formats: vec![ScrapeFormat::Markdown],
-            render: RenderMode::Auto,
             timeout_ms: 30_000,
             wait_for_ms: 0,
             only_main_content: true,
             block_media: true,
+            max_age_ms: 5 * 60 * 1_000,
+            store_in_cache: true,
         }
     }
 }
@@ -67,7 +60,6 @@ pub struct ScrapeRequest {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub enum ScrapeEngine {
-    Fetch,
     Obscura,
 }
 

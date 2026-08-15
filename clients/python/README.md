@@ -29,7 +29,7 @@ for result in response["results"]:
 
 page = client.scrape(
     "https://example.com",
-    options={"formats": ["markdown", "links"], "render": "auto"},
+    options={"formats": ["markdown", "links"]},
 )
 print(page.get("markdown", ""))
 ```

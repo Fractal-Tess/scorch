@@ -11,7 +11,7 @@ default-members = ["crates/scorch-cli"]
 resolver = "3"
 
 [workspace.package]
-version = "0.6.0"
+version = "0.7.0"
 edition = "2024"
 authors = ["Fractal-Tess <vgfractal@gmail.com>"]
 license = "MIT"
@@ -27,6 +27,7 @@ dashmap = "6.2.1"
 dom_smoothie = "0.18.0"
 futures-util = "0.3.33"
 htmd = "0.5.5"
+httpdate = "1.0.3"
 obscura-browser = { git = "https://github.com/h4ckf0r0day/obscura.git", rev = "f458a7f23d4a9827f8be993c6340ef829211623c", features = ["stealth"] }
 quick-xml = "0.41.0"
 reqwest = { version = "0.13.4", default-features = false, features = ["json", "rustls", "stream"] }
@@ -51,11 +52,12 @@ uuid = { version = "1.24.0", features = ["serde", "v7"] }
 # clients hold separate connection pools, so every render paid a second TCP and
 # TLS handshake to its own origin, and subresources carried a different TLS
 # fingerprint than the navigation that requested them. The fork routes both over
-# the page's own client, and re-exports `StealthHttpClient` so the type of the
-# public `Page::stealth_client` field can be named without depending on
-# obscura-net. Remove this patch once both land upstream.
+# the page's own client, re-exports its stealth types for the slot pool, gives
+# the stealth transport the same bounded script cache/singleflight policy as the
+# plain transport, and retains the earlier response-handoff API in the pinned
+# fork. Remove this patch once all four changes land upstream.
 [patch."https://github.com/h4ckf0r0day/obscura.git"]
-obscura-browser = { git = "https://github.com/Fractal-Tess/obscura.git", rev = "4601649cbbf9e7a4df87970aac91594c4299fca7" }
+obscura-browser = { git = "https://github.com/Fractal-Tess/obscura.git", rev = "7d21c638805d5b8dcefb255d565bfdc25812dae4" }
 
 [profile.release]
 opt-level = 3

@@ -63,11 +63,12 @@ const headings = [
   "url": "https://example.com",
   "options": &#123;
     "formats": ["markdown", "html", "text", "links", "metadata"],
-    "render": "auto",
     "timeoutMs": 30000,
     "waitForMs": 0,
     "onlyMainContent": true,
-    "blockMedia": true
+    "blockMedia": true,
+    "maxAgeMs": 300000,
+    "storeInCache": true
   &#125;
 &#125;</code></pre>
   <div class="table-wrap">
@@ -84,11 +85,6 @@ const headings = [
             ><code>markdown</code>, <code>html</code>, <code>text</code>, <code
               >links</code
             >, and <code>metadata</code>.</td
-          ></tr
-        >
-        <tr
-          ><td><code>render</code></td><td><code>auto</code></td><td
-            ><code>auto</code>, <code>always</code>, or <code>never</code>.</td
           ></tr
         >
         <tr
@@ -111,17 +107,30 @@ const headings = [
             >Suppress browser media requests where supported.</td
           ></tr
         >
+        <tr
+          ><td><code>maxAgeMs</code></td><td><code>300000</code></td><td
+            >Accept an eligible identical extracted result from the bounded
+            in-memory cache up to this age. Set to <code>0</code> to force a fresh
+            scrape and refresh the cache. Only same-URL successful navigations with
+            safe freshness, cookie, redirect, and <code>Vary</code> provenance are
+            retained.</td
+          ></tr
+        >
+        <tr
+          ><td><code>storeInCache</code></td><td><code>true</code></td><td
+            >Read and populate the extracted-result cache. Set to <code
+              >false</code
+            > to bypass both cache reads and writes.</td
+          ></tr
+        >
       </tbody>
     </table>
   </div>
-  <p>
-    The response <code>engine</code> is <code>fetch</code> or <code>obscura</code
-    >.
-  </p>
+  <p>The response <code>engine</code> is always <code>obscura</code>.</p>
   <pre><code>&#123;
   "url": "https://example.com",
   "finalUrl": "https://example.com/",
-  "engine": "fetch",
+  "engine": "obscura",
   "elapsedMs": 143,
   "metadata": &#123;
     "title": "Example Domain",
@@ -211,8 +220,7 @@ const headings = [
   "includePaths": [],
   "excludePaths": [],
   "scrapeOptions": &#123;
-    "formats": ["markdown"],
-    "render": "auto"
+    "formats": ["markdown"]
   &#125;
 &#125;</code></pre>
   <p>Configured defaults and ceilings:</p>

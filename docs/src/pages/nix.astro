@@ -24,11 +24,11 @@ const headings = [
     deployments. Nix downloads the matching GitHub Actions release archive and
     patches it for the Nix store; it does not compile Scorch locally.
   </p>
-  <pre><code>nix run github:Fractal-Tess/scorch/v0.5.0#scorch -- --help
-nix run github:Fractal-Tess/scorch/v0.5.0#scorchd -- --help</code></pre>
+  <pre><code>nix run github:Fractal-Tess/scorch/v0.7.0#scorch -- --help
+nix run github:Fractal-Tess/scorch/v0.7.0#scorchd -- --help</code></pre>
   <p>Install either package into a profile:</p>
-  <pre><code>nix profile install github:Fractal-Tess/scorch/v0.5.0#scorch
-nix profile install github:Fractal-Tess/scorch/v0.5.0#scorchd</code></pre>
+  <pre><code>nix profile install github:Fractal-Tess/scorch/v0.7.0#scorch
+nix profile install github:Fractal-Tess/scorch/v0.7.0#scorchd</code></pre>
   <div class="callout">
     <strong>Linux support.</strong> The embedded Obscura V8 renderer is packaged for
     <code>x86_64-linux</code> and <code>aarch64-linux</code>. No external
@@ -50,7 +50,7 @@ nix profile install github:Fractal-Tess/scorch/v0.5.0#scorchd</code></pre>
   <pre><code>&#123;
   inputs = &#123;
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    scorch.url = "github:Fractal-Tess/scorch/v0.5.0";
+    scorch.url = "github:Fractal-Tess/scorch/v0.7.0";
   &#125;;
 
   outputs = &#123; nixpkgs, scorch, ... &#125;: &#123;
@@ -80,7 +80,6 @@ scorch search "rust web extraction" --limit 3</code></pre>
   <h2 id="service-policy">Configure service policy</h2>
   <pre><code>services.scorchd = &#123;
   enable = true;
-  obscuraStealth = true;
   maxConcurrency = 4;
   maxResponseBytes = 5 * 1024 * 1024;
   jobTtlSeconds = 900;
@@ -256,5 +255,5 @@ SCORCH_BRAVE_SEARCH_API_KEY=replace-at-deploy-time</code></pre>
       </tbody>
     </table>
   </div>
-  <pre><code>nix flake show github:Fractal-Tess/scorch/v0.5.0</code></pre>
+  <pre><code>nix flake show github:Fractal-Tess/scorch/v0.7.0</code></pre>
 </DocLayout>

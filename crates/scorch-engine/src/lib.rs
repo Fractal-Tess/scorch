@@ -1,4 +1,5 @@
 mod browser;
+mod cache;
 mod config;
 mod error;
 mod extract;
@@ -9,33 +10,40 @@ mod proxy;
 mod search;
 mod security;
 
+use futures_util::{StreamExt, stream};
+use scorch_types::{
+    CrawlJob, CrawlPage, CrawlRequest, CrawlStatusRequest, MapRequest, MapResponse, ScrapeDocument,
+    ScrapeEngine, ScrapeOptions, ScrapeRequest, SearchRequest, SearchResponse,
+};
 use std::{
     sync::Arc,
     time::{Duration, Instant},
 };
-
-use futures_util::{StreamExt, stream};
-use scorch_types::{
-    CrawlJob, CrawlPage, CrawlRequest, CrawlStatusRequest, MapRequest, MapResponse, RenderMode,
-    ScrapeDocument, ScrapeEngine, ScrapeRequest, SearchRequest, SearchResponse,
-};
-use scraper::{Html, Selector};
 use tracing::{debug, info, warn};
 
 pub use config::{EngineConfig, default_max_concurrency};
 pub use error::{EngineError, Result};
+
+/// Obscura's Chrome-like transport is the only scrape transport policy.
+pub const OBSCURA_STEALTH: bool = true;
 use extract::ExtractInput;
 use fetch::FetchResponse;
 use jobs::JobStore;
 use security::SecurityPolicy;
 
-use crate::{browser::BrowserManager, fetch::SafeFetcher};
+use crate::{
+    browser::BrowserManager,
+    cache::{CacheWarmer, ScrapeCache, ScrapeCacheKey},
+    fetch::SafeFetcher,
+};
 
 pub struct ScorchEngine {
     config: EngineConfig,
     fetcher: SafeFetcher,
     search: search::SearchService,
     browser: BrowserManager,
+    scrape_cache: Arc<ScrapeCache>,
+    cache_warmer: CacheWarmer,
     jobs: Arc<JobStore>,
 }
 
@@ -50,7 +58,7 @@ impl ScorchEngine {
             .join(",");
         info!(
             browser = "obscura",
-            obscura_stealth = config.obscura_stealth,
+            obscura_stealth = OBSCURA_STEALTH,
             max_concurrency = config.max_concurrency,
             max_response_bytes = config.max_response_bytes,
             search_provider = "metasearch",
@@ -63,6 +71,8 @@ impl ScorchEngine {
         let fetcher = SafeFetcher::new(security.clone(), config.clone());
         let search = search::SearchService::new(&config)?;
         let browser = BrowserManager::new(config.clone(), security).await?;
+        let scrape_cache = Arc::new(ScrapeCache::default());
+        let cache_warmer = cache::start_warmer(Arc::clone(&scrape_cache));
         let jobs = Arc::new(JobStore::new(
             config.job_ttl,
             config.crawl_timeout,
@@ -75,6 +85,8 @@ impl ScorchEngine {
             fetcher,
             search,
             browser,
+            scrape_cache,
+            cache_warmer,
             jobs,
         }))
     }
@@ -97,7 +109,6 @@ impl ScorchEngine {
         info!(
             operation = "scrape",
             %origin,
-            render = ?request.options.render,
             format_count = request.options.formats.len(),
             "scrape started"
         );
@@ -131,83 +142,98 @@ impl ScorchEngine {
         started: Instant,
     ) -> Result<ScrapeDocument> {
         validate_scrape_request(request)?;
-        let timeout = Duration::from_millis(request.options.timeout_ms.min(120_000));
-        let deadline = Instant::now() + timeout;
-        let forced_browser = request.options.render == RenderMode::Always;
-        let render = || async {
-            let remaining = deadline.saturating_duration_since(Instant::now());
-            if remaining.is_zero() {
-                return Err(EngineError::Timeout);
-            }
-            self.browser
-                .render(
-                    &request.url,
-                    remaining,
-                    Duration::from_millis(request.options.wait_for_ms.min(60_000)),
-                    request.options.block_media,
-                )
-                .await
+        let cache_key = ScrapeCacheKey::new(&request.url, &request.options);
+        let cached = if request.options.store_in_cache {
+            self.scrape_cache.get(
+                &cache_key,
+                &request.options.formats,
+                Duration::from_millis(request.options.max_age_ms),
+            )
+        } else {
+            None
         };
-
-        // A forced render does not fetch the page itself. The browser downloads
-        // the document anyway and records its status and headers, which is all
-        // the fetch contributed here -- its body was always discarded in favour
-        // of the rendered DOM. Fetching alongside the render doubled the
-        // document download and hit the origin twice per scrape, with two
-        // different TLS fingerprints milliseconds apart.
-        if forced_browser {
-            let rendered = render().await?;
-            let response = FetchResponse {
-                final_url: rendered.final_url,
-                status: reqwest::StatusCode::from_u16(rendered.status)
-                    .unwrap_or(reqwest::StatusCode::OK),
-                content_type: rendered.content_type,
-                headers: rendered.headers,
-                body: Vec::new(),
-            };
-            return extract::extract(
-                ExtractInput {
-                    requested_url: &request.url,
-                    html: rendered.html,
-                    response: &response,
-                    engine: ScrapeEngine::Obscura,
-                    elapsed_ms: started.elapsed().as_millis() as u64,
-                },
-                &request.options,
+        if let Some(cached) = cached {
+            debug!(
+                operation = "scrape",
+                origin = %log_origin(&request.url),
+                cache_hit = true,
+                "serving extracted scrape result from memory"
             );
+            return Ok(cache::project_document(
+                &cached,
+                &request.url,
+                &request.options.formats,
+                started.elapsed().as_millis() as u64,
+            ));
         }
 
-        let fetched = self.fetcher.get(&request.url, timeout).await;
-        if matches!((&fetched, request.options.render), (Ok(response), RenderMode::Auto) if needs_browser(response))
-        {
-            let rendered = render().await?;
-            let mut response = fetched?;
-            response.final_url = rendered.final_url;
-            return extract::extract(
-                ExtractInput {
-                    requested_url: &request.url,
-                    html: rendered.html,
-                    response: &response,
-                    engine: ScrapeEngine::Obscura,
-                    elapsed_ms: started.elapsed().as_millis() as u64,
-                },
-                &request.options,
-            );
-        }
-
-        let response = fetched?;
-        ensure_supported_content(&response)?;
-        let html = String::from_utf8_lossy(&response.body).into_owned();
-        extract::extract(
-            ExtractInput {
-                requested_url: &request.url,
-                html,
-                response: &response,
-                engine: ScrapeEngine::Fetch,
-                elapsed_ms: started.elapsed().as_millis() as u64,
-            },
-            &request.options,
+        let observation = self.scrape_cache.begin_observation(&cache_key);
+        let timeout = Duration::from_millis(request.options.timeout_ms.min(120_000));
+        let rendered = self
+            .browser
+            .render(
+                &request.url,
+                timeout,
+                Duration::from_millis(request.options.wait_for_ms.min(60_000)),
+                request.options.block_media,
+            )
+            .await?;
+        self.extract_and_cache(
+            rendered_extract_input(&request.url, rendered),
+            request.options.clone(),
+            started,
+            cache_key,
+            observation,
         )
+        .await
+    }
+
+    async fn extract_and_cache(
+        &self,
+        input: ExtractInput,
+        options: ScrapeOptions,
+        started: Instant,
+        cache_key: ScrapeCacheKey,
+        observation: u64,
+    ) -> Result<ScrapeDocument> {
+        let cache_ttl = input.cache_ttl.filter(|_| options.store_in_cache);
+        let cache_observed_at = input.cache_observed_at.filter(|_| cache_ttl.is_some());
+        if options.store_in_cache {
+            self.scrape_cache
+                .invalidate_observation(&cache_key, observation);
+        }
+        let warm_input = cache_ttl.map(|_| input.clone());
+        let formats = options.formats.clone();
+        let document = extract_document(input, options.clone(), started).await?;
+        let (Some(warm_input), Some(cache_ttl), Some(observed_at)) =
+            (warm_input, cache_ttl, cache_observed_at)
+        else {
+            return Ok(document);
+        };
+        if !self.scrape_cache.insert(
+            cache_key.clone(),
+            observation,
+            observed_at,
+            cache_ttl,
+            document.clone(),
+            &formats,
+        ) {
+            return Ok(document);
+        }
+        if cache::needs_warm(&formats)
+            && !self.cache_warmer.try_send(cache::warm_job(
+                cache_key,
+                observation,
+                warm_input,
+                options,
+            ))
+        {
+            debug!(
+                operation = "scrape",
+                "background format cache budget is full; retaining requested formats only"
+            );
+        }
+        Ok(document)
     }
 
     pub async fn search(&self, request: &SearchRequest) -> Result<SearchResponse> {
@@ -366,6 +392,44 @@ impl ScorchEngine {
     }
 }
 
+fn rendered_extract_input(requested_url: &str, rendered: browser::RenderedPage) -> ExtractInput {
+    let cache_ttl = rendered.cache_ttl;
+    let cache_observed_at = rendered.cache_observed_at;
+    let response = FetchResponse {
+        final_url: rendered.final_url,
+        status: reqwest::StatusCode::from_u16(rendered.status).unwrap_or(reqwest::StatusCode::OK),
+        content_type: rendered.content_type,
+        headers: rendered.headers,
+        body: Vec::new(),
+    };
+    ExtractInput {
+        requested_url: requested_url.to_owned(),
+        html: rendered.html.into(),
+        response,
+        engine: ScrapeEngine::Obscura,
+        cache_ttl,
+        cache_observed_at,
+    }
+}
+
+async fn extract_document(
+    input: ExtractInput,
+    options: ScrapeOptions,
+    request_started: Instant,
+) -> Result<ScrapeDocument> {
+    let extraction_started = Instant::now();
+    let mut document = tokio::task::spawn_blocking(move || extract::extract(input, &options))
+        .await
+        .map_err(|error| EngineError::Extraction(format!("extraction worker failed: {error}")))??;
+    let extraction_ms = extraction_started.elapsed().as_millis() as u64;
+    document.elapsed_ms = request_started.elapsed().as_millis() as u64;
+    debug!(
+        operation = "scrape",
+        extraction_ms, "content extraction completed"
+    );
+    Ok(document)
+}
+
 pub(crate) fn log_origin(input: &str) -> String {
     let Ok(url) = url::Url::parse(input) else {
         return "<invalid-url>".into();
@@ -407,55 +471,6 @@ fn validate_scrape_request(request: &ScrapeRequest) -> Result<()> {
         ));
     }
     Ok(())
-}
-
-fn needs_browser(response: &FetchResponse) -> bool {
-    let content_type = response
-        .content_type
-        .as_deref()
-        .unwrap_or_default()
-        .to_ascii_lowercase();
-    if !content_type.is_empty() && !content_type.contains("html") {
-        return false;
-    }
-    let html = String::from_utf8_lossy(&response.body);
-    let document = Html::parse_document(&html);
-    let body_text = Selector::parse("body")
-        .ok()
-        .and_then(|selector| {
-            document
-                .select(&selector)
-                .next()
-                .map(|body| body.text().collect::<Vec<_>>().join(" "))
-        })
-        .unwrap_or_default();
-    let script_count =
-        Selector::parse("script").map_or(0, |selector| document.select(&selector).count());
-    let lower = body_text.to_ascii_lowercase();
-    let source = html.to_ascii_lowercase();
-    (body_text.split_whitespace().count() < 40 && script_count >= 2)
-        || lower.contains("enable javascript")
-        || lower.contains("javascript is required")
-        || source.contains("document.write(")
-        || source.contains("__next_data__")
-        || source.contains("data-reactroot")
-        || source.contains("ng-app")
-        || source.contains("id=\"root\"></div>")
-}
-
-fn ensure_supported_content(response: &FetchResponse) -> Result<()> {
-    let Some(content_type) = response.content_type.as_deref() else {
-        return Ok(());
-    };
-    let content_type = content_type.to_ascii_lowercase();
-    if content_type.contains("html")
-        || content_type.starts_with("text/")
-        || content_type.contains("xml")
-    {
-        Ok(())
-    } else {
-        Err(EngineError::UnsupportedContent(content_type))
-    }
 }
 
 #[cfg(test)]

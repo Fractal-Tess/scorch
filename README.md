@@ -25,7 +25,7 @@ Scorch has two executables:
 - `scorchd` — HTTP API, metasearch, embedded Obscura rendering, and bounded crawl runtime.
 - `scorch` — lightweight HTTP client and MCP stdio adapter.
 
-Static pages use direct HTTP. JavaScript rendering uses embedded Obscura with stealth transport enabled by default. Scorch needs no database, broker, external browser service, or worker deployment.
+Every page scrape executes through embedded Obscura with its stealth transport enabled as a fixed service policy. Callers cannot select a direct transport, disable stealth, or bypass JavaScript execution. Eligible identical extracted results are retained in a bounded five-minute memory cache by default, and a background queue prepares the other output formats after the requested response is ready; set `maxAgeMs` to `0` to refresh an entry or `storeInCache` to `false` to bypass both reads and writes. Scorch needs no database, broker, external browser service, or worker deployment.
 
 ## Examples
 
@@ -40,7 +40,7 @@ scorch search "времето в София" --country bg --language bg --engine
 scorch search "rust HTTP clients" --engine brave-web
 scorch search "времето в София" --country bg --language bg --engine bing,duckduckgo
 scorch scrape https://example.com --format markdown,links
-scorch scrape https://example.com --render always --format markdown
+scorch scrape https://example.com/app --format markdown
 scorch map https://example.com --limit 100
 scorch crawl https://example.com --limit 20 --max-depth 2 --wait
 ```
@@ -49,7 +49,7 @@ The default endpoint is `http://127.0.0.1:33000`. Override it with `SCORCH_API_U
 
 ## Self-hosted footprint and browser-scrape benchmark
 
-We compared unreleased Scorch (post-`0.6.0`) with Firecrawl `2.11.0` at commit [`ef12eb36`](https://github.com/firecrawl/firecrawl/tree/ef12eb36b2f3382838dfe0a0c1a5add3d5df7fe5). Both columns were collected together on August 14, 2026, on one host. Firecrawl used its pinned, unmodified full Docker Compose configuration, which starts six long-running containers plus a completed one-shot FoundationDB initializer. Scorch ran as one process with maximum concurrency four.
+We compared Scorch `0.7.0` with Firecrawl `2.11.0` at commit [`ef12eb36`](https://github.com/firecrawl/firecrawl/tree/ef12eb36b2f3382838dfe0a0c1a5add3d5df7fe5). Both columns were collected together on August 14, 2026, on one host. Firecrawl used its pinned, unmodified full Docker Compose configuration, which starts six long-running containers plus a completed one-shot FoundationDB initializer. Scorch ran as one process with maximum concurrency four.
 
 | Measured result | Firecrawl | Scorch |
 | --- | ---: | ---: |
@@ -68,6 +68,8 @@ This is a small end-to-end browser-rendered Markdown scrape and deployment-footp
 The benchmark was collected twice. Where the two runs disagreed, the table reports whichever figure is worse for Scorch and better for Firecrawl, so the margins are the conservative ones: the other collection put Scorch at 0.617 s sequential, 1.225 s per parallel trial, and 6.53 req/s. Scorch's advantage here is recent and is not a property of `0.5.0`, which measured 1.822 s sequential and 1.05 req/s against a comparable Firecrawl result; removing screenshot rendering and pooling browser connections account for the change. Scorch's default maximum concurrency is now higher than the four used here, which raises throughput further on this host but would no longer match Firecrawl's tested configuration.
 
 Four public pages were used: Example Domain, Scrape This Site, Books to Scrape, and Quotes to Scrape's JavaScript page. Sequential latency is the pooled median of 12 balanced requests—three per URL. Parallel throughput is derived from the median of three balanced eight-request trials—two requests per URL per trial—at client concurrency four. Product and URL order were alternated. Both APIs had browser rendering forced with a 1 ms post-load wait and 30-second timeout; Firecrawl caching was disabled. Success required a successful API response, a 2xx/3xx page status, non-empty Markdown containing page-specific expected content, and, for Scorch, confirmation that Obscura rendered the page.
+
+A separate post-cache collection used the same four pages through the always-stealth browser path. After one cold request per URL and background format warming, 24 sequential memory hits had a 0.724 ms median; six eight-request trials had a 6.36 ms median, or 1,257 req/s. These are warm-cache figures and therefore are not replacements for the cache-disabled comparison above. Preparing all formats increased steady RSS by roughly 472 KiB over a no-cache process after the same four cold pages. In three additional cache-disabled forced-render collections, stealth measured 662 ms sequential and 2.067 s per parallel trial, versus 676 ms and 2.200 s without stealth; disabling stealth was not faster on this workload.
 
 Memory was sampled every 50 ms from cgroup v2 as `memory.current - inactive_file`, matching Docker's Linux working-set convention. Firecrawl values are simultaneous sums across its six running container cgroups; Scorch uses its own scope cgroup. Process counts come from recursive `cgroup.procs` and exclude threads. Docker/containerd daemons and shims, systemd, the benchmark client, build time, and the completed one-shot initializer are excluded. Results were collected on a 16-thread Ryzen 7 5825U host with 30.7 GiB RAM, Docker 29.6.2, and Compose 5.4.0. Public-network conditions and the small page sample make the timing figures host- and run-specific.
 
@@ -98,8 +100,8 @@ wget -qO- https://github.com/Fractal-Tess/scorch/releases/latest/download/instal
 The installer detects the Linux architecture and verifies the release checksum. Pin a version or choose another directory with:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/Fractal-Tess/scorch/v0.5.0/install.sh \
-  | sh -s -- --version 0.5.0 --install-dir ~/.local/bin
+curl -fsSL https://raw.githubusercontent.com/Fractal-Tess/scorch/v0.7.0/install.sh \
+  | sh -s -- --version 0.7.0 --install-dir ~/.local/bin
 ```
 
 ### Release archive
@@ -107,7 +109,7 @@ curl -fsSL https://raw.githubusercontent.com/Fractal-Tess/scorch/v0.5.0/install.
 Download the archive from [GitHub Releases](https://github.com/Fractal-Tess/scorch/releases) for the current Linux architecture and verify its published checksum:
 
 ```sh
-VERSION=0.5.0
+VERSION=0.7.0
 TARGET="$(uname -m)-unknown-linux-gnu"
 ARCHIVE="scorch-v${VERSION}-${TARGET}.tar.xz"
 BASE="https://github.com/Fractal-Tess/scorch/releases/download/v${VERSION}"
@@ -129,11 +131,11 @@ Release archives support `x86_64-linux` and `aarch64-linux`.
 Nix downloads the same fixed-hash CI binaries rather than compiling the Rust workspace:
 
 ```sh
-nix run github:Fractal-Tess/scorch/v0.5.0#scorch -- --help
-nix run github:Fractal-Tess/scorch/v0.5.0#scorchd -- --help
+nix run github:Fractal-Tess/scorch/v0.7.0#scorch -- --help
+nix run github:Fractal-Tess/scorch/v0.7.0#scorchd -- --help
 ```
 
-Use `github:Fractal-Tess/scorch/v0.5.0` as a flake input. The flake exports packages, an overlay, NixOS and Home Manager modules, checks, and the Agent Skill. See the [Nix guide](docs/src/pages/nix.astro) for a complete declarative configuration.
+Use `github:Fractal-Tess/scorch/v0.7.0` as a flake input. The flake exports packages, an overlay, NixOS and Home Manager modules, checks, and the Agent Skill. See the [Nix guide](docs/src/pages/nix.astro) for a complete declarative configuration.
 
 ## Python and JavaScript clients
 

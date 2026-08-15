@@ -158,11 +158,14 @@ jobs:
             echo "scorchd still exposes a removed browser surface" >&2
             exit 1
           fi
-          if grep -Eiq -- 'chromium|--browser' <<<"${client_help}"; then
-            echo "scorch still exposes a removed browser surface" >&2
+          if grep -Eiq -- 'chromium|--browser|--render' <<<"${client_help}"; then
+            echo "scorch still exposes a removed browser or render surface" >&2
             exit 1
           fi
-          grep -F -- '--obscura-stealth <OBSCURA_STEALTH>' <<<"${server_help}"
+          if grep -F -- '--obscura-stealth' <<<"${server_help}"; then
+            echo "scorchd still exposes the fixed stealth policy" >&2
+            exit 1
+          fi
 
       - name: Package deterministic archive
         env:

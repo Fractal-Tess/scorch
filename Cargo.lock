@@ -1954,7 +1954,7 @@ checksum = "cf8baf1c55e62ffcace7a9f06f4bd9cd3f0c4beb022d3b367256b91b87513d98"
 
 [[package]]
 name = "metasearch"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "base64 0.23.1",
  "futures-util",
@@ -2067,7 +2067,7 @@ dependencies = [
 [[package]]
 name = "obscura-browser"
 version = "0.1.0"
-source = "git+https://github.com/Fractal-Tess/obscura.git?rev=4601649cbbf9e7a4df87970aac91594c4299fca7#4601649cbbf9e7a4df87970aac91594c4299fca7"
+source = "git+https://github.com/Fractal-Tess/obscura.git?rev=7d21c638805d5b8dcefb255d565bfdc25812dae4#7d21c638805d5b8dcefb255d565bfdc25812dae4"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -2085,7 +2085,7 @@ dependencies = [
 [[package]]
 name = "obscura-dom"
 version = "0.1.0"
-source = "git+https://github.com/Fractal-Tess/obscura.git?rev=4601649cbbf9e7a4df87970aac91594c4299fca7#4601649cbbf9e7a4df87970aac91594c4299fca7"
+source = "git+https://github.com/Fractal-Tess/obscura.git?rev=7d21c638805d5b8dcefb255d565bfdc25812dae4#7d21c638805d5b8dcefb255d565bfdc25812dae4"
 dependencies = [
  "cssparser 0.34.0",
  "html5ever 0.39.0",
@@ -2100,7 +2100,7 @@ dependencies = [
 [[package]]
 name = "obscura-js"
 version = "0.1.0"
-source = "git+https://github.com/Fractal-Tess/obscura.git?rev=4601649cbbf9e7a4df87970aac91594c4299fca7#4601649cbbf9e7a4df87970aac91594c4299fca7"
+source = "git+https://github.com/Fractal-Tess/obscura.git?rev=7d21c638805d5b8dcefb255d565bfdc25812dae4#7d21c638805d5b8dcefb255d565bfdc25812dae4"
 dependencies = [
  "aes",
  "aes-gcm",
@@ -2132,7 +2132,7 @@ dependencies = [
 [[package]]
 name = "obscura-net"
 version = "0.1.0"
-source = "git+https://github.com/Fractal-Tess/obscura.git?rev=4601649cbbf9e7a4df87970aac91594c4299fca7#4601649cbbf9e7a4df87970aac91594c4299fca7"
+source = "git+https://github.com/Fractal-Tess/obscura.git?rev=7d21c638805d5b8dcefb255d565bfdc25812dae4#7d21c638805d5b8dcefb255d565bfdc25812dae4"
 dependencies = [
  "async-trait",
  "encoding_rs",
@@ -2965,7 +2965,7 @@ checksum = "94143f37725109f92c262ed2cf5e59bce7498c01bcc1502d7b9afe439a4e9f49"
 
 [[package]]
 name = "scorch-api"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "anyhow",
  "axum",
@@ -2982,7 +2982,7 @@ dependencies = [
 
 [[package]]
 name = "scorch-cli"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -3000,12 +3000,13 @@ dependencies = [
 
 [[package]]
 name = "scorch-engine"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "dashmap",
  "dom_smoothie",
  "futures-util",
  "htmd",
+ "httpdate",
  "metasearch",
  "obscura-browser",
  "quick-xml",
@@ -3024,7 +3025,7 @@ dependencies = [
 
 [[package]]
 name = "scorch-server"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -3038,7 +3039,7 @@ dependencies = [
 
 [[package]]
 name = "scorch-types"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "schemars",
  "serde",

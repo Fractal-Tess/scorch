@@ -43,21 +43,25 @@ let
       "[${server.address}]:${toString server.port}"
     else
       "${server.address}:${toString server.port}";
-  serverCommand = lib.escapeShellArgs ([
-    "${server.package}/bin/scorchd"
-    "--bind"
-    bindAddress
-    "--obscura-stealth"
-    (lib.boolToString server.obscuraStealth)
-    "--max-concurrency"
-    (toString server.maxConcurrency)
-    "--max-response-bytes"
-    (toString server.maxResponseBytes)
-    "--job-ttl-secs"
-    (toString server.jobTtlSeconds)
-    "--search-engines"
-    (lib.concatStringsSep "," server.searchEngines)
-  ]);
+  serverCommand = lib.escapeShellArgs (
+    [
+      "${server.package}/bin/scorchd"
+      "--bind"
+      bindAddress
+    ]
+    ++ lib.optionals (server.maxConcurrency != null) [
+      "--max-concurrency"
+      (toString server.maxConcurrency)
+    ]
+    ++ [
+      "--max-response-bytes"
+      (toString server.maxResponseBytes)
+      "--job-ttl-secs"
+      (toString server.jobTtlSeconds)
+      "--search-engines"
+      (lib.concatStringsSep "," server.searchEngines)
+    ]
+  );
 in
 {
   imports = [
@@ -76,6 +80,11 @@ in
       "scorchd"
       "browserPath"
     ] "Scorch no longer launches an external browser executable.")
+    (lib.mkRemovedOptionModule [
+      "services"
+      "scorchd"
+      "obscuraStealth"
+    ] "Scorch now renders every scrape through Obscura's stealth transport.")
   ];
 
   options = {
@@ -118,15 +127,10 @@ in
         default = false;
         description = "Open the configured TCP port in the NixOS firewall.";
       };
-      obscuraStealth = mkOption {
-        type = types.bool;
-        default = true;
-        description = "Use Obscura's stealth transport profile.";
-      };
       maxConcurrency = mkOption {
-        type = types.ints.positive;
-        default = 4;
-        description = "Maximum concurrent scrape and render operations.";
+        type = types.nullOr types.ints.positive;
+        default = null;
+        description = "Maximum concurrent scrape and render operations. Null selects the CPU-derived daemon default.";
       };
       maxResponseBytes = mkOption {
         type = types.ints.positive;

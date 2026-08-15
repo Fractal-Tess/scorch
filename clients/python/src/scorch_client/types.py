@@ -1,8 +1,7 @@
 from typing import Literal, NotRequired, TypedDict
 
 ScrapeFormat = Literal["markdown", "html", "text", "links", "metadata"]
-RenderMode = Literal["auto", "always", "never"]
-ScrapeEngine = Literal["fetch", "obscura"]
+ScrapeEngine = Literal["obscura"]
 SearchEngine = Literal[
     "bing",
     "brave",
@@ -32,11 +31,12 @@ CrawlStatus = Literal["queued", "running", "completed", "cancelled", "failed"]
 
 class ScrapeOptions(TypedDict, total=False):
     formats: list[ScrapeFormat]
-    render: RenderMode
     timeoutMs: int
     waitForMs: int
     onlyMainContent: bool
     blockMedia: bool
+    maxAgeMs: int
+    storeInCache: bool
 
 
 class Link(TypedDict):

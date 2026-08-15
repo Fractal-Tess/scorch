@@ -1,6 +1,6 @@
 {
   "name": "@fractal-tess/scorch",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "Typed JavaScript client for the Scorch HTTP API",
   "type": "module",
   "sideEffects": false,

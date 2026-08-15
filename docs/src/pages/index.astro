@@ -16,7 +16,7 @@ const capabilities = [
   {
     shape: "page" as const,
     title: "Clean content on demand",
-    body: "Fetch inexpensive static pages directly. Escalate JavaScript pages to isolated embedded Obscura with stealth transport enabled by default.",
+    body: "Render every page through isolated embedded Obscura with JavaScript execution and Chrome-like stealth transport statically enabled.",
     meta: "Extract · Markdown · text",
     href: "/api/#scrape",
   },
@@ -480,9 +480,9 @@ const trust = [
             class="text-muted-foreground max-w-xl pt-3 pr-6 text-sm leading-relaxed"
           >
             The server controls the engine allowlist; callers may select an
-            allowed subset, while omitted selection uses DuckDuckGo. Every
-            browser render uses embedded Obscura, and callers only choose
-            whether rendering is automatic, forced, or disabled.
+            allowed subset, while omitted selection uses DuckDuckGo. Every page
+            scrape uses embedded Obscura with stealth statically enabled;
+            callers cannot switch rendering or transport modes.
           </p>
         </details>
         <details class="group border-border border-b border-dotted py-6">

@@ -11,13 +11,6 @@ use tracing_subscriber::EnvFilter;
 struct ServerArgs {
     #[arg(long, env = "SCORCH_BIND", default_value = "127.0.0.1:33000")]
     bind: SocketAddr,
-    #[arg(
-        long,
-        env = "SCORCH_OBSCURA_STEALTH",
-        default_value_t = true,
-        action = clap::ArgAction::Set
-    )]
-    obscura_stealth: bool,
     #[arg(long, env = "SCORCH_MAX_CONCURRENCY", default_value_t = default_max_concurrency())]
     max_concurrency: usize,
     #[arg(long, env = "SCORCH_MAX_RESPONSE_BYTES", default_value_t = 5 * 1024 * 1024)]
@@ -44,7 +37,6 @@ impl ServerArgs {
     fn engine_config(&self) -> EngineConfig {
         let search_engines = unique_engines(&self.search_engines);
         EngineConfig {
-            obscura_stealth: self.obscura_stealth,
             max_concurrency: self.max_concurrency.max(1),
             max_response_bytes: self.max_response_bytes.max(1024),
             job_ttl: Duration::from_secs(self.job_ttl_secs.max(1)),
@@ -184,12 +176,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn obscura_stealth_is_enabled_by_default() {
-        let args = ServerArgs::try_parse_from(["scorchd"]).unwrap();
-        assert!(args.engine_config().obscura_stealth);
-    }
-
-    #[test]
     fn credential_free_engines_are_allowed_by_default() {
         let args = ServerArgs::try_parse_from(["scorchd"]).unwrap();
         let engines = args.engine_config().search_engines;
@@ -198,14 +184,13 @@ mod tests {
     }
 
     #[test]
-    fn obscura_standard_transport_requires_an_explicit_override() {
-        let args = ServerArgs::try_parse_from(["scorchd", "--obscura-stealth", "false"]).unwrap();
-        assert!(!args.engine_config().obscura_stealth);
-    }
-
-    #[test]
     fn removed_browser_flags_are_rejected() {
-        for flag in ["--browser", "--allowed-browsers", "--browser-path"] {
+        for flag in [
+            "--browser",
+            "--allowed-browsers",
+            "--browser-path",
+            "--obscura-stealth",
+        ] {
             assert!(ServerArgs::try_parse_from(["scorchd", flag, "obscura"]).is_err());
         }
     }

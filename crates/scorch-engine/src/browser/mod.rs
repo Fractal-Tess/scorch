@@ -32,11 +32,12 @@ pub struct RenderedPage {
     pub html: String,
     pub final_url: String,
     /// Status and headers of the main document, taken from the browser's own
-    /// record of the navigation. The browser already fetched the document, so
-    /// reading them here is what lets a forced render skip a second download.
+    /// navigation record.
     pub status: u16,
     pub content_type: Option<String>,
     pub headers: BTreeMap<String, String>,
+    pub cache_ttl: Option<Duration>,
+    pub cache_observed_at: Option<Instant>,
 }
 
 impl BrowserManager {
@@ -117,14 +118,23 @@ impl BrowserManager {
         timeout(request_timeout, self.security.validate(url))
             .await
             .map_err(|_| EngineError::Timeout)??;
-        let remaining = request_timeout.saturating_sub(started.elapsed());
+        let validation_elapsed = started.elapsed();
+        let remaining = request_timeout.saturating_sub(validation_elapsed);
         if remaining.is_zero() {
             return Err(EngineError::Timeout);
         }
+        let queue_started = Instant::now();
         let permit = timeout(remaining, Arc::clone(&self.semaphore).acquire_owned())
             .await
             .map_err(|_| EngineError::Timeout)?
             .map_err(|_| EngineError::Browser("browser semaphore closed".into()))?;
+        let queue_elapsed = queue_started.elapsed();
+        tracing::debug!(
+            browser = "obscura",
+            validation_ms = validation_elapsed.as_millis(),
+            queue_ms = queue_elapsed.as_millis(),
+            "browser admission phases completed"
+        );
         let remaining = request_timeout.saturating_sub(started.elapsed());
         if remaining.is_zero() {
             return Err(EngineError::Timeout);
@@ -132,15 +142,5 @@ impl BrowserManager {
         self.obscura
             .render(permit, url, remaining, wait_for, block_media)
             .await
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::EngineConfig;
-
-    #[test]
-    fn obscura_stealth_is_enabled_by_default() {
-        assert!(EngineConfig::default().obscura_stealth);
     }
 }

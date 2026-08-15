@@ -6,7 +6,7 @@ use std::time::Duration;
 use clap::{Args, Parser, Subcommand, ValueEnum};
 use client::ApiClient;
 use scorch_types::{
-    CrawlRequest, CrawlStatus, MapRequest, RenderMode, ScrapeFormat, ScrapeOptions, ScrapeRequest,
+    CrawlRequest, CrawlStatus, MapRequest, ScrapeFormat, ScrapeOptions, ScrapeRequest,
     SearchCategory, SearchEngine, SearchRequest,
 };
 use uuid::Uuid;
@@ -62,34 +62,19 @@ impl From<FormatArg> for ScrapeFormat {
     }
 }
 
-#[derive(Debug, Clone, Copy, ValueEnum)]
-enum RenderArg {
-    Auto,
-    Always,
-    Never,
-}
-
-impl From<RenderArg> for RenderMode {
-    fn from(value: RenderArg) -> Self {
-        match value {
-            RenderArg::Auto => Self::Auto,
-            RenderArg::Always => Self::Always,
-            RenderArg::Never => Self::Never,
-        }
-    }
-}
-
 #[derive(Args)]
 struct ScrapeArgs {
     url: String,
     #[arg(long, value_delimiter = ',', default_value = "markdown")]
     format: Vec<FormatArg>,
-    #[arg(long, value_enum, default_value = "auto")]
-    render: RenderArg,
     #[arg(long, default_value_t = 30_000)]
     timeout_ms: u64,
     #[arg(long, default_value_t = 0)]
     wait_for_ms: u64,
+    #[arg(long, default_value_t = 5 * 60 * 1_000)]
+    max_age_ms: u64,
+    #[arg(long, default_value_t = true, action = clap::ArgAction::Set)]
+    store_in_cache: bool,
     #[arg(long)]
     full_content: bool,
 }
@@ -100,9 +85,10 @@ impl ScrapeArgs {
             url: self.url.clone(),
             options: ScrapeOptions {
                 formats: self.format.iter().copied().map(Into::into).collect(),
-                render: self.render.into(),
                 timeout_ms: self.timeout_ms,
                 wait_for_ms: self.wait_for_ms,
+                max_age_ms: self.max_age_ms,
+                store_in_cache: self.store_in_cache,
                 only_main_content: !self.full_content,
                 ..Default::default()
             },
@@ -313,17 +299,13 @@ mod tests {
     use super::*;
 
     #[test]
-    fn removed_browser_flag_is_rejected() {
-        assert!(
-            Cli::try_parse_from([
-                "scorch",
-                "scrape",
-                "https://example.com",
-                "--browser",
-                "obscura",
-            ])
-            .is_err()
-        );
+    fn removed_browser_flags_are_rejected() {
+        for (flag, value) in [("--browser", "obscura"), ("--render", "always")] {
+            assert!(
+                Cli::try_parse_from(["scorch", "scrape", "https://example.com", flag, value])
+                    .is_err()
+            );
+        }
     }
 
     #[test]

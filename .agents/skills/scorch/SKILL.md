@@ -55,16 +55,13 @@ An empty result list is not proof that no relevant page exists. Refine the query
 ```bash
 scorch scrape "https://example.com" --format markdown
 scorch scrape "https://example.com" --format markdown,links,metadata
-scorch scrape "https://example.com" --format html,text --render never
-scorch scrape "https://example.com/app" --format markdown --render always
+scorch scrape "https://example.com" --format html,text
+scorch scrape "https://example.com/app" --format markdown
 ```
 
 Render policy:
 
-- `--render auto` fetches first and invokes a browser only when needed.
-- `--render always` forces JavaScript rendering.
-- `--render never` stays on the direct HTTP path.
-- Browser rendering always uses embedded Obscura. Stealth transport is enabled by default by the service.
+- Every scrape uses embedded Obscura with its stealth transport enabled. Rendering and transport policy are not request-level controls.
 
 Use `--wait-for-ms <milliseconds>` only when a rendered page needs a short settling period. Keep `--timeout-ms` bounded. Page extraction expects supported web-document content types; use an appropriate API client such as `curl` for a known JSON API rather than forcing it through `scorch scrape`.
 

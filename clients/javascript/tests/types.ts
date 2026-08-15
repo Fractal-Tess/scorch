@@ -25,7 +25,6 @@ const search: Promise<SearchResponse> = client.search("Rust", {
 });
 const scrape: Promise<ScrapeDocument> = client.scrape("https://example.com", {
   formats: ["markdown", "links"],
-  render: "auto",
 });
 const error: ScorchAPIError = new ScorchAPIError("bad request", {
   status: 400,

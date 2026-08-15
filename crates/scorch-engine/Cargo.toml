@@ -12,6 +12,7 @@ dashmap.workspace = true
 dom_smoothie.workspace = true
 futures-util.workspace = true
 htmd.workspace = true
+httpdate.workspace = true
 metasearch = { path = "../metasearch" }
 obscura-browser.workspace = true
 quick-xml.workspace = true

@@ -29,8 +29,8 @@ const headings = [
       <strong class="text-accent font-mono">scorchd</strong><p
         class="mt-2 text-sm"
       >
-        The long-running HTTP service. It owns metasearch, direct fetch, browser
-        rendering, extraction, mapping, and crawl jobs.
+        The long-running HTTP service. It owns metasearch, guarded mapping
+        fetches, always-stealth browser scraping, extraction, and crawl jobs.
       </p>
     </div>
     <div class="cut-corners border-border bg-surface border p-5">
@@ -51,8 +51,8 @@ const headings = [
   <h2 id="install">Install</h2>
   <h3 id="nix-flake">Option A: Nix flake</h3>
   <p>Run either released executable without cloning the repository:</p>
-  <pre><code>nix run github:Fractal-Tess/scorch/v0.5.0#scorch -- --help
-nix run github:Fractal-Tess/scorch/v0.5.0#scorchd -- --help</code></pre>
+  <pre><code>nix run github:Fractal-Tess/scorch/v0.7.0#scorch -- --help
+nix run github:Fractal-Tess/scorch/v0.7.0#scorchd -- --help</code></pre>
   <p>
     For a declarative NixOS service and client installation, continue to the <a
       href="/nix/">Nix installation guide</a
@@ -139,14 +139,12 @@ scorch crawl https://example.com --limit 20 --max-depth 2 --wait</code></pre>
   -d '&#123;
     "url": "https://example.com",
     "options": &#123;
-      "formats": ["markdown", "links"],
-      "render": "auto"
+      "formats": ["markdown", "links"]
     &#125;
   &#125;' | jq</code></pre>
   <p>
-    With <code>render: "auto"</code>, Scorch starts with a guarded direct fetch
-    and escalates to a browser only when the content appears
-    JavaScript-dependent.
+    Every scrape executes JavaScript through embedded Obscura with its stealth
+    transport enabled. Rendering and transport policy are fixed by the service.
   </p>
 
   <h2 id="production-notes">Production notes</h2>
