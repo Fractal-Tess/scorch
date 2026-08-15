@@ -201,18 +201,23 @@ fn clean_url(raw: &str) -> Option<String> {
     let parsed = Url::parse(raw)
         .or_else(|_| Url::parse("https://duckduckgo.com").and_then(|base| base.join(raw)))
         .ok()?;
-    let candidate = parsed
-        .query_pairs()
-        .find(|(key, _)| key == "uddg")
-        .map(|(_, value)| value.into_owned())
-        .unwrap_or_else(|| parsed.to_string());
-    let mut url = Url::parse(&candidate).ok()?;
-    if !matches!(url.scheme(), "http" | "https")
-        || (url.host_str().is_some_and(|host| {
-            host.eq_ignore_ascii_case("duckduckgo.com")
-                || host.eq_ignore_ascii_case("www.duckduckgo.com")
-        }) && url.path() == "/y.js")
-    {
+    let is_duckduckgo = parsed.host_str().is_some_and(|host| {
+        host.eq_ignore_ascii_case("duckduckgo.com")
+            || host.eq_ignore_ascii_case("www.duckduckgo.com")
+    });
+    if is_duckduckgo && parsed.path() == "/y.js" {
+        return None;
+    }
+    let mut url = if is_duckduckgo && parsed.path() == "/l/" {
+        let destination = parsed
+            .query_pairs()
+            .find(|(key, _)| key == "uddg")
+            .map(|(_, value)| value.into_owned())?;
+        Url::parse(&destination).ok()?
+    } else {
+        parsed
+    };
+    if !matches!(url.scheme(), "http" | "https") {
         return None;
     }
     url.set_fragment(None);
@@ -273,12 +278,21 @@ mod tests {
     }
 
     #[test]
-    fn sponsored_redirect_is_rejected_without_ad_markup() {
+    fn cleans_only_duckduckgo_redirects() {
         assert!(
             clean_url(
                 "https://duckduckgo.com/y.js?ad_provider=bingv7aa&u3=https%3A%2F%2Fexample.com"
             )
             .is_none()
+        );
+        assert_eq!(
+            clean_url("https://duckduckgo.com/l/?uddg=https%3A%2F%2Fexample.com%2Fpage%23part")
+                .as_deref(),
+            Some("https://example.com/page")
+        );
+        assert_eq!(
+            clean_url("https://example.test/?uddg=https%3A%2F%2Fexample.com%2F").as_deref(),
+            Some("https://example.test/?uddg=https%3A%2F%2Fexample.com%2F")
         );
     }
 
