@@ -172,6 +172,13 @@ fn build_hit(
     link_selector: &Selector,
     snippet_selector: &Selector,
 ) -> Option<SearchHit> {
+    if block
+        .value()
+        .classes()
+        .any(|class| class.eq_ignore_ascii_case("result--ad"))
+    {
+        return None;
+    }
     let link = block.select(link_selector).next()?;
     let url = clean_url(link.value().attr("href")?)?;
     let title = normalize_space(&link.text().collect::<Vec<_>>().join(" "));
@@ -200,7 +207,12 @@ fn clean_url(raw: &str) -> Option<String> {
         .map(|(_, value)| value.into_owned())
         .unwrap_or_else(|| parsed.to_string());
     let mut url = Url::parse(&candidate).ok()?;
-    if !matches!(url.scheme(), "http" | "https") {
+    if !matches!(url.scheme(), "http" | "https")
+        || (url.host_str().is_some_and(|host| {
+            host.eq_ignore_ascii_case("duckduckgo.com")
+                || host.eq_ignore_ascii_case("www.duckduckgo.com")
+        }) && url.path() == "/y.js")
+    {
         return None;
     }
     url.set_fragment(None);
@@ -241,6 +253,32 @@ mod tests {
         assert_eq!(
             hits[0].snippet.as_deref(),
             Some("A language empowering everyone.")
+        );
+    }
+
+    #[test]
+    fn sponsored_results_do_not_consume_organic_result_slots() {
+        let html = r#"
+          <div class="result result--ad">
+            <a class="result__a" href="https://duckduckgo.com/y.js?ad_provider=bingv7aa&amp;u3=https%3A%2F%2Fexample.com">Sponsored</a>
+          </div>
+          <div class="result results_links">
+            <a class="result__a" href="https://www.rust-lang.org/">Rust</a>
+          </div>
+        "#;
+
+        let hits = parse(html).expect("result markup is not a challenge");
+        assert_eq!(hits.len(), 1);
+        assert_eq!(hits[0].title, "Rust");
+    }
+
+    #[test]
+    fn sponsored_redirect_is_rejected_without_ad_markup() {
+        assert!(
+            clean_url(
+                "https://duckduckgo.com/y.js?ad_provider=bingv7aa&u3=https%3A%2F%2Fexample.com"
+            )
+            .is_none()
         );
     }
 
