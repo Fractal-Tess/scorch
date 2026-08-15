@@ -33,7 +33,10 @@ use security::SecurityPolicy;
 
 use crate::{
     browser::BrowserManager,
-    cache::{CacheWarmer, ScrapeCache, ScrapeCacheKey},
+    cache::{
+        CacheWarmer, RenderFlightKey, RenderFlightLease, RenderFlightOutcome, RenderFlights,
+        ScrapeCache, ScrapeCacheKey,
+    },
     fetch::SafeFetcher,
 };
 
@@ -41,8 +44,9 @@ pub struct ScorchEngine {
     config: EngineConfig,
     fetcher: SafeFetcher,
     search: search::SearchService,
-    browser: BrowserManager,
+    browser: Arc<BrowserManager>,
     scrape_cache: Arc<ScrapeCache>,
+    render_flights: Arc<RenderFlights>,
     cache_warmer: CacheWarmer,
     jobs: Arc<JobStore>,
 }
@@ -70,8 +74,9 @@ impl ScorchEngine {
         let security = SecurityPolicy::new();
         let fetcher = SafeFetcher::new(security.clone(), config.clone());
         let search = search::SearchService::new(&config)?;
-        let browser = BrowserManager::new(config.clone(), security).await?;
+        let browser = Arc::new(BrowserManager::new(config.clone(), security).await?);
         let scrape_cache = Arc::new(ScrapeCache::default());
+        let render_flights = Arc::new(RenderFlights::default());
         let cache_warmer = cache::start_warmer(Arc::clone(&scrape_cache));
         let jobs = Arc::new(JobStore::new(
             config.job_ttl,
@@ -86,6 +91,7 @@ impl ScorchEngine {
             search,
             browser,
             scrape_cache,
+            render_flights,
             cache_warmer,
             jobs,
         }))
@@ -112,7 +118,16 @@ impl ScorchEngine {
             format_count = request.options.formats.len(),
             "scrape started"
         );
-        let result = self.scrape_inner(request, started).await;
+        let result = match validate_scrape_request(request) {
+            Ok(()) => tokio::time::timeout(
+                Duration::from_millis(request.options.timeout_ms),
+                self.scrape_inner(request, started),
+            )
+            .await
+            .map_err(|_| EngineError::Timeout)
+            .and_then(std::convert::identity),
+            Err(error) => Err(error),
+        };
         match &result {
             Ok(document) => info!(
                 operation = "scrape",
@@ -141,55 +156,124 @@ impl ScorchEngine {
         request: &ScrapeRequest,
         started: Instant,
     ) -> Result<ScrapeDocument> {
-        validate_scrape_request(request)?;
         let cache_key = ScrapeCacheKey::new(&request.url, &request.options);
-        let cached = if request.options.store_in_cache {
-            self.scrape_cache.get(
-                &cache_key,
-                &request.options.formats,
-                Duration::from_millis(request.options.max_age_ms),
-            )
-        } else {
-            None
-        };
-        if let Some(cached) = cached {
-            debug!(
-                operation = "scrape",
-                origin = %log_origin(&request.url),
-                cache_hit = true,
-                "serving extracted scrape result from memory"
-            );
-            return Ok(cache::project_document(
-                &cached,
-                &request.url,
-                &request.options.formats,
-                started.elapsed().as_millis() as u64,
-            ));
-        }
-
-        let observation = if request.options.store_in_cache {
-            self.scrape_cache.begin_observation(&cache_key)
-        } else {
-            0
-        };
         let timeout = Duration::from_millis(request.options.timeout_ms.min(120_000));
-        let rendered = self
-            .browser
-            .render(
-                &request.url,
-                timeout,
-                Duration::from_millis(request.options.wait_for_ms.min(60_000)),
-                request.options.block_media,
-            )
-            .await?;
-        self.extract_and_cache(
-            rendered_extract_input(&request.url, rendered),
-            request.options.clone(),
-            started,
-            cache_key,
-            observation,
-        )
-        .await
+        let flight_key = RenderFlightKey::new(&request.url, &request.options);
+
+        loop {
+            if request.options.store_in_cache
+                && let Some(cached) = self.scrape_cache.get(
+                    &cache_key,
+                    &request.options.formats,
+                    Duration::from_millis(request.options.max_age_ms),
+                )
+            {
+                debug!(
+                    operation = "scrape",
+                    origin = %log_origin(&request.url),
+                    cache_hit = true,
+                    "serving extracted scrape result from memory"
+                );
+                return Ok(cache::project_document(
+                    &cached,
+                    &request.url,
+                    &request.options.formats,
+                    started.elapsed().as_millis() as u64,
+                ));
+            }
+
+            let Some(mut admission) = self.render_flights.acquire(flight_key.clone()) else {
+                let observation = if request.options.store_in_cache {
+                    self.scrape_cache.begin_observation(&cache_key)
+                } else {
+                    0
+                };
+                let rendered = self
+                    .browser
+                    .render(
+                        &request.url,
+                        timeout,
+                        Duration::from_millis(request.options.wait_for_ms.min(60_000)),
+                        request.options.block_media,
+                    )
+                    .await?;
+                return self
+                    .extract_and_cache(
+                        rendered_extract_input(&request.url, rendered),
+                        request.options.clone(),
+                        started,
+                        cache_key,
+                        observation,
+                    )
+                    .await;
+            };
+
+            if admission.is_leader {
+                // Close the cache-to-flight race: another flight may have
+                // populated the requested formats after this caller's miss.
+                if request.options.store_in_cache
+                    && let Some(cached) = self.scrape_cache.get(
+                        &cache_key,
+                        &request.options.formats,
+                        Duration::from_millis(request.options.max_age_ms),
+                    )
+                {
+                    let (key, entry, _) = admission.lease.producer();
+                    self.render_flights.retry_cache(&key, &entry);
+                    return Ok(cache::project_document(
+                        &cached,
+                        &request.url,
+                        &request.options.formats,
+                        started.elapsed().as_millis() as u64,
+                    ));
+                }
+
+                let (key, entry, cancellation) = admission.lease.producer();
+                let flights = Arc::clone(&self.render_flights);
+                let browser = Arc::clone(&self.browser);
+                let url = request.url.clone();
+                let wait_for = Duration::from_millis(request.options.wait_for_ms.min(60_000));
+                let block_media = request.options.block_media;
+                tokio::spawn(async move {
+                    let outcome = tokio::select! {
+                        biased;
+                        () = cancellation.cancelled() => {
+                            RenderFlightOutcome::Failed(EngineError::Timeout)
+                        }
+                        result = browser.render(&url, timeout, wait_for, block_media) => {
+                            match result {
+                                Ok(rendered) => RenderFlightOutcome::Rendered(rendered),
+                                Err(error) => RenderFlightOutcome::Failed(error),
+                            }
+                        }
+                    };
+                    flights.complete(&key, &entry, outcome);
+                });
+            }
+
+            let remaining = timeout.saturating_sub(started.elapsed());
+            if remaining.is_zero() {
+                return Err(EngineError::Timeout);
+            }
+            let outcome = tokio::time::timeout(remaining, admission.lease.wait())
+                .await
+                .map_err(|_| EngineError::Timeout)??;
+            match outcome.as_ref() {
+                RenderFlightOutcome::RetryCache => continue,
+                RenderFlightOutcome::Failed(error) => return Err(error.clone()),
+                RenderFlightOutcome::Rendered(rendered) => {
+                    return self
+                        .extract_flight_document(
+                            rendered_extract_input(&request.url, rendered.clone()),
+                            request.options.clone(),
+                            started,
+                            cache_key,
+                            &admission.lease,
+                        )
+                        .await;
+                }
+            }
+        }
     }
 
     async fn extract_and_cache(
@@ -214,6 +298,65 @@ impl ScorchEngine {
         else {
             return Ok(document);
         };
+        if !self.scrape_cache.insert(
+            cache_key.clone(),
+            observation,
+            observed_at,
+            cache_ttl,
+            document.clone(),
+            &formats,
+        ) {
+            return Ok(document);
+        }
+        if cache::needs_warm(&formats)
+            && !self.cache_warmer.try_send(cache::warm_job(
+                cache_key,
+                observation,
+                warm_input,
+                options,
+            ))
+        {
+            debug!(
+                operation = "scrape",
+                "background format cache budget is full; retaining requested formats only"
+            );
+        }
+        Ok(document)
+    }
+
+    async fn extract_flight_document(
+        &self,
+        input: ExtractInput,
+        options: ScrapeOptions,
+        started: Instant,
+        cache_key: ScrapeCacheKey,
+        lease: &RenderFlightLease,
+    ) -> Result<ScrapeDocument> {
+        let cache_ttl = input.cache_ttl.filter(|_| options.store_in_cache);
+        let cache_observed_at = input.cache_observed_at.filter(|_| cache_ttl.is_some());
+        let warm_input = cache_ttl.map(|_| input.clone());
+        let formats = options.formats.clone();
+        let observation = if options.store_in_cache {
+            lease.prepare_cache_observation(&self.scrape_cache, &cache_key)
+        } else {
+            None
+        };
+        let document = extract_document(input, options.clone(), started).await?;
+        let Some(observation) = observation else {
+            return Ok(document);
+        };
+        let (Some(warm_input), Some(cache_ttl), Some(observed_at)) =
+            (warm_input, cache_ttl, cache_observed_at)
+        else {
+            return Ok(document);
+        };
+        if !self
+            .scrape_cache
+            .can_store(&cache_key, &document, cache_ttl)
+            || !lease.claim_cache_publication(&cache_key)
+        {
+            return Ok(document);
+        }
         if !self.scrape_cache.insert(
             cache_key.clone(),
             observation,
@@ -408,7 +551,7 @@ fn rendered_extract_input(requested_url: &str, rendered: browser::RenderedPage) 
     };
     ExtractInput {
         requested_url: requested_url.to_owned(),
-        html: rendered.html.into(),
+        html: rendered.html,
         response,
         engine: ScrapeEngine::Obscura,
         cache_ttl,

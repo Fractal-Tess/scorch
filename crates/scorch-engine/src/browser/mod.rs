@@ -27,9 +27,9 @@ pub struct BrowserManager {
     _proxy: Arc<SafeProxy>,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct RenderedPage {
-    pub html: String,
+    pub html: Arc<str>,
     pub final_url: String,
     /// Status and headers of the main document, taken from the browser's own
     /// navigation record.

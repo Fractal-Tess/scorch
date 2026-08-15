@@ -215,6 +215,10 @@ async fn render_page(
     }
     let page_elapsed = started.elapsed();
     page.set_viewport(VIEWPORT);
+    // Scorch consumes response metadata for cache safety but never exposes CDP
+    // response-body retrieval. Avoid duplicating every document, script, and
+    // Fetch/XHR body into Obscura's diagnostic buffers.
+    page.set_response_body_recording(false);
     page.set_navigation_timeout(request_timeout);
     page.set_blocked_urls(blocked_url_patterns(block_media));
     let navigation_started = Instant::now();
@@ -235,14 +239,15 @@ async fn render_page(
         value => value,
     };
     let serialization_started = Instant::now();
-    let html = page
-        .evaluate_with_timeout(
-            "document.documentElement.outerHTML",
-            remaining_time(started, request_timeout)?,
-        )
-        .as_str()
-        .map(str::to_owned)
-        .ok_or_else(|| EngineError::Browser("Obscura could not serialize the page DOM".into()))?;
+    let html = page.evaluate_with_timeout(
+        "document.documentElement.outerHTML",
+        remaining_time(started, request_timeout)?,
+    );
+    let serde_json::Value::String(html) = html else {
+        return Err(EngineError::Browser(
+            "Obscura could not serialize the page DOM".into(),
+        ));
+    };
     let serialization_elapsed = serialization_started.elapsed();
     ensure_size(html.len(), config.max_response_bytes)?;
     let cache_candidate = same_url(url, &final_url) && !page.author_active_content_observed;
@@ -268,7 +273,7 @@ async fn render_page(
         "browser render phases completed"
     );
     Ok(RenderedPage {
-        html,
+        html: html.into(),
         final_url,
         status,
         content_type,

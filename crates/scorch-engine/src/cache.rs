@@ -4,16 +4,22 @@ use std::{
     mem::size_of,
     sync::{
         Arc, Mutex,
-        atomic::{AtomicU64, AtomicUsize, Ordering},
+        atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering},
     },
     time::{Duration, Instant},
 };
 
 use scorch_types::{ScrapeDocument, ScrapeFormat, ScrapeOptions};
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, watch};
+use tokio_util::sync::CancellationToken;
 use tracing::debug;
 
-use crate::{extract, extract::ExtractInput};
+use crate::{
+    browser::RenderedPage,
+    error::{EngineError, Result},
+    extract,
+    extract::ExtractInput,
+};
 
 pub(crate) const CACHE_TTL: Duration = Duration::from_secs(5 * 60);
 const MAX_CACHE_ENTRIES: usize = 256;
@@ -22,6 +28,7 @@ const MAX_CACHE_ENTRY_BYTES: usize = 8 * 1024 * 1024;
 const CACHE_WARM_QUEUE_CAPACITY: usize = 8;
 const MAX_CACHE_WARM_BYTES: usize = 16 * 1024 * 1024;
 const MAX_OBSERVATION_TOMBSTONES: usize = 1_024;
+const MAX_RENDER_FLIGHTS: usize = 1_024;
 const ALL_FORMATS: [ScrapeFormat; 5] = [
     ScrapeFormat::Markdown,
     ScrapeFormat::Html,
@@ -53,6 +60,216 @@ impl ScrapeCacheKey {
     }
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub(super) struct RenderFlightKey {
+    url: String,
+    wait_for_ms: u64,
+    block_media: bool,
+    timeout_ms: u64,
+}
+
+impl RenderFlightKey {
+    pub(super) fn new(url: &str, options: &ScrapeOptions) -> Self {
+        Self {
+            url: url::Url::parse(url)
+                .map(|parsed| parsed.to_string())
+                .unwrap_or_else(|_| url.to_owned()),
+            wait_for_ms: options.wait_for_ms,
+            block_media: options.block_media,
+            timeout_ms: options.timeout_ms,
+        }
+    }
+}
+
+#[derive(Clone)]
+pub(super) enum RenderFlightOutcome {
+    Rendered(RenderedPage),
+    Failed(EngineError),
+    RetryCache,
+}
+
+#[derive(Default)]
+struct RenderFlightCacheState {
+    generation: Option<u64>,
+    invalidated: bool,
+    published: bool,
+}
+
+pub(super) struct RenderFlightEntry {
+    sender: watch::Sender<Option<Arc<RenderFlightOutcome>>>,
+    leases: AtomicUsize,
+    completed: AtomicBool,
+    cancellation: CancellationToken,
+    cache: Mutex<HashMap<ScrapeCacheKey, RenderFlightCacheState>>,
+}
+
+#[derive(Default)]
+pub(super) struct RenderFlights {
+    entries: Mutex<HashMap<RenderFlightKey, Arc<RenderFlightEntry>>>,
+}
+
+pub(super) struct RenderFlightAdmission {
+    pub lease: RenderFlightLease,
+    pub is_leader: bool,
+}
+
+pub(super) struct RenderFlightLease {
+    flights: Arc<RenderFlights>,
+    key: RenderFlightKey,
+    entry: Arc<RenderFlightEntry>,
+    receiver: watch::Receiver<Option<Arc<RenderFlightOutcome>>>,
+}
+
+impl RenderFlights {
+    pub(super) fn acquire(self: &Arc<Self>, key: RenderFlightKey) -> Option<RenderFlightAdmission> {
+        let mut entries = self.entries.lock().ok()?;
+        if let Some(entry) = entries.get(&key) {
+            entry.leases.fetch_add(1, Ordering::Relaxed);
+            return Some(RenderFlightAdmission {
+                lease: RenderFlightLease {
+                    flights: Arc::clone(self),
+                    key,
+                    entry: Arc::clone(entry),
+                    receiver: entry.sender.subscribe(),
+                },
+                is_leader: false,
+            });
+        }
+        if entries.len() >= MAX_RENDER_FLIGHTS {
+            return None;
+        }
+        let (sender, receiver) = watch::channel(None);
+        let entry = Arc::new(RenderFlightEntry {
+            sender,
+            leases: AtomicUsize::new(1),
+            completed: AtomicBool::new(false),
+            cancellation: CancellationToken::new(),
+            cache: Mutex::new(HashMap::new()),
+        });
+        entries.insert(key.clone(), Arc::clone(&entry));
+        Some(RenderFlightAdmission {
+            lease: RenderFlightLease {
+                flights: Arc::clone(self),
+                key,
+                entry,
+                receiver,
+            },
+            is_leader: true,
+        })
+    }
+
+    pub(super) fn complete(
+        &self,
+        key: &RenderFlightKey,
+        entry: &Arc<RenderFlightEntry>,
+        outcome: RenderFlightOutcome,
+    ) {
+        entry.sender.send_replace(Some(Arc::new(outcome)));
+        entry.completed.store(true, Ordering::Release);
+        let Ok(mut entries) = self.entries.lock() else {
+            return;
+        };
+        if entry.leases.load(Ordering::Acquire) == 0
+            && entries
+                .get(key)
+                .is_some_and(|current| Arc::ptr_eq(current, entry))
+        {
+            entries.remove(key);
+        }
+    }
+
+    pub(super) fn retry_cache(&self, key: &RenderFlightKey, entry: &Arc<RenderFlightEntry>) {
+        if let Ok(mut entries) = self.entries.lock()
+            && entries
+                .get(key)
+                .is_some_and(|current| Arc::ptr_eq(current, entry))
+        {
+            entries.remove(key);
+        }
+        entry.completed.store(true, Ordering::Release);
+        entry
+            .sender
+            .send_replace(Some(Arc::new(RenderFlightOutcome::RetryCache)));
+    }
+
+    fn release(&self, key: &RenderFlightKey, entry: &Arc<RenderFlightEntry>) {
+        let Ok(mut entries) = self.entries.lock() else {
+            entry.leases.fetch_sub(1, Ordering::AcqRel);
+            return;
+        };
+        let remaining = entry.leases.fetch_sub(1, Ordering::AcqRel) - 1;
+        if remaining != 0
+            || !entries
+                .get(key)
+                .is_some_and(|current| Arc::ptr_eq(current, entry))
+        {
+            return;
+        }
+        entries.remove(key);
+        if !entry.completed.load(Ordering::Acquire) {
+            entry.cancellation.cancel();
+        }
+    }
+}
+
+impl RenderFlightLease {
+    pub(super) fn producer(&self) -> (RenderFlightKey, Arc<RenderFlightEntry>, CancellationToken) {
+        (
+            self.key.clone(),
+            Arc::clone(&self.entry),
+            self.entry.cancellation.clone(),
+        )
+    }
+
+    pub(super) async fn wait(&mut self) -> Result<Arc<RenderFlightOutcome>> {
+        loop {
+            if let Some(outcome) = self.receiver.borrow().as_ref() {
+                return Ok(Arc::clone(outcome));
+            }
+            if self.receiver.changed().await.is_err() {
+                return Err(EngineError::Browser(
+                    "coalesced browser render stopped unexpectedly".into(),
+                ));
+            }
+        }
+    }
+
+    pub(super) fn prepare_cache_observation(
+        &self,
+        cache: &ScrapeCache,
+        cache_key: &ScrapeCacheKey,
+    ) -> Option<u64> {
+        let mut states = self.entry.cache.lock().ok()?;
+        let state = states.entry(cache_key.clone()).or_default();
+        let generation = *state
+            .generation
+            .get_or_insert_with(|| cache.begin_observation(cache_key));
+        if !state.invalidated {
+            cache.invalidate_observation(cache_key, generation);
+            state.invalidated = true;
+        }
+        Some(generation)
+    }
+
+    pub(super) fn claim_cache_publication(&self, cache_key: &ScrapeCacheKey) -> bool {
+        let Ok(mut states) = self.entry.cache.lock() else {
+            return false;
+        };
+        let state = states.entry(cache_key.clone()).or_default();
+        if state.published {
+            return false;
+        }
+        state.published = true;
+        true
+    }
+}
+
+impl Drop for RenderFlightLease {
+    fn drop(&mut self) {
+        self.flights.release(&self.key, &self.entry);
+    }
+}
+
 struct CacheEntry {
     document: Arc<ScrapeDocument>,
     formats: u8,
@@ -78,6 +295,15 @@ pub(super) struct ScrapeCache {
 }
 
 impl ScrapeCache {
+    pub(super) fn can_store(
+        &self,
+        key: &ScrapeCacheKey,
+        document: &ScrapeDocument,
+        ttl: Duration,
+    ) -> bool {
+        !ttl.is_zero() && entry_size(key, document) <= MAX_CACHE_ENTRY_BYTES
+    }
+
     pub(super) fn begin_observation(&self, key: &ScrapeCacheKey) -> u64 {
         let generation = self.next_generation.fetch_add(1, Ordering::Relaxed);
         let key_hash = cache_key_hash(key);
@@ -669,5 +895,133 @@ mod tests {
         assert!(projected.links.is_none());
         assert!(projected.metadata.headers.is_empty());
         assert_eq!(projected.elapsed_ms, 1);
+    }
+
+    #[tokio::test]
+    async fn concurrent_identical_misses_share_one_render_outcome() {
+        let flights = Arc::new(RenderFlights::default());
+        let options = ScrapeOptions::default();
+        let key = RenderFlightKey::new("https://example.com", &options);
+        let leader = flights.acquire(key.clone()).unwrap();
+        let mut follower = flights.acquire(key.clone()).unwrap();
+        assert!(leader.is_leader);
+        assert!(!follower.is_leader);
+        let (producer_key, entry, _) = leader.lease.producer();
+        flights.complete(
+            &producer_key,
+            &entry,
+            RenderFlightOutcome::Rendered(RenderedPage {
+                html: "<html></html>".into(),
+                final_url: "https://example.com/".into(),
+                status: 200,
+                content_type: Some("text/html".into()),
+                headers: BTreeMap::new(),
+                cache_ttl: None,
+                cache_observed_at: None,
+            }),
+        );
+
+        let outcome = follower.lease.wait().await.unwrap();
+        assert!(matches!(outcome.as_ref(), RenderFlightOutcome::Rendered(_)));
+    }
+
+    #[test]
+    fn completed_flight_is_retained_only_while_callers_extract() {
+        let flights = Arc::new(RenderFlights::default());
+        let options = ScrapeOptions::default();
+        let key = RenderFlightKey::new("https://example.com", &options);
+        let leader = flights.acquire(key.clone()).unwrap();
+        let follower = flights.acquire(key.clone()).unwrap();
+        let (producer_key, entry, _) = leader.lease.producer();
+        flights.complete(
+            &producer_key,
+            &entry,
+            RenderFlightOutcome::Failed(EngineError::Timeout),
+        );
+        drop(leader);
+        assert_eq!(flights.entries.lock().unwrap().len(), 1);
+        drop(follower);
+        assert!(flights.entries.lock().unwrap().is_empty());
+    }
+
+    #[test]
+    fn coalesced_callers_share_cache_observation_and_one_publication() {
+        let flights = Arc::new(RenderFlights::default());
+        let cache = ScrapeCache::default();
+        let options = ScrapeOptions::default();
+        let cache_key = ScrapeCacheKey::new("https://example.com", &options);
+        let key = RenderFlightKey::new("https://example.com", &options);
+        let first = flights.acquire(key.clone()).unwrap();
+        let second = flights.acquire(key).unwrap();
+
+        let first_generation = first
+            .lease
+            .prepare_cache_observation(&cache, &cache_key)
+            .unwrap();
+        let second_generation = second
+            .lease
+            .prepare_cache_observation(&cache, &cache_key)
+            .unwrap();
+        assert_eq!(first_generation, second_generation);
+        assert!(first.lease.claim_cache_publication(&cache_key));
+        assert!(!second.lease.claim_cache_publication(&cache_key));
+    }
+
+    #[test]
+    fn extraction_variants_share_render_but_publish_separate_cache_entries() {
+        let flights = Arc::new(RenderFlights::default());
+        let cache = ScrapeCache::default();
+        let main_options = ScrapeOptions::default();
+        let mut full_options = main_options.clone();
+        full_options.only_main_content = false;
+        let flight_key = RenderFlightKey::new("https://example.com", &main_options);
+        assert_eq!(
+            flight_key,
+            RenderFlightKey::new("https://example.com", &full_options)
+        );
+        let main = flights.acquire(flight_key.clone()).unwrap();
+        let full = flights.acquire(flight_key).unwrap();
+        let main_key = ScrapeCacheKey::new("https://example.com", &main_options);
+        let full_key = ScrapeCacheKey::new("https://example.com", &full_options);
+
+        assert_ne!(
+            main.lease
+                .prepare_cache_observation(&cache, &main_key)
+                .unwrap(),
+            full.lease
+                .prepare_cache_observation(&cache, &full_key)
+                .unwrap()
+        );
+        assert!(main.lease.claim_cache_publication(&main_key));
+        assert!(full.lease.claim_cache_publication(&full_key));
+    }
+
+    #[tokio::test]
+    async fn retry_cache_detaches_existing_waiters_before_new_acquisition() {
+        let flights = Arc::new(RenderFlights::default());
+        let options = ScrapeOptions::default();
+        let key = RenderFlightKey::new("https://example.com", &options);
+        let leader = flights.acquire(key.clone()).unwrap();
+        let mut follower = flights.acquire(key.clone()).unwrap();
+        let (producer_key, entry, _) = leader.lease.producer();
+        flights.retry_cache(&producer_key, &entry);
+
+        assert!(matches!(
+            follower.lease.wait().await.unwrap().as_ref(),
+            RenderFlightOutcome::RetryCache
+        ));
+        assert!(flights.acquire(key).unwrap().is_leader);
+    }
+
+    #[test]
+    fn dropping_last_incomplete_lease_cancels_producer() {
+        let flights = Arc::new(RenderFlights::default());
+        let options = ScrapeOptions::default();
+        let key = RenderFlightKey::new("https://example.com", &options);
+        let leader = flights.acquire(key).unwrap();
+        let (_, _, cancellation) = leader.lease.producer();
+
+        drop(leader);
+        assert!(cancellation.is_cancelled());
     }
 }

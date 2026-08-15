@@ -234,7 +234,8 @@ impl JobStore {
             }
         }
 
-        while !queue.is_empty() && self.completed(id) < request.limit {
+        let mut active = FuturesUnordered::new();
+        loop {
             if started.elapsed() >= self.crawl_timeout {
                 self.fail(id, &request.url, "crawl exceeded its absolute deadline");
                 return;
@@ -249,10 +250,10 @@ impl JobStore {
                 );
                 return;
             }
-            let remaining = request.limit.saturating_sub(self.completed(id));
-            let batch_size = request.concurrency.min(remaining).min(queue.len());
-            let mut batch = FuturesUnordered::new();
-            for _ in 0..batch_size {
+
+            while active.len() < request.concurrency
+                && self.completed(id).saturating_add(active.len()) < request.limit
+            {
                 let Some((url, depth)) = queue.pop_front() else {
                     break;
                 };
@@ -266,7 +267,7 @@ impl JobStore {
                 }
                 let engine = Arc::clone(&engine);
                 let task_cancel = cancel.clone();
-                batch.push(
+                active.push(
                     async move {
                         let scrape_request = ScrapeRequest {
                             url: url.clone(),
@@ -283,51 +284,71 @@ impl JobStore {
                 );
             }
             self.mutate(id, |job| {
-                let discovered = (job.completed + batch.len() + queue.len()).min(request.limit);
+                let discovered = (job.completed + active.len() + queue.len()).min(request.limit);
                 job.total = job.total.max(discovered);
             });
 
-            while let Some((url, depth, result)) = batch.next().await {
-                let Some(result) = result else {
-                    continue;
-                };
-                match result {
-                    Ok(document) => {
-                        if depth < request.max_depth
-                            && let Some(links) = &document.links
-                        {
-                            for link in links {
-                                if seen.len() >= request.limit.saturating_mul(10) {
-                                    break;
-                                }
-                                let Ok(candidate) = Url::parse(&link.url) else {
-                                    continue;
-                                };
-                                if same_origin(&root, &candidate)
-                                    && path_allowed(
-                                        candidate.path(),
-                                        &request.include_paths,
-                                        &request.exclude_paths,
-                                    )
-                                    && seen.insert(normalized(&candidate))
-                                {
-                                    queue.push_back((candidate.to_string(), depth + 1));
-                                }
+            let remaining_deadline = self.crawl_timeout.saturating_sub(started.elapsed());
+            let next = tokio::select! {
+                biased;
+                () = cancel.cancelled() => {
+                    self.finish(id, CrawlStatus::Cancelled);
+                    info!(
+                        operation = "crawl",
+                        crawl_id = %id,
+                        elapsed_ms = started.elapsed().as_millis() as u64,
+                        "crawl cancelled"
+                    );
+                    return;
+                }
+                () = tokio::time::sleep(remaining_deadline) => {
+                    self.fail(id, &request.url, "crawl exceeded its absolute deadline");
+                    return;
+                }
+                next = active.next() => next,
+            };
+            let Some((url, depth, result)) = next else {
+                break;
+            };
+            let Some(result) = result else {
+                continue;
+            };
+            match result {
+                Ok(document) => {
+                    if depth < request.max_depth
+                        && let Some(links) = &document.links
+                    {
+                        for link in links {
+                            if seen.len() >= request.limit.saturating_mul(10) {
+                                break;
+                            }
+                            let Ok(candidate) = Url::parse(&link.url) else {
+                                continue;
+                            };
+                            if same_origin(&root, &candidate)
+                                && path_allowed(
+                                    candidate.path(),
+                                    &request.include_paths,
+                                    &request.exclude_paths,
+                                )
+                                && seen.insert(normalized(&candidate))
+                            {
+                                queue.push_back((candidate.to_string(), depth + 1));
                             }
                         }
-                        if !self.store_document(id, document) {
-                            self.record_error(
-                                id,
-                                url,
-                                format!(
-                                    "crawl result exceeded the {} byte retained-data limit",
-                                    self.max_job_bytes
-                                ),
-                            );
-                        }
                     }
-                    Err(error) => self.record_error(id, url, error.to_string()),
+                    if !self.store_document(id, document) {
+                        self.record_error(
+                            id,
+                            url,
+                            format!(
+                                "crawl result exceeded the {} byte retained-data limit",
+                                self.max_job_bytes
+                            ),
+                        );
+                    }
                 }
+                Err(error) => self.record_error(id, url, error.to_string()),
             }
         }
 

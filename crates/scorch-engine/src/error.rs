@@ -1,6 +1,6 @@
 use thiserror::Error;
 
-#[derive(Debug, Error)]
+#[derive(Clone, Debug, Error)]
 pub enum EngineError {
     #[error("invalid request: {0}")]
     InvalidRequest(String),

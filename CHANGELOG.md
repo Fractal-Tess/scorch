@@ -4,6 +4,16 @@ All notable changes to Scorch are documented in this file. The project follows [
 
 ## [Unreleased]
 
+### Fixed
+
+- DuckDuckGo sponsored results no longer consume requested result slots. Scorch filters both the provider's `result--ad` markup and its `duckduckgo.com/y.js` redirect endpoint; a live five-result query returned five organic URLs with no sponsored redirect.
+
+### Changed
+
+- Concurrent equivalent scrape misses now share one bounded in-flight Obscura render while each caller retains its own timeout, requested-format extraction, and elapsed time. Active-page DOM snapshots live only until their participating callers finish extraction and are never promoted into the retained cache. Across six eight-request trials against Quotes to Scrape's JavaScript page at server concurrency four, excluding the first cold trial, the median fell from 816 ms to 408 ms and burst throughput rose from 9.80 to 19.63 requests per second, with identical Markdown.
+- Crawl scheduling now refills its `FuturesUnordered` frontier after every completed page instead of waiting at fixed batch barriers. Across three twelve-page Books to Scrape crawls at concurrency four, the median improved from 2.734 s to 2.524 s, about 7.7 percent, with the same twelve successful documents.
+- Scorch now asks Obscura to retain network metadata without duplicating document, script, and Fetch/XHR bodies into CDP diagnostic buffers that Scorch never reads. The rendered DOM handoff is reference-counted, and serialized JSON strings are consumed rather than payload-copied. Obscura's active-content scan now borrows DOM nodes instead of cloning every node and its attributes.
+
 ## [0.7.0] - 2026-08-15
 
 ### Fixed

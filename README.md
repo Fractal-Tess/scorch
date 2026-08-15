@@ -25,7 +25,7 @@ Scorch has two executables:
 - `scorchd` — HTTP API, metasearch, embedded Obscura rendering, and bounded crawl runtime.
 - `scorch` — lightweight HTTP client and MCP stdio adapter.
 
-Every page scrape executes through embedded Obscura with its stealth transport enabled as a fixed service policy. Callers cannot select a direct transport, disable stealth, or bypass JavaScript execution. Eligible identical extracted results are retained in a bounded five-minute memory cache by default, and a background queue prepares the other output formats after the requested response is ready; set `maxAgeMs` to `0` to refresh an entry or `storeInCache` to `false` to bypass both reads and writes. Scorch needs no database, broker, external browser service, or worker deployment.
+Every page scrape executes through embedded Obscura with its stealth transport enabled as a fixed service policy. Callers cannot select a direct transport, disable stealth, or bypass JavaScript execution. Eligible identical extracted results are retained in a bounded five-minute memory cache by default, and a background queue prepares the other output formats after the requested response is ready. Concurrent equivalent misses share one in-flight render without retaining active-page DOMs after their callers finish; set `maxAgeMs` to `0` to refresh an entry or `storeInCache` to `false` to bypass both reads and writes. Scorch needs no database, broker, external browser service, or worker deployment.
 
 ## Examples
 

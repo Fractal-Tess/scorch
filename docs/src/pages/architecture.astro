@@ -84,6 +84,11 @@ const headings = [
       immediately. Set <code>maxAgeMs</code> to <code>0</code> to bypass this lookup.
     </li>
     <li>
+      <strong>Join equivalent in-flight work.</strong> Concurrent misses for the same
+      browser-affecting options share one bounded render. Each caller keeps its own
+      timeout, extraction formats, and elapsed time.
+    </li>
+    <li>
       <strong>Validate the target.</strong> Scorch accepts only HTTP and HTTPS URLs
       without embedded credentials, blocks unsafe ports, and resolves the host against
       local and special-purpose address policy.
@@ -146,8 +151,10 @@ const headings = [
     Each Obscura request receives a fresh page and V8 state on a persistent
     render slot. Slots retain connection pools and explicitly public anonymous
     scripts, while cookies are cleared between renders and document bodies are
-    not shared. Browser concurrency is bounded, and one absolute deadline covers
-    validation, queueing, navigation, explicit waiting, and serialization.
+    not shared. Scorch retains network metadata for cache safety but disables
+    Obscura's unused CDP response-body buffers. Browser concurrency is bounded,
+    and one absolute deadline covers validation, queueing, navigation, explicit
+    waiting, and serialization.
   </p>
   <p>
     Stealth transport is statically enabled. It provides browser-aligned TLS and
@@ -324,7 +331,8 @@ const headings = [
     Crawling starts from mapped URLs, follows same-origin links breadth-first,
     applies include and exclude paths, and respects <code>robots.txt</code> as <code
       >ScorchBot</code
-    >. Jobs run in bounded batches and preserve individual page failures beside
+    >. A work-conserving bounded frontier starts the next eligible URL whenever
+    a page completes, and jobs preserve individual page failures beside
     successful documents.
   </p>
   <ul>
@@ -377,7 +385,7 @@ const headings = [
   </p>
   <p>
     There is no durable state. A restart clears crawl jobs, extracted scrape and
-    metasearch cache entries, remembered stealth domains, and circuit-breaker
+    metasearch cache entries, in-flight render coordination, and circuit-breaker
     state. This keeps deployment self-contained but means clients must persist
     any results they need to retain.
   </p>
