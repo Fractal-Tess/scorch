@@ -19,15 +19,15 @@
 
           # Keep the release tag and fixed archive hashes together. Promotion CI
           # updates these only after both immutable artifacts have been prepared.
-          version = "0.5.0";
+          version = "0.7.0";
           releaseArtifacts = {
             x86_64-linux = {
               target = "x86_64-unknown-linux-gnu";
-              hash = "sha256-BYilpvdmfd9SCZdN+6BYFwnBN0sySwh/z9Zm7Deb58k=";
+              hash = "sha256-MxH7Clb3AeUK5ekQefULGUWlHUu/eWsYkBLLzkqE8Hk=";
             };
             aarch64-linux = {
               target = "aarch64-unknown-linux-gnu";
-              hash = "sha256-OYvBDuApVVxRsQqE+hJoaMEA26BVya7TwahgVjY03aw=";
+              hash = "sha256-dmKu2FNeOWoRabu3wE/h+IWfufqm2zTR8G4ktj+Vp1U=";
             };
           };
           artifact = releaseArtifacts.${pkgs.stdenv.hostPlatform.system};
@@ -160,8 +160,8 @@
               touch "$out"
             '';
           version = pkgs.runCommand "scorch-version-check" { } ''
-            test "$(${packages.scorch}/bin/scorch --version)" = 'scorch 0.5.0'
-            test "$(${packages.scorchd}/bin/scorchd --version)" = 'scorchd 0.5.0'
+            test "$(${packages.scorch}/bin/scorch --version)" = 'scorch 0.7.0'
+            test "$(${packages.scorchd}/bin/scorchd --version)" = 'scorchd 0.7.0'
             touch "$out"
           '';
         }
